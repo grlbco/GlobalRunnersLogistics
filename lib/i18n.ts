@@ -26,3 +26,13 @@ export function localeFromPathname(pathname: string): Locale {
   const seg = pathname.split("/")[1];
   return seg && hasLocale(seg) ? seg : defaultLocale;
 }
+
+/** Resolve the [lang] param or throw notFound(). */
+export async function resolveLocale(params: Promise<{ lang: string }>): Promise<Locale> {
+  const { lang } = await params;
+  if (!hasLocale(lang)) {
+    const { notFound } = await import("next/navigation");
+    notFound();
+  }
+  return lang as Locale;
+}

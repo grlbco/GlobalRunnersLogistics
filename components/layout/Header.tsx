@@ -99,7 +99,8 @@ export function Header({ locale, nav }: { locale: Locale; nav: Dictionary["nav"]
               aria-expanded={megaOpen}
               aria-controls="mega-drive"
               onMouseEnter={() => setMegaOpen(true)}
-              onClick={() => setMegaOpen((v) => !v)}
+              onClick={(e) => (e.detail === 0 ? setMegaOpen((v) => !v) : setMegaOpen(true))}
+              onKeyDown={(e) => e.key === "Escape" && setMegaOpen(false)}
             >
               {nav.drive}
               <svg viewBox="0 0 10 6" className={clsx("h-1.5 w-2.5 transition-transform", megaOpen && "rotate-180")} aria-hidden>

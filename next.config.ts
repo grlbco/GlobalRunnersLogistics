@@ -3,7 +3,8 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   /* config options here */
   cacheComponents: true,
-  partialPrefetching: true,
+  // Off: segment-level prediction mis-resolves our locale rewrite (/drive -> /en/drive) as /[lang]=drive.
+  partialPrefetching: false,
   turbopack: {
     rules: {
       "*.css": {

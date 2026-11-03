@@ -8,6 +8,7 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { MobileCallBar } from "@/components/layout/MobileCallBar";
 import { SmoothScroll } from "@/components/motion/SmoothScroll";
+import { AttributionCapture } from "@/components/forms/fields";
 import { getDictionary } from "@/dictionaries";
 import { hasLocale, locales } from "@/lib/i18n";
 import { company } from "@/content/facts";
@@ -44,7 +45,7 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
 
   return (
     <html lang={lang} className={`${GeistSans.variable} ${GeistMono.variable} antialiased`}>
-      <body className="min-h-dvh bg-ink pb-14 text-white sm:pb-0">
+      <body className="min-h-dvh bg-ink text-white">
         <a
           href="#main"
           className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded focus:bg-signal focus:px-4 focus:py-2"
@@ -52,6 +53,7 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
           Skip to content
         </a>
         <SmoothScroll />
+        <AttributionCapture />
         <Header locale={lang} nav={dict.nav} />
         <ViewTransition default="page">
           <main id="main">{children}</main>

@@ -16,7 +16,8 @@ Legend: ✅ safe to publish · ⚠️ needs client confirmation before publishin
 | Truck yard | Henderson, NV (exact address not given) | ⚠️ need street address for Google Business Profile |
 | Hauling since | 2012 | ✅ |
 | Owner | Ken Aman | ✅ (name only) |
-| Owner phone / email | +1 312-975-3377 / lsbco@grlbco.com | 🔒 use the Quo line (725) 666-1558 publicly unless Ken says otherwise |
+| Public phone | (312) 975-3377 (Ken Aman) | ✅ shown everywhere — Ken answers all calls (George, 2026-11-03). Quo (725) 666-1558 only sends automated SMS |
+| Owner email | lsbco@grlbco.com | 🔒 |
 | Time zone | Pacific | ✅ |
 | Logo | Silver globe + highway mark, navy background | ✅ (attached by George) |
 

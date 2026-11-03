@@ -2,6 +2,8 @@
 
 import { motion } from "motion/react";
 import { ButtonLink } from "@/components/ui/Button";
+import { FrameSequence } from "@/components/motion/FrameSequence";
+import { truckSequence } from "@/content/media";
 import type { Dictionary } from "@/dictionaries/en";
 
 const ease = [0.22, 1, 0.36, 1] as const;
@@ -21,9 +23,19 @@ export function Hero({
   applyHref: string;
   payHref: string;
 }) {
+  const sequence = truckSequence.count > 1;
   return (
-    <section className="relative isolate flex min-h-[100svh] flex-col overflow-hidden">
-      <HeroMedia />
+    <section id="hero" className={sequence ? "relative h-[260vh]" : "relative"}>
+    <div className={(sequence ? "sticky top-0 h-svh" : "relative min-h-[100svh]") + " isolate flex flex-col overflow-hidden"}>
+      {sequence ? (
+        <>
+          <FrameSequence count={truckSequence.count} basePath={truckSequence.path} poster={truckSequence.poster} triggerId="hero" className="absolute inset-0 -z-10" />
+          <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-t from-ink via-ink/30 to-ink/10" />
+          <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-r from-ink/85 via-ink/30 to-transparent" />
+        </>
+      ) : (
+        <HeroMedia />
+      )}
 
       <div className="container-site relative z-10 flex flex-1 flex-col justify-end pb-10 pt-32 md:pb-14">
         <motion.p
@@ -93,6 +105,7 @@ export function Hero({
           ))}
         </motion.ul>
       </div>
+    </div>
     </section>
   );
 }

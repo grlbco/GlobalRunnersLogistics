@@ -9,7 +9,7 @@
 4. **Record** — moving violations last 3 yrs (0, 1, 2, 3, 4+) · DUI ever? · failed/refused drug test or SAP program? · accidents last 3 yrs.
 5. **Consent** — TCPA SMS/call consent checkbox (unchecked by default, links to SMS Terms) · privacy acknowledgment · submit.
 
-Smart rules: soft "may not qualify" note (never auto-reject on screen) if <1 yr, DUI, SAP, 4+ violations or under 21 — still saved, flagged in CRM. On success: thank-you screen with "Ken will call you from (725) 666-1558", plus "Create your account to finish your full application" → GRL driver portal.
+Smart rules: soft "may not qualify" note (never auto-reject on screen) if <1 yr, DUI, SAP, 4+ violations or under 21 — still saved, flagged in CRM. On success: thank-you screen with "Ken will call you from (312) 975-3377", plus "Create your account to finish your full application" → GRL driver portal.
 
 ### Full DOT driver application — inside GRL's own portal (no third-party systems)
 After quick-apply, the driver creates an account (`/register`, pre-filled) and completes the full employment application required by FMCSA (49 CFR 391.21), saving progress between sessions:

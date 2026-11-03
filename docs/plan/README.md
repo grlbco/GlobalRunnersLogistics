@@ -35,6 +35,14 @@ A cinematic, very fast hiring website for a 30-truck Las Vegas dry-van fleet: dr
 | 12 | Launch: domain to Vercel, GSC, Bing, IndexNow, GBP/Bing Places | Site live and indexed |
 | 13 (optional) | Wireframe 3D fleet scene (Three.js) | Desktop only, no perf regression |
 
+## Status (2026-11-03)
+- ✅ Steps 1–4, 6, 7, 9 built: all pages, forms → Supabase (RLS-tested), auth + portal shell, JSON-LD, sitemap, robots, llms.txt, OG image, legal drafts.
+- 🟡 Step 5 motion: reveals, counters, lane map, job rail, transitions done; hero truck waits for the Pexels clip (`scripts/make-frames.sh`, `content/media.ts`).
+- 🟡 Step 7 alerts: code ready; needs `RESEND_API_KEY`, `QUO_API_KEY` in Vercel (see `.env.example`) and Resend domain verified.
+- 🟡 Step 8: full DOT application inside the portal is next.
+- ⬜ Step 10 Spanish body copy (chrome, home and apply form are translated; other ES pages are noindex + canonical to EN until then).
+- ⬜ Supabase Auth URL config: add `http://localhost:3000/**` and `https://globalrunnerslogistics.com/**` to redirect URLs; set Site URL.
+
 ## Open questions (blocking specific steps)
 | # | Question | Blocks |
 |---|---|---|
@@ -43,5 +51,5 @@ A cinematic, very fast hiring website for a 30-truck Las Vegas dry-van fleet: dr
 | 3 | **Truck footage for the hero:** shoot at the Henderson yard (best), or license stock of a Peterbilt + 53' dry van? | Step 5 |
 | 4 | **Owner-operator program terms** (lease to GRL, split, truck age, insurance) | Owner-Operators page |
 | 5 | Speed limiter value, Hazmat required or preferred, orientation paid + location, rider/pet rules | Job pages, FAQ |
-| 6 | Public phone: Quo (725) 666-1558 or Ken's cell? Henderson yard street address? | Contact, GBP |
+| 6 | Henderson yard street address? (Public phone decided: Ken, (312) 975-3377) | Contact, GBP |
 | 7 | Social links, real photos/videos of the fleet and drivers, any real driver testimonials | About, Home |

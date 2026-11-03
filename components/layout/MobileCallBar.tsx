@@ -1,3 +1,7 @@
+"use client";
+
+import { usePathname } from "next/navigation";
+import { stripLocale } from "@/lib/i18n";
 import Link from "next/link";
 import { company } from "@/content/facts";
 import { routes } from "@/content/navigation";
@@ -6,6 +10,9 @@ import type { Dictionary } from "@/dictionaries/en";
 
 /** Sticky bottom bar on phones: drivers can call or apply with one thumb. */
 export function MobileCallBar({ locale, nav }: { locale: Locale; nav: Dictionary["nav"] }) {
+  const path = stripLocale(usePathname());
+  // Hidden where it would compete with the page's own form or portal UI.
+  if (/^\/(apply|login|register|reset-password|update-password|dashboard)/.test(path)) return null;
   return (
     <div className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-2 gap-px border-t border-white/10 bg-white/10 pb-[env(safe-area-inset-bottom)] sm:hidden">
       <a href={`tel:${company.phone.e164}`} className="flex h-14 items-center justify-center gap-2 bg-ink text-[0.95rem]">

@@ -10,7 +10,9 @@ export const company = {
   url: "https://globalrunnerslogistics.com",
   foundedYear: 2012,
   owner: "Ken Aman",
-  phone: { display: "(725) 666-1558", e164: "+17256661558" },
+  phone: { display: "(312) 975-3377", e164: "+13129753377" }, // Ken Aman — answers all calls (George, 2026-11-03)
+  /** Quo line used only to SEND automated SMS (A2P). Not shown publicly. */
+  smsSender: "+17256661558",
   email: "dev@grlbco.com", // TODO: switch to a public inbox (e.g. drive@globalrunnerslogistics.com) once Resend domain verifies
   office: {
     street: "732 S 6th St, Ste V",
