@@ -33,7 +33,7 @@
 System email only: Ken alerts, daily digest, password resets. Never cold email (that's Instantly).
 
 ## DeepSeek
-OpenAI-compatible `https://api.deepseek.com`, model `deepseek-v4-flash` (old `deepseek-chat` alias retired 2026-07-24). Tool calling + JSON output. Keep the system prompt + facts as a stable prefix so context caching cuts cost. Wrapper behind an interface so the model can be swapped (Claude/OpenAI) without touching the agent.
+OpenAI-compatible `https://api.deepseek.com`, model `deepseek-flash` (confirmed from our account's model list; `deepseek-v4-pro` also available). Tool calling + JSON output. Keep the system prompt + facts as a stable prefix so context caching cuts cost. Wrapper behind an interface so the model can be swapped (Claude/OpenAI) without touching the agent.
 
 ## Secrets (Vercel env, never git)
 `INSTANTLY_API_KEY`, `INSTANTLY_WEBHOOK_SECRET`, `QUO_API_KEY`, `QUO_WEBHOOK_SECRET`, `DEEPSEEK_API_KEY`, `RESEND_API_KEY`, `WORKER_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`.
