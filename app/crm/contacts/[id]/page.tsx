@@ -3,12 +3,13 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { clsx } from "clsx";
 import { requireStaff } from "@/lib/crm/auth";
-import { STAGES, TIERS, stageLabel } from "@/lib/crm/stages";
+import { STAGES, TIERS } from "@/lib/crm/stages";
 import { localTime } from "@/lib/crm/timezones";
 import { ago, fullName, initials, phoneDisplay } from "@/lib/crm/format";
-import { addNote, setAgentMode, setStage } from "@/app/crm/actions";
+import { addNote, addTask, setAgentMode, setStage, toggleTask, updateContact } from "@/app/crm/actions";
 import { Card, Label, Skeleton, StageBadge, btnCls, btnGhostCls, inputCls } from "@/components/crm/ui";
 import { Composer } from "@/components/crm/Composer";
+import { Timeline, loadTimeline } from "@/components/crm/Timeline";
 
 export default function ContactPage({ params }: { params: Promise<{ id: string }> }) {
   return (
@@ -18,38 +19,25 @@ export default function ContactPage({ params }: { params: Promise<{ id: string }
   );
 }
 
-type Item =
-  | { kind: "message"; at: string; channel: string; direction: string; author: string; subject: string | null; body: string; status: string }
-  | { kind: "activity"; at: string; type: string; data: Record<string, unknown>; actor: string }
-  | { kind: "note"; at: string; body: string; author_kind: string };
-
 async function Profile({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
   const { supabase } = await requireStaff(`/crm/contacts/${id}`);
 
-  const [{ data: c }, msgs, acts, notes, memory, runs, followups, forms] = await Promise.all([
+  const [{ data: c }, items, memory, runs, followups, forms, tasks] = await Promise.all([
     supabase.from("contacts").select("*").eq("id", id).maybeSingle(),
-    supabase.from("messages").select("channel, direction, author, subject, body, status, created_at").eq("contact_id", id).order("created_at", { ascending: false }).limit(200),
-    supabase.from("activities").select("type, data, actor, created_at").eq("contact_id", id).order("created_at", { ascending: false }).limit(200),
-    supabase.from("notes").select("body, author_kind, created_at").eq("contact_id", id).order("created_at", { ascending: false }).limit(100),
+    loadTimeline(supabase, id),
     supabase.from("agent_memory").select("*").eq("contact_id", id).maybeSingle(),
-    supabase.from("agent_runs").select("trigger, action, reply, created_at").eq("contact_id", id).order("created_at", { ascending: false }).limit(10),
-    supabase.from("followups").select("due_at, channel, reason, attempt").eq("contact_id", id).eq("status", "pending").order("due_at").limit(5),
+    supabase.from("agent_runs").select("trigger, action, created_at").eq("contact_id", id).order("created_at", { ascending: false }).limit(10),
+    supabase.from("followups").select("due_at, reason, attempt").eq("contact_id", id).eq("status", "pending").order("due_at").limit(5),
     supabase.from("form_links").select("sent_at, opened_at, step_reached, completed_at").eq("contact_id", id).order("created_at", { ascending: false }).limit(1),
+    supabase.from("tasks").select("id, title, due_at, done_at").eq("contact_id", id).order("done_at", { nullsFirst: true }).order("due_at", { nullsFirst: false }).limit(20),
   ]);
   if (!c) notFound();
 
-  const items: Item[] = [
-    ...(msgs.data ?? []).map((m) => ({ kind: "message" as const, at: m.created_at, ...m })),
-    ...(acts.data ?? []).map((a) => ({ kind: "activity" as const, at: a.created_at, type: a.type, data: a.data, actor: a.actor })),
-    ...(notes.data ?? []).map((nt) => ({ kind: "note" as const, at: nt.created_at, body: nt.body, author_kind: nt.author_kind })),
-  ].sort((a, b) => b.at.localeCompare(a.at));
-
   const form = forms.data?.[0];
-  const hasEmailThread = (msgs.data ?? []).some((m) => m.channel === "email");
+  const hasEmailThread = items.some((m) => m.kind === "message" && m.channel === "email");
   const facts = (memory.data?.facts ?? {}) as Record<string, unknown>;
-  const local = localTime(c.timezone);
 
   return (
     <div className="grid min-h-dvh lg:grid-cols-[18rem_1fr_20rem]">
@@ -81,7 +69,7 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
             ["Phone", phoneDisplay(c.phone)],
             ["Cell", phoneDisplay(c.cell_phone)],
             ["Location", [c.city, c.state].filter(Boolean).join(", ")],
-            ["Local time", local],
+            ["Local time", localTime(c.timezone)],
             ["USDOT", c.usdot],
             ["Tier", c.tier ? `${c.tier} · ${TIERS[c.tier]}` : null],
             ["Officer 2", c.officer_2],
@@ -93,22 +81,38 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
           ))}
         </dl>
 
+        <details className="group rounded-[6px] border border-white/[0.08]">
+          <summary className="cursor-pointer list-none px-3 py-2 text-sm text-white/60 hover:text-white">Edit details</summary>
+          <form action={updateContact} className="space-y-2 border-t border-white/[0.07] p-3">
+            <input type="hidden" name="id" value={c.id} />
+            <div className="grid grid-cols-2 gap-2">
+              <input name="first_name" defaultValue={c.first_name ?? ""} placeholder="First name" className={inputCls} />
+              <input name="last_name" defaultValue={c.last_name ?? ""} placeholder="Last name" className={inputCls} />
+            </div>
+            <input name="email" type="email" defaultValue={c.email ?? ""} placeholder="Email" className={inputCls} />
+            <input name="cell_phone" defaultValue={c.cell_phone ?? ""} placeholder="Cell (+1…)" className={inputCls} />
+            <div className="grid grid-cols-[1fr_4.5rem] gap-2">
+              <input name="city" defaultValue={c.city ?? ""} placeholder="City" className={inputCls} />
+              <input name="state" defaultValue={c.state ?? ""} placeholder="ST" maxLength={2} className={clsx(inputCls, "uppercase")} />
+            </div>
+            <button className={clsx(btnCls, "w-full")}>Save</button>
+          </form>
+        </details>
+
         <div className="space-y-2">
           <Label>Consent</Label>
           <div className="flex flex-wrap gap-2 text-xs">
             <span className={clsx("rounded-full px-2 py-0.5", c.email_consent && !c.do_not_contact ? "bg-emerald-400/15 text-emerald-300" : "bg-white/[0.05] text-white/40")}>Email {c.email_consent && !c.do_not_contact ? "ok" : "off"}</span>
             <span className={clsx("rounded-full px-2 py-0.5", c.sms_consent && !c.do_not_contact ? "bg-emerald-400/15 text-emerald-300" : "bg-white/[0.05] text-white/40")}>Text {c.sms_consent && !c.do_not_contact ? "ok" : "no consent"}</span>
             {c.do_not_contact && <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-red-300">Do not contact</span>}
+            {(c.tags as string[]).map((t) => <span key={t} className="rounded-full bg-white/[0.06] px-2 py-0.5 text-white/60">#{t}</span>)}
           </div>
         </div>
       </aside>
 
-      {/* Center: timeline */}
+      {/* Center: conversation + timeline */}
       <section className="min-w-0 p-5 md:p-8">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3"><StageBadge stage={c.stage} /><span className="text-xs text-white/40">since {ago(c.stage_changed_at)} ago</span></div>
-        </div>
-
+        <div className="flex flex-wrap items-center gap-3"><StageBadge stage={c.stage} /><span className="text-xs text-white/40">since {ago(c.stage_changed_at)} ago</span></div>
         <div className="mt-6">
           <Composer
             contactId={c.id}
@@ -117,21 +121,43 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
             sms={c.do_not_contact ? { ok: false, why: "Driver is do-not-contact" } : c.sms_consent ? { ok: true } : { ok: false, why: "No text consent yet: the driver must text us first or tick the form box" }}
           />
         </div>
-
-        <form action={addNote} className="mt-6 flex gap-2">
+        <form action={addNote} className="mt-4 flex gap-2">
           <input type="hidden" name="id" value={c.id} />
           <input name="body" required maxLength={5000} placeholder="Add a note…" className={inputCls} />
-          <button className={btnCls}>Save</button>
+          <button className={btnGhostCls}>Save note</button>
         </form>
-
-        <ol className="mt-8 space-y-4">
-          {items.length === 0 && <li className="rounded-[6px] border border-dashed border-white/10 p-10 text-center text-sm text-white/45">No activity yet. Emails, texts, calls, form steps and notes will appear here.</li>}
-          {items.map((it, i) => <TimelineItem key={i} it={it} />)}
-        </ol>
+        <div className="mt-8"><Timeline items={items} /></div>
       </section>
 
-      {/* Right: assistant */}
+      {/* Right: tasks + assistant */}
       <aside className="space-y-5 border-t border-white/[0.07] p-5 lg:border-l lg:border-t-0">
+        <Card className="p-4">
+          <Label>Tasks</Label>
+          <form action={addTask} className="mt-3 space-y-2">
+            <input type="hidden" name="contact_id" value={c.id} />
+            <input name="title" required maxLength={300} placeholder="Call back, send form…" className={inputCls} />
+            <div className="flex gap-2">
+              <input name="due_at" type="datetime-local" className={clsx(inputCls, "[color-scheme:dark]")} />
+              <button className={btnGhostCls}>Add</button>
+            </div>
+          </form>
+          {tasks.data?.length ? (
+            <ul className="mt-3 space-y-1.5 text-sm">
+              {tasks.data.map((t) => (
+                <li key={t.id}>
+                  <form action={toggleTask} className="flex items-start gap-2">
+                    <input type="hidden" name="id" value={t.id} />
+                    <input type="hidden" name="contact_id" value={c.id} />
+                    <button aria-label={t.done_at ? "Mark not done" : "Mark done"} className={clsx("mt-0.5 h-4 w-4 shrink-0 rounded-[3px] border", t.done_at ? "border-emerald-400 bg-emerald-400/30" : "border-white/30 hover:border-white")} />
+                    <span className={clsx("flex-1", t.done_at && "text-white/35 line-through")}>{t.title}</span>
+                    {t.due_at && !t.done_at && <span className={clsx("text-xs", new Date(t.due_at) < new Date() ? "text-red-300" : "text-white/40")}>{new Date(t.due_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>}
+                  </form>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </Card>
+
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <Label>Assistant</Label>
@@ -177,50 +203,10 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
         <Card className="p-4">
           <Label>Assistant log</Label>
           {runs.data?.length ? (
-            <ul className="mt-3 space-y-2 text-xs">{runs.data.map((r, i) => <li key={i} className="flex justify-between gap-3"><span className="text-white/70">{r.trigger} → {r.action}</span><span className="text-white/40">{ago(r.created_at)}</span></li>)}</ul>
+            <ul className="mt-3 space-y-2 text-xs">{runs.data.map((r, i) => <li key={i} className="flex justify-between gap-3"><span className="text-white/70">{r.trigger.replace(/_/g, " ")} → {r.action}</span><span className="text-white/40">{ago(r.created_at)}</span></li>)}</ul>
           ) : <p className="mt-3 text-sm text-white/40">No runs yet.</p>}
         </Card>
       </aside>
     </div>
-  );
-}
-
-function TimelineItem({ it }: { it: Item }) {
-  const time = <time className="text-[0.7rem] text-white/35">{new Date(it.at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</time>;
-  if (it.kind === "message") {
-    const inbound = it.direction === "inbound";
-    const who = inbound ? "Driver" : it.author === "agent" ? "Assistant" : it.author === "campaign" ? "Campaign" : it.author === "human" ? "You" : "System";
-    return (
-      <li className={clsx("max-w-[42rem]", !inbound && "ml-auto")}>
-        <div className={clsx("rounded-[8px] border p-4", inbound ? "border-white/10 bg-white/[0.03]" : "border-signal/25 bg-signal/[0.06]")}>
-          <div className="flex items-center justify-between gap-4 text-xs">
-            <span className="font-medium text-white/80">{who} · {it.channel === "sms" ? "Text" : it.channel === "call" ? "Call" : "Email"}{it.status === "draft" ? " · draft" : ""}</span>
-            {time}
-          </div>
-          {it.subject && <p className="mt-2 text-sm font-medium">{it.subject}</p>}
-          <p className="mt-1.5 whitespace-pre-wrap text-sm text-white/80">{it.body}</p>
-        </div>
-      </li>
-    );
-  }
-  if (it.kind === "note") {
-    return (
-      <li className="rounded-[6px] border border-dusk/20 bg-dusk/[0.05] p-3">
-        <div className="flex justify-between text-xs"><span className="text-dusk">Note{it.author_kind !== "human" ? ` · ${it.author_kind}` : ""}</span>{time}</div>
-        <p className="mt-1 whitespace-pre-wrap text-sm text-white/80">{it.body}</p>
-      </li>
-    );
-  }
-  const d = it.data as { from?: string; to?: string };
-  const text =
-    it.type === "stage_changed" ? `Moved from ${stageLabel(d.from ?? "")} to ${stageLabel(d.to ?? "")}` :
-    it.type === "taken_over" ? "Taken over by a person" :
-    it.type === "assistant_resumed" ? "Handed back to the assistant" :
-    it.type.replace(/_/g, " ");
-  return (
-    <li className="flex items-center justify-between gap-4 px-1 text-xs text-white/45">
-      <span>{text}{it.actor.startsWith("user:") ? "" : ` · ${it.actor}`}</span>
-      {time}
-    </li>
   );
 }

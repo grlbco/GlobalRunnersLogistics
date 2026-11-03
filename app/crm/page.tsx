@@ -16,6 +16,10 @@ export default function Dashboard() {
   );
 }
 
+function recentStamp() {
+  return new Date().toISOString();
+}
+
 function hoursAgo(h: number) {
   return new Date(Date.now() - h * 3600_000).toISOString();
 }
@@ -29,12 +33,13 @@ async function Body() {
   const head = { count: "exact" as const, head: true };
   const since = hoursAgo(24);
 
-  const [total, byStage, byTier, repliesToday, recent] = await Promise.all([
+  const [total, byStage, byTier, repliesToday, recent, tasks] = await Promise.all([
     count(supabase.from("contacts").select("*", head)),
     Promise.all(STAGES.map(async (s) => [s.key, await count(supabase.from("contacts").select("*", head).eq("stage", s.key))] as const)),
     Promise.all([1, 2, 3, 4, 5].map(async (t) => [t, await count(supabase.from("contacts").select("*", head).eq("tier", t))] as const)),
     count(supabase.from("messages").select("*", head).eq("direction", "inbound").gte("created_at", since)),
     supabase.from("contacts").select("id, first_name, last_name, company_name, stage, last_inbound_at").not("last_inbound_at", "is", null).order("last_inbound_at", { ascending: false }).limit(8),
+    supabase.from("tasks").select("id, title, due_at, contact:contacts(id, first_name, last_name, company_name)").is("done_at", null).order("due_at", { nullsFirst: false }).limit(10),
   ]);
   const stage = Object.fromEntries(byStage) as Record<string, number>;
   const reached = (key: string) => {
@@ -90,6 +95,24 @@ async function Body() {
         </Card>
       </div>
 
+      <div className="grid gap-6 lg:grid-cols-2">
+      <Card className="p-5">
+        <Label>Open tasks</Label>
+        {tasks.data?.length ? (
+          <ul className="mt-3 divide-y divide-white/[0.06] text-sm">
+            {tasks.data.map((t) => {
+              const c = t.contact as unknown as { id: string; first_name: string | null; last_name: string | null; company_name: string | null } | null;
+              const late = t.due_at && new Date(t.due_at).getTime() < new Date(recentStamp()).getTime();
+              return (
+                <li key={t.id} className="flex items-center justify-between gap-3 py-2.5">
+                  <span className="min-w-0 truncate">{t.title}{c && <Link href={`/crm/contacts/${c.id}`} className="ml-2 text-white/45 hover:text-white">· {fullName(c)}</Link>}</span>
+                  {t.due_at && <span className={late ? "shrink-0 text-xs text-red-300" : "shrink-0 text-xs text-white/40"}>{new Date(t.due_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>}
+                </li>
+              );
+            })}
+          </ul>
+        ) : <p className="mt-4 text-sm text-white/45">No open tasks.</p>}
+      </Card>
       <Card className="p-5">
         <div className="flex items-center justify-between">
           <Label>Latest replies</Label>
@@ -110,6 +133,7 @@ async function Body() {
           <p className="mt-4 text-sm text-white/45">No replies yet. They&apos;ll show up here as soon as the first campaign goes out.</p>
         )}
       </Card>
+      </div>
     </div>
   );
 }
