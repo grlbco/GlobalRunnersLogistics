@@ -9,7 +9,7 @@ export function GET() {
   if (process.env.NEXT_PUBLIC_ALLOW_INDEXING !== "true") {
     return new Response("User-agent: *\nDisallow: /\n", { headers: { "Content-Type": "text/plain" } });
   }
-  const disallow = ["/dashboard", "/es/dashboard", "/auth/", "/api/", "/design", "/es/design", "/login", "/register", "/reset-password", "/update-password"];
+  const disallow = ["/crm", "/dashboard", "/es/dashboard", "/auth/", "/api/", "/design", "/es/design", "/login", "/register", "/reset-password", "/update-password"];
   const bots = [
     "Googlebot", "Bingbot", "Applebot", "Applebot-Extended", "Google-Extended", "OAI-SearchBot", "ChatGPT-User", "GPTBot",
     "ClaudeBot", "Claude-User", "Claude-SearchBot", "PerplexityBot", "Perplexity-User", "DuckAssistBot", "meta-externalagent", "MistralAI-User", "CCBot",

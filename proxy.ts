@@ -33,6 +33,22 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url, 308);
   }
 
+  // Staff CRM lives outside the locale tree: no rewrite, fresh session, must be signed in.
+  if (pathname === "/crm" || pathname.startsWith("/crm/")) {
+    const response = NextResponse.next({ request });
+    const claims = await refreshSession(request, response);
+    if (!claims) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.search = `?next=${encodeURIComponent(pathname)}`;
+      const redirect = NextResponse.redirect(url);
+      response.cookies.getAll().forEach((c) => redirect.cookies.set(c));
+      return redirect;
+    }
+    response.headers.set("X-Robots-Tag", "noindex, nofollow");
+    return response;
+  }
+
   const first = pathname.split("/")[1];
   let response: NextResponse;
   if (NON_DEFAULT_LOCALES.includes(first)) {
