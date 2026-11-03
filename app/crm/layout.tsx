@@ -4,6 +4,7 @@ import { GeistMono } from "geist/font/mono";
 import { Suspense } from "react";
 import "../globals.css";
 import { Sidebar } from "@/components/crm/Sidebar";
+import { LiveSync } from "@/components/crm/LiveSync";
 
 export const metadata: Metadata = {
   title: { default: "Command", template: "%s · Command" },
@@ -22,6 +23,7 @@ export default function CrmLayout({ children }: { children: React.ReactNode }) {
             <Sidebar />
           </Suspense>
           <main className="min-w-0 flex-1 pb-20 md:pb-0">{children}</main>
+          <LiveSync dev={process.env.NODE_ENV !== "production"} />
         </div>
       </body>
     </html>

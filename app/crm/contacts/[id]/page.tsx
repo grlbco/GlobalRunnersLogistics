@@ -8,6 +8,7 @@ import { localTime } from "@/lib/crm/timezones";
 import { ago, fullName, initials, phoneDisplay } from "@/lib/crm/format";
 import { addNote, setAgentMode, setStage } from "@/app/crm/actions";
 import { Card, Label, Skeleton, StageBadge, btnCls, btnGhostCls, inputCls } from "@/components/crm/ui";
+import { Composer } from "@/components/crm/Composer";
 
 export default function ContactPage({ params }: { params: Promise<{ id: string }> }) {
   return (
@@ -46,6 +47,7 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
   ].sort((a, b) => b.at.localeCompare(a.at));
 
   const form = forms.data?.[0];
+  const hasEmailThread = (msgs.data ?? []).some((m) => m.channel === "email");
   const facts = (memory.data?.facts ?? {}) as Record<string, unknown>;
   const local = localTime(c.timezone);
 
@@ -105,10 +107,15 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
       <section className="min-w-0 p-5 md:p-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3"><StageBadge stage={c.stage} /><span className="text-xs text-white/40">since {ago(c.stage_changed_at)} ago</span></div>
-          <div className="flex gap-2">
-            <button disabled title="Available once sending is turned on" className={clsx(btnGhostCls, "opacity-40")}>Email</button>
-            <button disabled title="Available once texting is approved" className={clsx(btnGhostCls, "opacity-40")}>Text</button>
-          </div>
+        </div>
+
+        <div className="mt-6">
+          <Composer
+            contactId={c.id}
+            sendingOn={process.env.SENDING_ENABLED === "true"}
+            email={c.do_not_contact || !c.email_consent ? { ok: false, why: "Email is off for this driver" } : hasEmailThread ? { ok: true } : { ok: false, why: "No email thread yet: the first email comes from a campaign" }}
+            sms={c.do_not_contact ? { ok: false, why: "Driver is do-not-contact" } : c.sms_consent ? { ok: true } : { ok: false, why: "No text consent yet: the driver must text us first or tick the form box" }}
+          />
         </div>
 
         <form action={addNote} className="mt-6 flex gap-2">
