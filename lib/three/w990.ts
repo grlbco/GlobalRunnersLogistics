@@ -1,24 +1,28 @@
 import * as THREE from "three";
+import { toCreasedNormals } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import meta from "./w990.json";
 
 /**
- * Loads the derived Kenworth W990 tractor geometry (edge lines + low-poly silhouette) that
- * scripts/derive-rig produced from the licensed model. Only derived lines/silhouette ship —
- * never the original model. Units: feet, +X front, Y up, Z width. Nose at x ≈ 6.9 ft.
+ * Loads the derived Kenworth W990 tractor geometry that scripts/rig produced from the licensed model.
+ * Only simplified edge lines + low-poly per-material surfaces ship — never the original model.
+ * Units: feet, +X front, Y up, Z width. Nose at x ≈ 6.9 ft.
  */
+export type SolidPart = "paint" | "chrome" | "dark" | "glass" | "tire" | "lamp";
 export type RigGeometry = {
   body: THREE.BufferGeometry;
   tire: THREE.BufferGeometry;
   glass: THREE.BufferGeometry;
-  solid: THREE.BufferGeometry;
-  rearAxleTires: THREE.BufferGeometry;
-  rearAxleX: number;
+  solids: Record<SolidPart, THREE.BufferGeometry>;
+  /** Rear drive axle (both duals) — reused for the trailer tandem so every wheel matches. */
+  rearTireLines: THREE.BufferGeometry;
+  rearTireSolid: THREE.BufferGeometry;
+  axles: { steer: number; d1: number; d2: number; radius: number };
   noseX: number;
 };
 
 type Part = { offset: number; count: number; type?: string };
 
-export async function loadRig(url = "/models/w990.bin"): Promise<RigGeometry> {
+export async function loadRig(url = "/models/w990.bin?v=2"): Promise<RigGeometry> {
   const buf = await (await fetch(url)).arrayBuffer();
   const p = meta.parts as Record<string, Part>;
   const s = meta.scale;
@@ -34,36 +38,47 @@ export async function loadRig(url = "/models/w990.bin"): Promise<RigGeometry> {
     g.computeBoundingSphere();
     return g;
   };
+  const indexed = (k: string) => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(read(p[`s_${k}`]), 3));
+    const ip = p[`s_${k}_i`];
+    g.setIndex(new THREE.BufferAttribute(ip.type === "u16" ? new Uint16Array(buf, ip.offset, ip.count) : new Uint32Array(buf, ip.offset, ip.count), 1));
+    return g;
+  };
+  const ax = meta.axles as Record<"steer" | "d1" | "d2", number[]>;
+  const split = (ax.d1[0] + ax.d2[0]) / 2;
 
+  // Rear-axle tire lines: keep whole segments whose both ends are behind the split (no half-tires).
   const tireArr = read(p.tire);
-  // Rear drive axle tires (both sides) → reused for the trailer tandem so every wheel matches.
   const rear: number[] = [];
-  let minX = Infinity;
-  let maxX = -Infinity;
-  for (let i = 0; i < tireArr.length; i += 6) {
-    const mx = (tireArr[i] + tireArr[i + 3]) / 2;
-    if (mx < -17.2) {
-      for (let k = 0; k < 6; k++) rear.push(tireArr[i + k]);
-      minX = Math.min(minX, tireArr[i], tireArr[i + 3]);
-      maxX = Math.max(maxX, tireArr[i], tireArr[i + 3]);
-    }
+  for (let i = 0; i < tireArr.length; i += 6) if (tireArr[i] < split && tireArr[i + 3] < split) for (let k = 0; k < 6; k++) rear.push(tireArr[i + k]);
+
+  const solids = {} as Record<SolidPart, THREE.BufferGeometry>;
+  for (const k of ["paint", "chrome", "dark", "glass", "tire", "lamp"] as SolidPart[]) {
+    const g = indexed(k);
+    solids[k] = k === "lamp" ? (g.computeVertexNormals(), g) : toCreasedNormals(g, k === "paint" ? Math.PI / 5 : Math.PI / 4);
   }
 
-  const solid = new THREE.BufferGeometry();
-  solid.setAttribute("position", new THREE.BufferAttribute(read(p.solid), 3));
-  const ip = p.solidIndex;
-  const bytes = ip.count * (ip.type === "u16" ? 2 : 4);
-  const idxBuf = buf.slice(ip.offset, ip.offset + bytes); // copy: index data may not be 4-byte aligned
-  solid.setIndex(new THREE.BufferAttribute(ip.type === "u16" ? new Uint16Array(idxBuf) : new Uint32Array(idxBuf), 1));
-  solid.computeVertexNormals();
+  // Rear tire solid: triangles fully behind the split.
+  const tp = solids.tire.getAttribute("position").array as Float32Array;
+  const tn = solids.tire.getAttribute("normal").array as Float32Array;
+  const rp: number[] = [];
+  const rn: number[] = [];
+  for (let t = 0; t < tp.length; t += 9) {
+    if (tp[t] < split && tp[t + 3] < split && tp[t + 6] < split) for (let k = 0; k < 9; k++) (rp.push(tp[t + k]), rn.push(tn[t + k]));
+  }
+  const rearTireSolid = new THREE.BufferGeometry();
+  rearTireSolid.setAttribute("position", new THREE.Float32BufferAttribute(rp, 3));
+  rearTireSolid.setAttribute("normal", new THREE.Float32BufferAttribute(rn, 3));
 
   return {
     body: lineGeo(read(p.body)),
     tire: lineGeo(tireArr),
     glass: lineGeo(read(p.glass)),
-    solid,
-    rearAxleTires: lineGeo(new Float32Array(rear)),
-    rearAxleX: (minX + maxX) / 2,
+    solids,
+    rearTireLines: lineGeo(new Float32Array(rear)),
+    rearTireSolid,
+    axles: { steer: ax.steer[0], d1: ax.d1[0], d2: ax.d2[0], radius: ax.d2[2] },
     noseX: 6.86,
   };
 }

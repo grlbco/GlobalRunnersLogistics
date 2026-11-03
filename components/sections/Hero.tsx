@@ -17,7 +17,7 @@ type SceneModule = typeof import("@/lib/three/heroScene") & { rig: import("@/lib
 /** Camera keyframes per breakpoint: front three-quarter → side profile → aerial over the yard. */
 const SHOTS: Record<"desktop" | "mobile", [CamState, CamState, CamState]> = {
   desktop: [
-    { x: 80, y: 7.5, z: 50, lx: -30, ly: 11.5, lz: -6 },
+    { x: 80, y: 7.5, z: 50, lx: -35, ly: 11.5, lz: -6 },
     { x: 2, y: 10, z: 112, lx: 2, ly: 9.5, lz: 0 },
     { x: -40, y: 165, z: 120, lx: -24, ly: 0, lz: -52 },
   ],
