@@ -206,7 +206,7 @@ export function Hero({
             <span className="h-2 w-2 rounded-full bg-signal" />
             {hero.eyebrow}
           </p>
-          <h1 data-hero-title className="mt-6 max-w-[14ch] text-[clamp(3rem,1.2rem+6.2vw,8.75rem)] font-semibold leading-[0.9] tracking-[-0.045em]">
+          <h1 data-hero-title className="mt-6 max-w-[14ch] text-[clamp(2.75rem,min(1.2rem+6.2vw,10.5svh),8.75rem)] font-semibold leading-[0.9] tracking-[-0.045em]">
             {hero.titleLines.map((line) => (
               <span key={line} className="block">
                 {line}
