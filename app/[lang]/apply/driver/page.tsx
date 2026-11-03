@@ -2,7 +2,9 @@ import { resolveLocale, localePath } from "@/lib/i18n";
 import { pageMeta } from "@/lib/seo";
 import { routes } from "@/content/navigation";
 import { company } from "@/content/facts";
+import { Suspense } from "react";
 import { DriverApplyForm } from "@/components/forms/DriverApplyForm";
+import { prefillForToken } from "@/lib/crm/forms";
 
 export async function generateMetadata({ params }: PageProps<"/[lang]/apply/driver">) {
   const lang = await resolveLocale(params);
@@ -15,10 +17,11 @@ export async function generateMetadata({ params }: PageProps<"/[lang]/apply/driv
   );
 }
 
-export default async function ApplyDriverPage({ params }: PageProps<"/[lang]/apply/driver">) {
+export default async function ApplyDriverPage({ params, searchParams }: PageProps<"/[lang]/apply/driver">) {
   const lang = await resolveLocale(params);
   const p = (path: string) => localePath(lang, path);
   const es = lang === "es";
+  const paths = { register: p("/register"), home: p("/"), privacy: p(routes.privacy), sms: p(routes.sms) };
   return (
     <section className="min-h-svh pb-24 pt-32 md:pt-40">
       <div className="container-site grid gap-14 lg:grid-cols-12">
@@ -41,9 +44,19 @@ export default async function ApplyDriverPage({ params }: PageProps<"/[lang]/app
           </p>
         </div>
         <div className="lg:col-span-7 lg:col-start-6">
-          <DriverApplyForm locale={lang} paths={{ register: p("/register"), home: p("/"), privacy: p(routes.privacy), sms: p(routes.sms) }} />
+          <Suspense fallback={<DriverApplyForm locale={lang} paths={paths} />}>
+            <PersonalForm lang={lang} paths={paths} searchParams={searchParams} />
+          </Suspense>
         </div>
       </div>
     </section>
   );
+}
+
+/** `?t=<token>` = personal link from the CRM: prefill and track progress. */
+async function PersonalForm({ lang, paths, searchParams }: { lang: "en" | "es"; paths: { register: string; home: string; privacy: string; sms: string }; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const sp = await searchParams;
+  const token = typeof sp.t === "string" && /^[0-9a-f]{24}$/.test(sp.t) ? sp.t : undefined;
+  const prefill = token ? await prefillForToken(token).catch(() => null) : null;
+  return <DriverApplyForm locale={lang} paths={paths} token={prefill ? token : undefined} prefill={prefill} />;
 }

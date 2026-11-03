@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { trackFormStep } from "@/app/actions/forms";
 import { AnimatePresence, motion } from "motion/react";
 import { clsx } from "clsx";
 import { submitDriverLead } from "@/app/actions/leads";
@@ -16,6 +17,12 @@ type State = Partial<DriverLeadInput> & { endorsements: NonNullable<DriverLeadIn
 const t = {
   en: {
     steps: ["You", "The job", "Experience", "Record", "Send"],
+    hi: (n: string) => (n ? `Hi ${n},` : "Hi,"),
+    confirmQ: "Is this the best number to reach you?",
+    yesMine: "Yes, that's my number",
+    different: "Use a different number",
+    notYou: (n: string) => `Not ${n}?`,
+    change: "Change",
     first: "First name",
     last: "Last name",
     phone: "Mobile phone",
@@ -63,6 +70,12 @@ const t = {
   },
   es: {
     steps: ["Tú", "El trabajo", "Experiencia", "Historial", "Enviar"],
+    hi: (n: string) => (n ? `Hola ${n},` : "Hola,"),
+    confirmQ: "¿Este es el mejor número para contactarte?",
+    yesMine: "Sí, es mi número",
+    different: "Usar otro número",
+    notYou: (n: string) => `¿No eres ${n}?`,
+    change: "Cambiar",
     first: "Nombre",
     last: "Apellido",
     phone: "Celular",
@@ -110,12 +123,28 @@ const t = {
   },
 } as const;
 
-export function DriverApplyForm({ locale, paths }: { locale: Locale; paths: { register: string; home: string; privacy: string; sms: string } }) {
+export function DriverApplyForm({
+  locale,
+  paths,
+  token,
+  prefill,
+}: {
+  locale: Locale;
+  paths: { register: string; home: string; privacy: string; sms: string };
+  token?: string;
+  prefill?: { first_name?: string; last_name?: string; phone?: string; email?: string } | null;
+}) {
   const L = t[locale];
   const getAttr = useAttribution();
   const [step, setStep] = useState(0);
-  const [data, setData] = useState<State>({ endorsements: [], run_types: [], sms_consent: false, locale });
+  const [data, setData] = useState<State>({ endorsements: [], run_types: [], sms_consent: false, locale, ...(prefill ?? {}) });
+  // Personal link: tell the CRM how far the driver got (opened → step n).
+  useEffect(() => {
+    if (token) trackFormStep(token, step);
+  }, [token, step]);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // Personal link with a known phone: one-tap confirm instead of typing.
+  const [editing, setEditing] = useState(!prefill?.phone);
   const [serverError, setServerError] = useState<string>();
   const [done, setDone] = useState(false);
   const [hp, setHp] = useState("");
@@ -162,7 +191,7 @@ export function DriverApplyForm({ locale, paths }: { locale: Locale; paths: { re
   const submit = () => {
     setServerError(undefined);
     start(async () => {
-      const res = await submitDriverLead({ ...(data as DriverLeadInput), company_website: hp, ...getAttr() });
+      const res = await submitDriverLead({ ...(data as DriverLeadInput), ...(token ? { t: token } : {}), company_website: hp, ...getAttr() });
       if (res.ok) {
         setDone(true);
         window.scrollTo({ top: 0, behavior: "smooth" });
@@ -224,17 +253,42 @@ export function DriverApplyForm({ locale, paths }: { locale: Locale; paths: { re
           transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
           className="space-y-8"
         >
-          {step === 0 && (
+          {step === 0 && !editing && (
+            <div className="space-y-6">
+              <div>
+                <p className="h3">{L.hi(data.first_name ?? "")}</p>
+                <p className="body-lg mt-2 text-white/70">{L.confirmQ}</p>
+              </div>
+              <p className="rounded-[6px] border border-white/15 bg-white/[0.03] px-5 py-5 text-center text-[1.75rem] font-semibold tracking-[-0.02em] tabular-nums sm:text-[2rem]">{data.phone}</p>
+              <div className="grid gap-3">
+                <button type="button" onClick={() => (validate(0) ? setStep(1) : setEditing(true))} className="flex h-14 items-center justify-center gap-2 rounded-[4px] bg-signal text-base font-medium text-white transition-colors hover:bg-signal-ink">
+                  {L.yesMine} <Arrow />
+                </button>
+                <button type="button" onClick={() => { setEditing(true); set("phone", ""); }} className="h-14 rounded-[4px] border border-white/20 text-base text-white/85 transition-colors hover:border-white">
+                  {L.different}
+                </button>
+              </div>
+              {data.first_name && (
+                <p className="text-center text-sm text-white/50">
+                  {L.notYou(data.first_name)}{" "}
+                  <button type="button" onClick={() => setEditing(true)} className="text-white underline underline-offset-4">{L.change}</button>
+                </p>
+              )}
+            </div>
+          )}
+          {step === 0 && editing && (
             <>
               <div className="grid gap-6 sm:grid-cols-2">
                 <TextField label={L.first} name="first_name" autoComplete="given-name" value={data.first_name ?? ""} onChange={(e) => set("first_name", e.target.value)} error={errors.first_name} />
                 <TextField label={L.last} name="last_name" autoComplete="family-name" value={data.last_name ?? ""} onChange={(e) => set("last_name", e.target.value)} error={errors.last_name} />
               </div>
               <TextField label={L.phone} name="phone" type="tel" inputMode="tel" autoComplete="tel" placeholder="(702) 555-0123" value={data.phone ?? ""} onChange={(e) => set("phone", e.target.value)} error={errors.phone} />
-              <div className="grid gap-6 sm:grid-cols-2">
-                <TextField label={L.email} hint={L.optional} name="email" type="email" autoComplete="email" value={data.email ?? ""} onChange={(e) => set("email", e.target.value)} error={errors.email} />
-                <TextField label={L.zip} hint={L.optional} name="zip" inputMode="numeric" autoComplete="postal-code" maxLength={5} value={data.zip ?? ""} onChange={(e) => set("zip", e.target.value.replace(/\D/g, ""))} error={errors.zip} />
-              </div>
+              {!prefill && (
+                <div className="grid gap-6 sm:grid-cols-2">
+                  <TextField label={L.email} hint={L.optional} name="email" type="email" autoComplete="email" value={data.email ?? ""} onChange={(e) => set("email", e.target.value)} error={errors.email} />
+                  <TextField label={L.zip} hint={L.optional} name="zip" inputMode="numeric" autoComplete="postal-code" maxLength={5} value={data.zip ?? ""} onChange={(e) => set("zip", e.target.value.replace(/\D/g, ""))} error={errors.zip} />
+                </div>
+              )}
             </>
           )}
 
@@ -305,12 +359,12 @@ export function DriverApplyForm({ locale, paths }: { locale: Locale; paths: { re
 
       <ErrorText>{serverError}</ErrorText>
 
-      <div className="mt-10 flex items-center justify-between gap-3 border-t border-white/10 pt-6">
-        <button type="button" onClick={back} className={clsx("h-12 px-2 text-white/70 hover:text-white", step === 0 && "invisible")}>
+      <div className={clsx("mt-10 flex items-center justify-between gap-3 border-t border-white/10 pt-6", step === 0 && !editing && "hidden")}>
+        <button type="button" onClick={back} className={clsx("h-12 px-2 text-white/70 hover:text-white", step === 0 && "hidden")}>
           ← {L.back}
         </button>
         {step < 4 ? (
-          <button type="button" onClick={next} className="inline-flex h-14 items-center gap-2 rounded bg-signal px-8 font-medium transition-colors hover:bg-signal-ink">
+          <button type="button" onClick={next} className="inline-flex h-14 flex-1 items-center justify-center gap-2 rounded bg-signal px-8 font-medium transition-colors hover:bg-signal-ink sm:flex-none">
             {L.next} <Arrow />
           </button>
         ) : (
@@ -318,7 +372,7 @@ export function DriverApplyForm({ locale, paths }: { locale: Locale; paths: { re
             type="button"
             onClick={submit}
             disabled={pending}
-            className="inline-flex h-14 items-center gap-2 rounded bg-signal px-8 font-medium transition-colors hover:bg-signal-ink disabled:opacity-60"
+            className="inline-flex h-14 flex-1 items-center justify-center gap-2 rounded bg-signal px-8 font-medium transition-colors hover:bg-signal-ink disabled:opacity-60 sm:flex-none"
           >
             {pending ? L.sending : L.submit} {!pending && <Arrow />}
           </button>

@@ -46,6 +46,8 @@ export const driverLeadSchema = z.object({
   work_authorized: yesNo,
   over_21: yesNo,
   sms_consent: z.boolean().default(false),
+  // personal form link token (from the CRM / assistant)
+  t: z.string().regex(/^[0-9a-f]{24}$/).optional(),
   // honeypot
   company_website: z.string().max(0).optional(),
   utm: z.record(z.string(), z.string().max(200)).default({}),

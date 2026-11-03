@@ -102,6 +102,35 @@ export async function submitDriverLead(input: DriverLeadInput): Promise<ActionRe
 
   const name = `${d.first_name} ${d.last_name}`;
   const exp = { lt1: "<1 yr", "1-2": "1–2 yrs", "3-5": "3–5 yrs", "5plus": "5+ yrs" }[d.experience];
+
+  // CRM: link to the driver's profile (or create one), move to Applied, stop follow-ups, task for Ken.
+  let crmLink: string | null = null;
+  try {
+    const { adminDb } = await import("@/lib/crm/admin");
+    const { completeForm } = await import("@/lib/crm/forms");
+    const { data: lead } = await adminDb().from("driver_leads").select("id").eq("phone", phone).order("created_at", { ascending: false }).limit(1).maybeSingle();
+    const contactId = await completeForm({
+      token: d.t ?? null,
+      first_name: d.first_name,
+      last_name: d.last_name,
+      phone,
+      email: d.email ?? null,
+      zip: d.zip || null,
+      sms_consent: d.sms_consent,
+      driverLeadId: lead?.id ?? null,
+      flags,
+      summary: [
+        `Type: ${d.driver_type}${d.run_types.length ? ` (${d.run_types.join(", ")})` : ""}`,
+        `CDL-A: ${d.has_cdl_a} · Experience: ${exp}`,
+        `Endorsements: ${d.endorsements.join(", ") || "none"}`,
+        `Violations (3y): ${d.moving_violations} · Accidents (3y): ${d.accidents} · DUI: ${d.dui} · Drug test/SAP: ${d.drug_test_issue}`,
+        `21+: ${d.over_21} · Work authorized: ${d.work_authorized} · ZIP: ${d.zip || "—"} · Language: ${d.locale.toUpperCase()}`,
+      ].join("\n"),
+    });
+    if (contactId) crmLink = `${process.env.NEXT_PUBLIC_SITE_URL || company.url}/crm/contacts/${contactId}`;
+  } catch (e) {
+    console.error("crm completeForm", e);
+  }
   await Promise.allSettled([
     notifyRecruiter({
       subject: `New driver lead: ${name} (${d.driver_type}, ${exp})${flags.length ? " ⚠" : ""}`,
@@ -127,6 +156,7 @@ export async function submitDriverLead(input: DriverLeadInput): Promise<ActionRe
         ["SMS consent", d.sms_consent ? "yes" : "no"],
         ["Flags", flags.join(", ")],
         ["Source", [d.utm.utm_source, d.utm.utm_campaign].filter(Boolean).join(" / ") || d.referrer],
+        ["CRM profile", crmLink],
       ],
     }),
     d.sms_consent
