@@ -1,0 +1,21 @@
+/** Route map. Paths are locale-agnostic; wrap with localePath() when rendering. */
+export const routes = {
+  home: "/",
+  drive: "/drive",
+  team: "/drive/team-cdl-a-otr-las-vegas",
+  solo: "/drive/solo-cdl-a-regional-las-vegas",
+  pay: "/drive#pay",
+  requirements: "/drive#requirements",
+  ownerOperators: "/owner-operators",
+  about: "/about",
+  locations: "/locations",
+  contact: "/contact",
+  faq: "/faq",
+  applyDriver: "/apply/driver",
+  applyOwner: "/apply/owner-operator",
+  login: "/login",
+  privacy: "/legal/privacy",
+  terms: "/legal/terms",
+  sms: "/legal/sms-terms",
+  eeo: "/legal/eeo",
+} as const;
