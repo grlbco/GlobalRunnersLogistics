@@ -7,7 +7,7 @@ export function AuthShell({ label, title, intro, children }: { label: string; ti
     <section className="min-h-svh pb-20 pt-28 md:pt-36">
       <div className="container-site grid gap-14 lg:grid-cols-12">
         <div className="lg:col-span-5">
-          <LogoMark className="h-14 w-14 text-silver" />
+          <LogoMark className="h-14" />
           <p className="label mt-10 text-white/50">{label}</p>
           <h1 className="display mt-4 max-w-[12ch]">{title}</h1>
           {intro && <p className="body-lg mt-6 max-w-md text-white/65">{intro}</p>}

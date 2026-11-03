@@ -51,7 +51,7 @@ export function Footer({ locale, dict }: { locale: Locale; dict: Dictionary }) {
       <div className="container-site">
         <div className="grid grid-cols-1 gap-12 md:grid-cols-12">
           <div className="md:col-span-5">
-            <LogoMark className="h-14 w-14 text-silver" />
+            <LogoMark className="h-14" />
             <p className="mt-6 max-w-sm text-white/60 body-lg">{f.tagline}</p>
             <div className="mt-8 flex flex-wrap gap-3">
               <ButtonLink href={p(routes.applyDriver)} arrow>

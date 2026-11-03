@@ -21,7 +21,7 @@ export function organizationSchema() {
     name: company.legalName,
     alternateName: company.shortName,
     url: company.url,
-    logo: `${company.url}/icon.svg`,
+    logo: `${company.url}/icon.png`,
     foundingDate: String(company.foundedYear),
     address,
     telephone: company.phone.e164,
@@ -86,7 +86,7 @@ export function jobPostingSchema(job: Job, descriptionHtml: string) {
     validThrough: `${job.validThrough}T23:59:59-08:00`,
     employmentType: "FULL_TIME",
     directApply: true,
-    hiringOrganization: { "@type": "Organization", name: company.legalName, sameAs: company.url, logo: `${company.url}/icon.svg` },
+    hiringOrganization: { "@type": "Organization", name: company.legalName, sameAs: company.url, logo: `${company.url}/icon.png` },
     jobLocation: {
       "@type": "Place",
       address: { "@type": "PostalAddress", addressLocality: company.yard.city, addressRegion: company.yard.region, addressCountry: "US" },

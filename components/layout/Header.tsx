@@ -85,7 +85,7 @@ export function Header({ locale, nav }: { locale: Locale; nav: Dictionary["nav"]
       >
         <div className="container-site flex h-16 items-center justify-between md:h-20">
           <Link href={p("/")} className="relative z-10" aria-label={company.shortName}>
-            <Logo />
+            <Logo priority />
           </Link>
 
           {/* Desktop nav */}

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { LogoMark } from "@/components/brand/Logo";
+import { Logo, LogoMark } from "@/components/brand/Logo";
 import { ButtonLink } from "@/components/ui/Button";
 
 export const metadata: Metadata = { title: "Design system", robots: { index: false, follow: false } };
@@ -27,9 +27,10 @@ export default function DesignPage() {
       <section>
         <p className="label text-white/40">01 — Logo</p>
         <div className="mt-6 flex flex-wrap items-center gap-10">
-          <LogoMark className="h-28 w-28 text-silver" />
-          <div className="rounded bg-fog p-6 [--logo-bg:#eef0f3]">
-            <LogoMark className="h-28 w-28 text-navy" />
+          <LogoMark className="h-28" />
+          <Logo className="h-16 md:h-16" />
+          <div className="rounded bg-fog p-6">
+            <Logo tone="dark" className="h-16 md:h-16" />
           </div>
         </div>
       </section>
