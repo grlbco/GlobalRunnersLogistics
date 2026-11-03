@@ -9,6 +9,7 @@ import { ago, fullName, initials, phoneDisplay } from "@/lib/crm/format";
 import { addNote, addTask, setAgentMode, setStage, toggleTask, updateContact } from "@/app/crm/actions";
 import { Card, Label, Skeleton, StageBadge, btnCls, btnGhostCls, inputCls } from "@/components/crm/ui";
 import { Composer } from "@/components/crm/Composer";
+import { Drafts } from "@/components/crm/Drafts";
 import { Timeline, loadTimeline } from "@/components/crm/Timeline";
 
 export default function ContactPage({ params }: { params: Promise<{ id: string }> }) {
@@ -113,7 +114,8 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
       {/* Center: conversation + timeline */}
       <section className="min-w-0 p-5 md:p-8">
         <div className="flex flex-wrap items-center gap-3"><StageBadge stage={c.stage} /><span className="text-xs text-white/40">since {ago(c.stage_changed_at)} ago</span></div>
-        <div className="mt-6">
+        <div className="mt-6"><Drafts supabase={supabase} contactId={c.id} /></div>
+        <div className="mt-4">
           <Composer
             contactId={c.id}
             sendingOn={process.env.SENDING_ENABLED === "true"}

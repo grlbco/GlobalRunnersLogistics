@@ -6,6 +6,7 @@ import { ago, fullName, phoneDisplay } from "@/lib/crm/format";
 import { localTime } from "@/lib/crm/timezones";
 import { Skeleton, StageBadge } from "@/components/crm/ui";
 import { Composer } from "@/components/crm/Composer";
+import { Drafts } from "@/components/crm/Drafts";
 import { Timeline, loadTimeline } from "@/components/crm/Timeline";
 import { MarkRead } from "@/components/crm/MarkRead";
 
@@ -135,7 +136,8 @@ async function Thread({ contact: c, unread, back }: { contact: Contact; unread: 
         </div>
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6"><Timeline items={items} oldestFirst /></div>
-      <div className="border-t border-white/[0.07] p-4">
+      <div className="space-y-3 border-t border-white/[0.07] p-4">
+        <Drafts supabase={supabase} contactId={c.id} />
         <Composer
           contactId={c.id}
           sendingOn={process.env.SENDING_ENABLED === "true"}

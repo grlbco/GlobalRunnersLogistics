@@ -140,3 +140,62 @@ export async function markRead(contactId: string) {
   if (!id.safeParse(contactId).success) return;
   await supabase.from("conversations").update({ unread: false }).eq("contact_id", contactId).eq("unread", true);
 }
+
+/** Approve an assistant draft (optionally edited) and send it now. */
+export async function approveDraft(formData: FormData) {
+  const { supabase, staff } = await requireStaff();
+  const parsed = z.object({ id, contact_id: id, body: z.string().trim().min(1).max(1500) }).safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return;
+  await supabase.from("outbox").update({ status: "pending", body: parsed.data.body, send_after: new Date().toISOString(), author_id: staff.id }).eq("id", parsed.data.id).in("status", ["draft", "pending"]);
+  const { processRow } = await import("@/lib/crm/outbox");
+  const out = await processRow(parsed.data.id);
+  await supabase.from("activities").insert({ contact_id: parsed.data.contact_id, type: out.ok ? "draft_approved" : "draft_failed", data: out.ok ? {} : { reason: out.reason }, actor: `user:${staff.id}` });
+  revalidatePath(`/crm/contacts/${parsed.data.contact_id}`);
+  revalidatePath("/crm/inbox");
+}
+
+export async function discardDraft(formData: FormData) {
+  const { supabase, staff } = await requireStaff();
+  const parsed = z.object({ id, contact_id: id }).safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return;
+  await supabase.from("outbox").update({ status: "cancelled", error: "discarded by staff" }).eq("id", parsed.data.id).in("status", ["draft", "pending"]);
+  await supabase.from("activities").insert({ contact_id: parsed.data.contact_id, type: "draft_discarded", actor: `user:${staff.id}` });
+  revalidatePath(`/crm/contacts/${parsed.data.contact_id}`);
+  revalidatePath("/crm/inbox");
+}
+
+export async function saveAssistantSettings(formData: FormData) {
+  const { supabase, staff } = await requireStaff();
+  if (staff.role !== "admin") return;
+  const f = Object.fromEntries(formData) as Record<string, string>;
+  const num = (v: string, lo: number, hi: number, d: number) => Math.min(hi, Math.max(lo, Number(v) || d));
+  const value = {
+    enabled: f.enabled === "on",
+    draft_mode: f.draft_mode === "on",
+    max_per_day: num(f.max_per_day, 1, 10, 3),
+    delay_min_s: num(f.delay_min_m, 0, 60, 2) * 60,
+    delay_max_s: Math.max(num(f.delay_min_m, 0, 60, 2), num(f.delay_max_m, 0, 120, 9)) * 60,
+    max_followups: num(f.max_followups, 0, 8, 5),
+  };
+  await supabase.from("app_settings").upsert({ key: "assistant", value, updated_at: new Date().toISOString() });
+  revalidatePath("/crm/assistant");
+}
+
+export type TestState = { reply?: string | null; action?: string; channel?: string; json?: string; problems?: string[]; cost?: number; error?: string } | null;
+
+/** Dry run: what would the assistant answer? Nothing is saved or sent. */
+export async function testAssistant(_prev: TestState, formData: FormData): Promise<TestState> {
+  const { supabase } = await requireStaff();
+  const f = Object.fromEntries(formData) as Record<string, string>;
+  const body = (f.message ?? "").trim();
+  if (!body) return { error: "Type a driver message first." };
+  let contactId = f.contact_id;
+  if (!id.safeParse(contactId).success) {
+    const { data } = await supabase.from("contacts").select("id").contains("tags", ["test"]).limit(1).maybeSingle();
+    contactId = data?.id ?? "";
+  }
+  if (!contactId) return { error: "No test contact found." };
+  const { runAgent } = await import("@/lib/agent/engine");
+  const r = await runAgent({ contactId, trigger: "test", dryRunMessage: { channel: f.channel === "email" ? "email" : "sms", body } });
+  return { reply: r.reply, action: r.action, channel: r.channel, json: r.decision ? JSON.stringify(r.decision, null, 2) : undefined, problems: r.problems, cost: r.costUsd, error: r.reason };
+}

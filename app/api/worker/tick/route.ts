@@ -1,5 +1,6 @@
 import { syncAll } from "@/lib/crm/sync";
 import { processDue } from "@/lib/crm/outbox";
+import { processAgentQueue } from "@/lib/agent/engine";
 
 export const maxDuration = 60;
 
@@ -13,8 +14,9 @@ async function run(req: Request) {
   if (!ok && !devLocal) return new Response("Unauthorized", { status: 401 });
   const started = Date.now();
   const sync = await syncAll();
+  const agent = await processAgentQueue();
   const sent = await processDue();
-  return Response.json({ ok: true, ms: Date.now() - started, sync, sent }, { headers: { "Cache-Control": "no-store" } });
+  return Response.json({ ok: true, ms: Date.now() - started, sync, agent, sent }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export const GET = run;
