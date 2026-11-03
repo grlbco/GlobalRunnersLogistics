@@ -20,6 +20,8 @@ export async function setStage(formData: FormData) {
     data: { from: before.stage, to: parsed.data.stage },
     actor: `user:${staff.id}`,
   });
+  const { emit } = await import("@/lib/automations/engine");
+  await emit("stage_changed", parsed.data.id, { from: before.stage, to: parsed.data.stage });
   revalidatePath(`/crm/contacts/${parsed.data.id}`);
   revalidatePath("/crm/pipeline");
 }

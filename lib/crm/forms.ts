@@ -32,7 +32,11 @@ export async function trackStep(token: string, step: number) {
   if (step > (link.step_reached ?? 0)) patch.step_reached = step;
   if (!Object.keys(patch).length) return;
   await db.from("form_links").update(patch).eq("token", token);
-  if (!link.opened_at) await activity(link.contact_id, "form_opened", {}, "website");
+  if (!link.opened_at) {
+    await activity(link.contact_id, "form_opened", {}, "website");
+    const { emit } = await import("@/lib/automations/engine");
+    await emit("form_opened", link.contact_id, {});
+  }
 }
 
 export type Completion = {
@@ -84,6 +88,8 @@ export async function completeForm(f: Completion): Promise<string | null> {
   await db.from("outbox").update({ status: "cancelled", error: "form completed" }).eq("contact_id", contact.id).eq("author", "agent").in("status", ["draft", "pending"]);
   await db.from("notes").insert({ contact_id: contact.id, author_kind: "system", body: `Driver form completed.\n${f.summary}${f.flags.length ? `\nFlags: ${f.flags.join(", ")}` : ""}` });
   await activity(contact.id, "form_completed", { flags: f.flags }, "website");
+  const { emit } = await import("@/lib/automations/engine");
+  await emit("form_completed", contact.id, {});
   if (next === "applied") {
     await db.from("tasks").insert({ contact_id: contact.id, title: `Call ${f.first_name} ${f.last_name} — form completed`, due_at: new Date(Date.now() + 3600_000).toISOString(), created_by: "workflow" });
   }

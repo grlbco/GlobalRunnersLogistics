@@ -4,6 +4,7 @@ import {
   activity, contactByEmail, contactByPhone, createInboundContact, isOptOut, logEvent, moveStage, recordMessage, suppress, type Contact,
 } from "./ingest";
 import * as quo from "@/lib/integrations/quo";
+import { emit } from "@/lib/automations/engine";
 import * as instantly from "@/lib/integrations/instantly";
 
 /**
@@ -51,6 +52,7 @@ export async function ingestQuoMessage(m: quo.QuoMessage): Promise<string | null
   // Texting us first = consent to reply by text (TCPA: responding to an inbound message).
   await moveStage(contact, "replied", "quo", { sms_consent: true, ...(contact.cell_phone ? {} : { cell_phone: other }) });
   await enqueueAgent(contact.id, id, "text_received");
+  await emit("text_received", contact.id, {});
   return id;
 }
 
@@ -103,6 +105,7 @@ export async function ingestInstantlyEmail(e: instantly.InstantlyEmail): Promise
   }
   await moveStage(contact, "replied", "instantly");
   await enqueueAgent(contact.id, id, "email_received");
+  await emit("email_received", contact.id, {});
   return id;
 }
 
@@ -140,6 +143,7 @@ export async function handleInstantlyStatus(event: { event_type: string; lead_em
     case "link_clicked":
     case "email_link_clicked":
       await activity(contact.id, event.event_type === "email_opened" ? "email_opened" : "link_clicked", { campaign: event.campaign_name ?? null }, "instantly");
+      await emit(event.event_type === "email_opened" ? "email_opened" : "link_clicked", contact.id, {});
       break;
     case "lead_interested":
       await moveStage(contact, "interested", "instantly");

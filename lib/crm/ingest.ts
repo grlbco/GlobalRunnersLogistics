@@ -39,6 +39,8 @@ export async function createInboundContact(p: { email?: string; phone?: string; 
     .select(COLS)
     .single();
   if (error) throw error;
+  const { emit } = await import("@/lib/automations/engine");
+  await emit("contact_created", data.id, { source: p.source });
   return data as Contact;
 }
 
@@ -49,6 +51,8 @@ export async function moveStage(contact: Contact, next: Stage, actor = "system",
   if (Object.keys(patch).length) await adminDb().from("contacts").update(patch).eq("id", contact.id);
   if (to !== contact.stage) {
     await adminDb().from("activities").insert({ contact_id: contact.id, type: "stage_changed", data: { from: contact.stage, to }, actor });
+    const { emit } = await import("@/lib/automations/engine");
+    await emit("stage_changed", contact.id, { from: contact.stage, to });
   }
   return { ...contact, ...patch, stage: to } as Contact;
 }
