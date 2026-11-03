@@ -33,6 +33,7 @@ export function Footer({ locale, dict }: { locale: Locale; dict: Dictionary }) {
         [f.links.locations, routes.locations],
         [f.links.contact, routes.contact],
         [f.links.faq, routes.faq],
+        [f.links.guides, routes.guides],
       ],
     },
     {

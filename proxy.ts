@@ -15,6 +15,18 @@ const PROTECTED = /^\/(?:es\/)?dashboard(\/|$)/;
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Markdown for AI agents: /<path>.md, or Accept: text/markdown preferred over text/html.
+  if (pathname.endsWith(".md") && pathname !== "/sitemap.md") {
+    const url = request.nextUrl.clone();
+    url.pathname = `/md${pathname.slice(0, -3)}`;
+    return NextResponse.rewrite(url);
+  }
+  if (!pathname.includes(".") && !AUTH_PATHS.test(pathname) && prefersMarkdown(request.headers.get("accept"))) {
+    const url = request.nextUrl.clone();
+    url.pathname = `/md${pathname === "/" ? "/index" : pathname}`;
+    return NextResponse.rewrite(url);
+  }
+
   if (pathname === "/en" || pathname.startsWith("/en/")) {
     const url = request.nextUrl.clone();
     url.pathname = pathname.replace(/^\/en/, "") || "/";
@@ -44,12 +56,32 @@ export async function proxy(request: NextRequest) {
     }
   }
 
+  response.headers.append("Vary", "Accept");
+  if (!pathname.startsWith("/es") && !AUTH_PATHS.test(pathname)) {
+    response.headers.set("Link", `<${pathname === "/" ? "/index.md" : `${pathname}.md`}>; rel="alternate"; type="text/markdown"`);
+  }
   return response;
+}
+
+/** True when the client ranks text/markdown above text/html (q-values). Browsers never send text/markdown. */
+function prefersMarkdown(accept: string | null) {
+  if (!accept || !accept.includes("text/markdown")) return false;
+  const q = (type: string) => {
+    for (const part of accept.split(",")) {
+      const [t, ...params] = part.trim().split(";");
+      if (t.trim() === type) {
+        const qp = params.find((x) => x.trim().startsWith("q="));
+        return qp ? parseFloat(qp.trim().slice(2)) : 1;
+      }
+    }
+    return 0;
+  };
+  return q("text/markdown") >= q("text/html");
 }
 
 export const config = {
   matcher: [
     // Skip Next internals, API routes, metadata files and anything with a file extension.
-    "/((?!_next|api|favicon.ico|robots.txt|sitemap.xml|llms.txt|llms-full.txt|manifest.webmanifest|opengraph-image|icon|.*\\..*).*)",
+    "/((?!_next|api|favicon.ico|robots.txt|sitemap.xml|llms.txt|llms-full.txt|sitemap.md|manifest.webmanifest|opengraph-image|icon|.*\\.(?!md$)[^/]*$).*)",
   ],
 };

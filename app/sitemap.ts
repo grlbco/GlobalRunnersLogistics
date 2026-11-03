@@ -3,6 +3,7 @@ import { company } from "@/content/facts";
 import { jobs } from "@/content/jobs";
 import { places } from "@/content/locations";
 import { legalDocs } from "@/content/legal";
+import { guides } from "@/content/guides";
 
 /** English pages + Spanish pages that are fully translated (home, apply). docs/plan/06 */
 export default function sitemap(): MetadataRoute.Sitemap {
@@ -27,6 +28,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ...places.map((p) => entry(`/locations/${p.slug}`, 0.7)),
     entry("/lanes/nevada-georgia", 0.6),
     entry("/faq", 0.7),
+    entry("/guides", 0.6),
+    ...guides.map((g) => entry(`/guides/${g.slug}`, 0.6)),
     entry("/contact", 0.6),
     ...legalDocs.map((d) => entry(`/legal/${d.slug}`, 0.2, "yearly")),
   ];

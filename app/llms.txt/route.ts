@@ -2,6 +2,7 @@ import { company, fleet, hiring, pay } from "@/content/facts";
 import { jobs, requirements } from "@/content/jobs";
 import { places } from "@/content/locations";
 import { faqs } from "@/content/faq";
+import { guides } from "@/content/guides";
 
 /** /llms.txt — plain-Markdown brief for AI assistants (llmstxt.org format). Generated from content/facts.ts. */
 
@@ -34,6 +35,14 @@ ${jobs.map((j) => `- [${j.title}](${u}/drive/${j.slug}): ${j.route}`).join("\n")
 - [Locations](${u}/locations): Las Vegas office, Henderson yard, hiring areas
 - [FAQ](${u}/faq)
 - [Contact](${u}/contact)
+
+## Guides
+${guides.map((g) => `- [${g.title}](${u}/guides/${g.slug}): ${g.description}`).join("\n")}
+
+## Machine-readable
+- [Full site content in one file](${u}/llms-full.txt)
+- [Markdown sitemap](${u}/sitemap.md)
+- Every page has a Markdown version: append .md to the URL (home: ${u}/index.md)
 
 ## Hiring areas
 ${places.map((p) => `- [CDL-A jobs in ${p.city}, NV](${u}/locations/${p.slug})`).join("\n")}

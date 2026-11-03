@@ -120,6 +120,7 @@ const en = {
       about: "About us",
       locations: "Locations",
       contact: "Contact",
+      guides: "Driver guides",
       faq: "FAQ",
       privacy: "Privacy policy",
       terms: "Terms",

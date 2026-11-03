@@ -28,6 +28,11 @@ export async function generateMetadata({ params }: LayoutProps<"/[lang]">): Prom
     applicationName: company.shortName,
     alternates: { canonical: lang === "en" ? "/" : `/${lang}`, languages: { en: "/", es: "/es", "x-default": "/" } },
     openGraph: { type: "website", siteName: company.shortName, locale: lang === "en" ? "en_US" : "es_US" },
+    // Search Console / Bing Webmaster verification tokens come from env (set in Vercel).
+    verification: {
+      google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || undefined,
+      other: process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION ? { "msvalidate.01": process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION } : undefined,
+    },
     // Indexing stays off until launch (docs/plan/09). Flip via env on production.
     robots: process.env.NEXT_PUBLIC_ALLOW_INDEXING === "true" ? undefined : { index: false, follow: false },
   };

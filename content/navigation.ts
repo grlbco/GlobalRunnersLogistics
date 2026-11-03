@@ -11,6 +11,7 @@ export const routes = {
   locations: "/locations",
   contact: "/contact",
   faq: "/faq",
+  guides: "/guides",
   applyDriver: "/apply/driver",
   applyOwner: "/apply/owner-operator",
   login: "/login",

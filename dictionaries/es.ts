@@ -119,6 +119,7 @@ const es: Dictionary = {
       about: "Nosotros",
       locations: "Ubicaciones",
       contact: "Contacto",
+      guides: "Guías para choferes",
       faq: "Preguntas frecuentes",
       privacy: "Política de privacidad",
       terms: "Términos",
