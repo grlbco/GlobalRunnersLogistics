@@ -22,10 +22,19 @@ export function LiveSync({ dev }: { dev: boolean }) {
       .channel("crm-live")
       .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, refresh)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "contacts" }, refresh)
-      .subscribe();
+      .subscribe((status: string) => {
+        if (status !== "SUBSCRIBED") console.warn("[crm] live updates:", status);
+      });
     let timer: ReturnType<typeof setInterval> | undefined;
     if (dev) {
-      const tick = () => fetch("/api/worker/tick", { cache: "no-store" }).catch(() => {});
+      // After each sync, refresh if it brought anything new (covers Realtime being unavailable).
+      const tick = () =>
+        fetch("/api/worker/tick", { cache: "no-store" })
+          .then((r) => r.json())
+          .then((j) => {
+            if ((j?.sync?.quo?.newMessages ?? 0) + (j?.sync?.instantly?.newMessages ?? 0) + (j?.sent?.length ?? 0) > 0) refresh();
+          })
+          .catch(() => {});
       tick();
       timer = setInterval(tick, 20_000);
     }

@@ -66,10 +66,17 @@ async function conversationFor(contactId: string, channel: "email" | "sms" | "ca
   if (externalId) {
     const { data } = await db.from("conversations").select("id").eq("channel", channel).eq("external_id", externalId).maybeSingle();
     if (data) return data.id as string;
+    // adopt a thread we started from the CRM before the provider gave us its id
+    const { data: loose } = await db.from("conversations").select("id").eq("contact_id", contactId).eq("channel", channel).is("external_id", null).limit(1).maybeSingle();
+    if (loose) {
+      await db.from("conversations").update({ external_id: externalId }).eq("id", loose.id);
+      return loose.id as string;
+    }
     const { data: created } = await db.from("conversations").insert({ contact_id: contactId, channel, external_id: externalId }).select("id").single();
     return created?.id as string;
   }
-  const { data } = await db.from("conversations").select("id").eq("contact_id", contactId).eq("channel", channel).is("external_id", null).maybeSingle();
+  // no provider id: continue the contact's latest thread on this channel
+  const { data } = await db.from("conversations").select("id").eq("contact_id", contactId).eq("channel", channel).order("last_message_at", { ascending: false, nullsFirst: false }).limit(1).maybeSingle();
   if (data) return data.id as string;
   const { data: created } = await db.from("conversations").insert({ contact_id: contactId, channel }).select("id").single();
   return created?.id as string;
