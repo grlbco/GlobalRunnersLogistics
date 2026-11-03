@@ -149,7 +149,7 @@ export function Hero({
           // Scroll story — one top-level timeline owns the ScrollTrigger (gsap-scrolltrigger rule).
           const tl = gsap.timeline({
             defaults: { ease: "power2.inOut" },
-            scrollTrigger: { trigger: el, start: "top top", end: "bottom bottom", scrub: 1 },
+            scrollTrigger: { trigger: el, start: "top top", end: "bottom bottom", scrub: 0.35 }, // Lenis already smooths; keep this catch-up short
           });
           tl.addLabel("intro", 0)
             .to("[data-hero-intro]", { autoAlpha: 0, yPercent: -12, duration: 1.4, ease: "power1.in" }, 0.15)
@@ -186,7 +186,7 @@ export function Hero({
   );
 
   return (
-    <section ref={root} id="hero" className="relative h-[400svh]" aria-label="Global Runners Logistics — now hiring">
+    <section ref={root} id="hero" className="relative h-[300svh]" aria-label="Global Runners Logistics — now hiring">
       <div className="sticky top-0 h-svh overflow-hidden">
         {/* Sky: dusk, deepening to night as the camera rises over the yard */}
         <div aria-hidden className="absolute inset-0 bg-[linear-gradient(180deg,#070d18_0%,#0e1628_38%,#1a1d2e_56%,#2b2230_66%,#121827_74%,#0a1220_100%)]" />

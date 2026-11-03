@@ -16,7 +16,7 @@ export type Anchor = "cab" | "trailer" | "wheels";
  */
 export function createHeroScene(canvas: HTMLCanvasElement, rig: RigGeometry, opts: { mobile: boolean; fleetCount: number }) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "high-performance" });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, opts.mobile ? 1.5 : 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5)); // thin lines look identical; ~45% fewer pixels at 2x
   renderer.setClearColor(0x000000, 0);
   renderer.localClippingEnabled = true;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -157,8 +157,19 @@ export function createHeroScene(canvas: HTMLCanvasElement, rig: RigGeometry, opt
 
   // ---------- Fleet in the yard ----------
   const fleet = new THREE.Group();
+  // Parked rigs are small and far away: draw every 3rd body segment / every 4th tire segment.
+  const thin = (g: THREE.BufferGeometry, every: number) => {
+    const src = g.getAttribute("position").array as Float32Array;
+    const out: number[] = [];
+    for (let i = 0, seg = 0; i < src.length; i += 6, seg++) if (seg % every === 0) for (let k = 0; k < 6; k++) out.push(src[i + k]);
+    const ng = new THREE.BufferGeometry();
+    ng.setAttribute("position", new THREE.Float32BufferAttribute(out, 3));
+    return ng;
+  };
+  const fleetBody = thin(rig.body, 3);
+  const fleetTire = thin(rig.tire, 4);
   const template = new THREE.Group();
-  template.add(new THREE.LineSegments(rig.body, mats.fleet), new THREE.LineSegments(rig.tire, mats.fleetDim));
+  template.add(new THREE.LineSegments(fleetBody, mats.fleet), new THREE.LineSegments(fleetTire, mats.fleetDim));
   template.add(new THREE.LineSegments(vanEdges, mats.fleet), new THREE.LineSegments(ribGeo, mats.fleetDim));
   const perRow = opts.mobile ? 3 : 5;
   for (let i = 0; i < opts.fleetCount; i++) {
