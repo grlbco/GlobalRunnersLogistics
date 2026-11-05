@@ -10,6 +10,14 @@ export const maxDuration = 300;
  * Real model calls and real sends (to the test contact only). Leaves the contact ready for more testing.
  */
 export async function GET() {
+  try {
+    return await run();
+  } catch (e) {
+    return Response.json({ error: e instanceof Error ? `${e.message}\n${e.stack}` : String(e) }, { status: 500 });
+  }
+}
+
+async function run() {
   if (process.env.NODE_ENV === "production") return new Response("Not found", { status: 404 });
   const db = adminDb();
   const { data: c0 } = await db.from("contacts").select("*").contains("tags", ["test"]).limit(1).single();
