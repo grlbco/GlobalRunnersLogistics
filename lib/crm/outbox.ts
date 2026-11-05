@@ -58,13 +58,23 @@ async function sendOne(row: Row): Promise<SendOutcome> {
 }
 
 /** Claims and sends one outbox row. */
+/** A person wrote to the driver: the assistant steps back for 2 hours so nobody talks over each other. */
+export async function pauseAssistantForHuman(contactId: string, hours = 2) {
+  const db = adminDb();
+  await db.from("contacts").update({ agent_paused_until: new Date(Date.now() + hours * 3600_000).toISOString() }).eq("id", contactId);
+  await db.from("outbox").update({ status: "cancelled", error: "a person replied" }).eq("contact_id", contactId).eq("author", "agent").in("status", ["draft", "pending"]);
+}
+
 export async function processRow(id: string): Promise<SendOutcome> {
   const db = adminDb();
   const { data: row } = await db.from("outbox").update({ status: "sending" }).eq("id", id).eq("status", "pending").select("id, contact_id, channel, author, author_id, subject, body, attempts, is_reply").maybeSingle();
   if (!row) return { ok: false, reason: "Already sent or cancelled" };
   try {
     const out = await sendOne(row as Row);
-    if (out.ok) await db.from("outbox").update({ status: "sent", message_id: out.messageId, attempts: row.attempts + 1 }).eq("id", id);
+    if (out.ok) {
+      await db.from("outbox").update({ status: "sent", message_id: out.messageId, attempts: row.attempts + 1 }).eq("id", id);
+      if (row.author === "human") await pauseAssistantForHuman(row.contact_id);
+    }
     else if (out.retry) await db.from("outbox").update({ status: "pending", send_after: new Date(Date.now() + 30 * 60_000).toISOString(), error: out.reason }).eq("id", id);
     else await db.from("outbox").update({ status: "failed", error: out.reason, attempts: row.attempts + 1 }).eq("id", id);
     return out;

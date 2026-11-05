@@ -5,6 +5,9 @@ const BANNED = [
   /\b(as an ai|as an a\.i\.|artificial intelligence|language model|large language)\b/i, // honesty answers ("Ken's team's assistant") are allowed
   /\b(great question|i hope this helps|feel free to|don'?t hesitate)\b/i,
   /[—–;]/, // em/en dashes and semicolons read robotic in texts
+  /\b(it'?s|this is) not (just )?[^.,!?]{1,40}, (it'?s|but)\b/i, // "it's not X, it's Y"
+  /\bnot just\b[^.!?]{1,40}\bbut\b/i,
+  /\b(absolutely|certainly|rest assured|seamless|journey|reach out|i understand your concern|thrilled)\b/i,
   /\bguarantee(d)?\b/i,
   /\b(green card|citizen(ship)?|immigration|visa status|undocumented)\b/i,
   /\b(leverage|synergy|opportunity awaits|exciting opportunity)\b/i,

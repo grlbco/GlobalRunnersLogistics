@@ -26,7 +26,27 @@ const Decision = z.object({
 });
 export type Decision = z.infer<typeof Decision>;
 
-const FOLLOWUP_LADDER_H = [20, 48, 96, 168, 336];
+// Research: 2-3 texts without a reply max, then slower email nurture; most replies come from follow-ups.
+const FOLLOWUP_LADDER_H = [24, 72, 168, 336];
+const MAX_TEXT_FOLLOWUPS = 3;
+const HUMAN_WORDS = /\b(human|real person|manager|supervisor|lawyer|attorney|sue|lawsuit|complaint|harass|scam|police|report you)\b/i;
+
+/** Moves a follow-up time into a good texting window in the driver's zone: 10-11am or 5-6:30pm, Mon-Sat. */
+function inGoodWindow(due: Date, tz: string | null): Date {
+  if (!tz) return due;
+  const local = (d: Date) => {
+    const p = new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", minute: "numeric", hour12: false, weekday: "short" }).formatToParts(d);
+    return { h: Number(p.find((x) => x.type === "hour")?.value) % 24, m: Number(p.find((x) => x.type === "minute")?.value), wd: p.find((x) => x.type === "weekday")?.value };
+  };
+  let d = new Date(due);
+  for (let i = 0; i < 96; i++) {
+    const { h, m, wd } = local(d);
+    const mins = h * 60 + m;
+    if (wd !== "Sun" && ((mins >= 600 && mins <= 660) || (mins >= 1020 && mins <= 1110))) return new Date(d.getTime() + Math.random() * 20 * 60_000);
+    d = new Date(d.getTime() + 15 * 60_000);
+  }
+  return due;
+}
 /** Last-mile cleanup so texts read human: no em/en dashes, no semicolons, no wrapping quotes. */
 const clean = (t: string) => t.trim().replace(/\s*[—–]\s*/g, ", ").replace(/;\s*/g, ". ").replace(/^["“]|["”]$/g, "").replace(/,\s*,/g, ",").trim();
 const siteUrl = () => process.env.NEXT_PUBLIC_SITE_URL || company.url;
@@ -59,6 +79,8 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
       if (!settings.enabled) return (await log({ action: "ignored", decision: { reason: "assistant is off" } }), { action: "ignored", reason: "Assistant is off" });
       if (c.agent_mode !== "auto") return (await log({ action: "ignored", decision: { reason: "manual" } }), { action: "ignored", reason: "A person is handling this driver" });
       if (c.do_not_contact) return (await log({ action: "ignored", decision: { reason: "do not contact" } }), { action: "ignored", reason: "Do not contact" });
+      if (input.trigger !== "manual" && c.agent_paused_until && new Date(c.agent_paused_until) > new Date())
+        return (await log({ action: "ignored", decision: { reason: "a person replied recently (paused)" } }), { action: "ignored", reason: "Paused: a person replied recently" });
       const since = new Date(Date.now() - 86400_000).toISOString();
       const { count } = await db.from("outbox").select("*", { count: "exact", head: true }).eq("contact_id", c.id).eq("author", "agent").gte("created_at", since).neq("status", "cancelled");
       if ((count ?? 0) >= settings.max_per_day) return (await log({ action: "ignored", decision: { reason: "daily limit" } }), { action: "ignored", reason: "Daily message limit reached for this driver" });
@@ -72,13 +94,32 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
     ]);
     const turns: Turn[] = input.simTurns ?? (msgs ?? []).reverse().map((m) => ({ at: m.created_at, direction: m.direction, channel: m.channel, author: m.author, body: m.body }));
     if (input.dryRunMessage) turns.push({ at: new Date().toISOString(), direction: "inbound", channel: input.dryRunMessage.channel, author: "lead", body: input.dryRunMessage.body });
+    const startedAt = Date.now();
+    const lastInboundTurn = [...turns].reverse().find((t) => t.direction === "inbound");
+
+    // Hand-off words are caught in code, before the model (asks for a person, legal words, anger).
+    if (!dry && lastInboundTurn && input.trigger !== "followup" && HUMAN_WORDS.test(lastInboundTurn.body)) {
+      await handoff(c, `Driver wrote: "${lastInboundTurn.body.slice(0, 120)}"`);
+      await log({ action: "handed_off", decision: { reason: "hand-off words" } });
+      return { action: "handed_off", reason: "hand-off words" };
+    }
+    // No endless loops: 10+ assistant texts in 7 days without the form → a person takes it from here.
+    if (!dry && !input.simTurns) {
+      const since7 = new Date(Date.now() - 7 * 86400_000).toISOString();
+      const { count: sent7 } = await db.from("messages").select("*", { count: "exact", head: true }).eq("contact_id", c.id).eq("author", "agent").gte("created_at", since7);
+      if ((sent7 ?? 0) >= 10) {
+        await handoff(c, "Long conversation without the form (10+ assistant texts in 7 days)");
+        await log({ action: "handed_off", decision: { reason: "conversation limit" } });
+        return { action: "handed_off", reason: "conversation limit" };
+      }
+    }
     if (link.form.completed && input.trigger !== "test" && input.trigger !== "text_received" && input.trigger !== "email_received")
       return (await log({ action: "ignored", decision: { reason: "form already completed" } }), { action: "ignored", reason: "Form already completed" });
 
     // Reply on the channel they used; follow-ups prefer text when allowed.
     const lastInbound = [...turns].reverse().find((t) => t.direction === "inbound");
     let channel: "email" | "sms" = (lastInbound?.channel as "email" | "sms") ?? (c.sms_consent ? "sms" : "email");
-    if (input.trigger === "followup" && c.sms_consent && (input.followupAttempt ?? 1) % 2 === 0) channel = "sms";
+    if (input.trigger === "followup") channel = c.sms_consent && (input.followupAttempt ?? 1) <= MAX_TEXT_FOLLOWUPS ? "sms" : "email";
     // "Reply now" from staff: answer the driver if they wrote last, otherwise a fresh nudge.
     const promptTrigger = input.trigger === "manual" ? (turns.at(-1)?.direction === "inbound" ? "text_received" : "followup") : input.trigger === "test" ? "text_received" : input.trigger;
     if (channel === "sms" && !c.sms_consent) channel = "email";
@@ -128,6 +169,15 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
 
     if (dry) return decision ? { action: decision.handoff ? "handed_off" : decision.replies.length ? "would_reply" : "no_reply", reply: decision.replies.join("\n\n"), channel, decision, problems, costUsd } : { action: "failed", problems, costUsd };
 
+    // Freshness: if the driver texted again while we were writing, drop this reply; the next run answers everything.
+    if (!dry && !input.simTurns) {
+      const { data: newer } = await db.from("messages").select("id").eq("contact_id", c.id).eq("direction", "inbound").gt("created_at", new Date(Math.max(startedAt - 2000, lastInboundTurn ? new Date(lastInboundTurn.at).getTime() + 1 : 0)).toISOString()).limit(1);
+      if (newer?.length) {
+        await log({ action: "superseded", decision: { reason: "driver texted again while writing" }, ...{ model, tokens_in: tokensIn, tokens_out: tokensOut, cost_usd: costUsd, latency_ms: latency } });
+        return { action: "superseded", reason: "newer message" };
+      }
+    }
+
     if (!decision) {
       await handoff(c, `Couldn't write a safe reply: ${problems.join("; ")}`);
       await log({ action: "handed_off", checks: { problems, raw: raw.slice(0, 1500) }, ...meta });
@@ -164,7 +214,10 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
       // Human timing: quick in a live back-and-forth, slower after a long silence; extra texts follow like someone typing.
       const lastOut = [...turns].reverse().find((t) => t.direction === "outbound");
       const live = !!lastOut && Date.now() - new Date(lastOut.at).getTime() < 20 * 60_000;
-      let at = Date.now() + 1000 * (manual ? 5 : live ? 20 + Math.random() * 40 + parts[0].length * 0.2 : settings.delay_min_s + Math.random() * Math.max(0, settings.delay_max_s - settings.delay_min_s));
+      const replying = input.trigger === "text_received" || input.trigger === "email_received";
+      // Human cadence (GoHighLevel uses ~60-90s for SMS): live chat 30-75s, reply after a silence 60-150s, plus "typing" time.
+      const base = manual ? 5 : replying ? (live ? 30 + Math.random() * 45 : 60 + Math.random() * 90) + parts[0].length * 0.25 : settings.delay_min_s + Math.random() * Math.max(0, settings.delay_max_s - settings.delay_min_s);
+      let at = Date.now() + 1000 * base;
       await db.from("outbox").update({ status: "cancelled", error: "replaced by a newer reply" }).eq("contact_id", c.id).eq("author", "agent").in("status", ["draft", "pending"]);
       const isReply = input.trigger === "text_received" || input.trigger === "email_received" || manual;
       for (let i = 0; i < parts.length; i++) {
@@ -185,9 +238,11 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
     await db.from("followups").update({ status: "cancelled" }).eq("contact_id", c.id).eq("status", "pending");
     const attempt = input.trigger === "followup" ? (input.followupAttempt ?? 1) + 1 : 1; // manual/reply resets the ladder
     const done = ["not_interested", "not_fit", "stop", "wrong_person"].includes(decision.intent) || decision.stage === "not_interested" || decision.stage === "not_fit";
-    if (!done && !link.form.completed && attempt <= settings.max_followups) {
-      const hours = decision.followup_hours ?? FOLLOWUP_LADDER_H[Math.min(attempt - 1, FOLLOWUP_LADDER_H.length - 1)];
-      await db.from("followups").insert({ contact_id: c.id, due_at: new Date(Date.now() + hours * 3600_000).toISOString(), attempt, reason: `Follow-up #${attempt}`, channel });
+    if (!done && !link.form.completed && attempt <= Math.min(settings.max_followups, FOLLOWUP_LADDER_H.length)) {
+      const hours = FOLLOWUP_LADDER_H[attempt - 1];
+      const fuChannel: "email" | "sms" = c.sms_consent && attempt <= MAX_TEXT_FOLLOWUPS ? "sms" : "email";
+      const due = inGoodWindow(new Date(Date.now() + hours * 3600_000), c.timezone);
+      await db.from("followups").insert({ contact_id: c.id, due_at: due.toISOString(), attempt, reason: `Follow-up #${attempt} (${fuChannel === "sms" ? "text" : "email"})`, channel: fuChannel });
     }
 
     await log({ action, decision, reply: parts.join("\n\n") || null, checks: { problems }, ...meta });
@@ -215,9 +270,9 @@ export async function processAgentQueue(limit = 10) {
   // Collapse several new messages from one driver into one run (answer the latest).
   const seen = new Set<string>();
   for (const q of queued ?? []) {
-    // Wait until the driver has stopped typing (no new text for 25s), then answer everything at once.
+    // Trailing-edge debounce: wait until the driver stops sending for 40s, then answer all their texts at once.
     const { data: lastIn } = await db.from("messages").select("created_at").eq("contact_id", q.contact_id).eq("direction", "inbound").order("created_at", { ascending: false }).limit(1).maybeSingle();
-    if (lastIn && Date.now() - new Date(lastIn.created_at).getTime() < 25_000) continue;
+    if (lastIn && Date.now() - new Date(lastIn.created_at).getTime() < 40_000) continue;
     if (seen.has(q.contact_id)) {
       await db.from("agent_runs").update({ action: "merged" }).eq("id", q.id);
       continue;

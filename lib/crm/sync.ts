@@ -42,6 +42,14 @@ export async function ingestQuoMessage(m: quo.QuoMessage): Promise<string | null
     body: m.text ?? "", externalId: m.id, threadId: m.conversationId ?? null, at: m.createdAt, status: inbound ? "received" : "sent",
     meta: { quo_user: m.userId ?? null },
   });
+  if (id && !inbound && m.userId) {
+    // sent by a person from the Quo app (not by us through the API): pause the assistant
+    const { data: viaCrm } = await adminDb().from("outbox").select("id").eq("message_id", id).maybeSingle();
+    if (!viaCrm) {
+      const { pauseAssistantForHuman } = await import("./outbox");
+      await pauseAssistantForHuman(contact.id);
+    }
+  }
   if (!id || !inbound) return id;
 
   if (isOptOut(m.text)) {
