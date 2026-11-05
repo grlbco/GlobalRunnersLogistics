@@ -2,7 +2,8 @@ import { allowedNumbers } from "./knowledge";
 
 /** Code-level guardrails on every reply. Any failure → retry once, then hand to a person. */
 const BANNED = [
-  /\b(as an ai|as an a\.i\.|artificial intelligence|language model|large language)\b/i, // honesty answers ("Ken's team's assistant") are allowed
+  /\b(as an ai|as an a\.i\.|language model|large language)\b/i, // cliché openers ("I'm an AI assistant" when asked is fine)
+  /\b(real person here|i'?m (a |an )?(real )?(human|person)\b|i am (a |an )?(real )?(human|person)\b|not a (bot|robot)|i'?m not (a |an )?(bot|robot|ai)\b|a real human)/i, // never claim to be human
   /\b(great question|i hope this helps|feel free to|don'?t hesitate)\b/i,
   /[—–;]/, // em/en dashes and semicolons read robotic in texts
   /\b(it'?s|this is) not (just )?[^.,!?]{1,40}, (it'?s|but)\b/i, // "it's not X, it's Y"

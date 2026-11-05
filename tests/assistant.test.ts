@@ -10,11 +10,14 @@ describe("assistant safety checks (every message before it sends)", () => {
     ["em dash", "Great pay — weekly"],
     ["semicolon", "Paid weekly; plus bonus"],
     ["AI giveaway", "As an AI, I can help"],
+    ["claiming to be human", "So yeah, real person here, just not Ken"],
+    ["denying being a bot", "I'm not a bot, promise"],
     ["not X it's Y", "It's not just a job, it's a career"],
     ["buzzword", "Rest assured, we got you"],
     ["foreign link", "Apply at https://example.com/apply"],
     ["made-up rate", "We pay 70 cents per mile"],
   ])("blocks %s", (_n, text) => expect(checkReply(text, ctx).ok).toBe(false));
+  it("allows an honest AI answer", () => expect(checkReply("I'm an AI assistant, I help Ken with texts. Ken's real, he calls everyone himself", ctx).ok).toBe(true));
   it("allows the driver's own form link", () => expect(checkReply(`Here's the form: ${ctx.formUrl}`, ctx).ok).toBe(true));
   it("blocks texts that are too long", () => expect(checkReply("a ".repeat(200), ctx).ok).toBe(false));
 });
