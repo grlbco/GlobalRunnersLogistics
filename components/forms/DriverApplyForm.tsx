@@ -218,7 +218,7 @@ export function DriverApplyForm({
         <h2 className="h2 mt-8">{L.doneTitle}</h2>
         <p className="body-lg mt-4 max-w-xl text-white/70">{L.doneSub(data.first_name ?? "")}</p>
         <p className="mt-8 max-w-xl text-white/60">{L.doneNext}</p>
-        <div className="mt-6 max-w-xl"><CallMeNow token={token ?? null} phone={data.phone ?? null} name={[data.first_name, data.last_name].filter(Boolean).join(" ")} source="application" /></div>
+        <div className="mt-6 max-w-xl"><CallMeNow token={token ?? null} phone={data.phone ?? null} name={[data.first_name, data.last_name].filter(Boolean).join(" ")} source="application" locale={locale === "es" ? "es" : "en"} /></div>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link href={`${paths.register}?email=${encodeURIComponent(data.email ?? "")}`} className="inline-flex h-12 items-center gap-2 rounded bg-signal px-6 font-medium">
             {L.register} <Arrow />

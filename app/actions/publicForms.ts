@@ -53,7 +53,7 @@ export async function getFormPrefill(slug: string, token: string): Promise<Answe
 }
 
 /** Public submit for /f/[slug]. Validation happens again on the server; the honeypot drops bots silently. */
-export async function submitPublicForm(input: { slug: string; answers: Answers; token?: string | null; hp?: string; utm?: Record<string, string>; ms?: number }): Promise<SubmitResult> {
+export async function submitPublicForm(input: { slug: string; answers: Answers; token?: string | null; hp?: string; utm?: Record<string, string>; ms?: number; locale?: "en" | "es" }): Promise<SubmitResult> {
   if (typeof input?.slug !== "string" || !/^[a-z0-9-]{2,61}$/.test(input.slug) || typeof input.answers !== "object" || !input.answers) return { ok: false, error: "Invalid form" };
   if (input.hp) return { ok: true }; // bot filled the hidden field
   if (typeof input.ms === "number" && input.ms < 1500) return { ok: true }; // too fast for a person
@@ -65,6 +65,7 @@ export async function submitPublicForm(input: { slug: string; answers: Answers; 
       slug: input.slug,
       answers: input.answers,
       token: input.token ?? null,
+      locale: input.locale === "es" ? "es" : "en",
       meta: {
         ip_hash: ip ? createHash("sha256").update(ip).digest("hex").slice(0, 16) : null,
         ua: (h.get("user-agent") ?? "").slice(0, 300) || null,

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { getPublicForm } from "@/lib/formbuilder/public";
+import { settingsText } from "@/lib/formbuilder/schema";
 import { PublicForm } from "@/components/forms/PublicForm";
 import { company } from "@/content/facts";
 
@@ -23,18 +24,19 @@ export default function FormPage({ params }: { params: Promise<{ lang: string; s
   );
 }
 
-async function Body({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
+async function Body({ params }: { params: Promise<{ lang: string; slug: string }> }) {
+  const { slug, lang } = await params;
+  const locale = lang === "es" ? "es" : "en";
   if (!/^[a-z0-9-]{2,61}$/.test(slug)) notFound();
   const form = await getPublicForm(slug);
   if (!form || form.status === "draft") notFound();
-  const s = form.schema.settings;
+  const s = settingsText(form.schema.settings, locale);
   return (
     <>
       {s.title && <h1 className="display text-[clamp(2rem,6vw,3.5rem)]">{s.title}</h1>}
       {s.description && <p className="body-lg mt-4 text-white/65">{s.description}</p>}
       <div className="mt-10">
-        {form.status === "closed" ? <p className="text-white/60">This form is closed. Call us at {company.phone.display}.</p> : <PublicForm slug={form.slug} schema={form.schema} />}
+        {form.status === "closed" ? <p className="text-white/60">{locale === "es" ? "Este formulario está cerrado. Llámanos al" : "This form is closed. Call us at"} {company.phone.display}.</p> : <PublicForm slug={form.slug} schema={form.schema} locale={locale} />}
       </div>
     </>
   );

@@ -46,9 +46,11 @@ export type FormField = {
   options?: string[];
   map?: CrmMap;
   validation?: { minLength?: number; maxLength?: number; min?: number; max?: number };
+  /** Spanish wording (answers are always stored in English, options map by position). */
+  es?: { label?: string; description?: string; placeholder?: string; options?: string[] };
 };
 export type FormPage = { id: string; title?: string; fields: FormField[] };
-export type FormSettings = { title?: string; description?: string; submitText?: string; successMessage?: string; redirectUrl?: string; showProgress?: boolean };
+export type FormSettings = { title?: string; description?: string; submitText?: string; successMessage?: string; redirectUrl?: string; showProgress?: boolean; es?: { title?: string; description?: string; submitText?: string; successMessage?: string } };
 export type FormSchema = { pages: FormPage[]; settings: FormSettings };
 
 export type OnSubmit = {
@@ -189,10 +191,15 @@ const fieldZ = z.object({
   options: z.array(z.string().max(200)).max(50).optional(),
   map: z.enum(Object.keys(CRM_MAP) as [CrmMap, ...CrmMap[]]).optional(),
   validation: z.object({ minLength: z.number().optional(), maxLength: z.number().optional(), min: z.number().optional(), max: z.number().optional() }).optional(),
+  es: z.object({ label: z.string().max(600).optional(), description: z.string().max(600).optional(), placeholder: z.string().max(200).optional(), options: z.array(z.string().max(200)).max(50).optional() }).optional(),
 });
 export const schemaZ = z.object({
   pages: z.array(z.object({ id: z.string().min(1).max(40), title: z.string().max(200).optional(), fields: z.array(fieldZ).max(60) })).min(1).max(20),
-  settings: z.object({ title: z.string().max(200).optional(), description: z.string().max(1000).optional(), submitText: z.string().max(40).optional(), successMessage: z.string().max(500).optional(), redirectUrl: z.string().url().optional().or(z.literal("")), showProgress: z.boolean().optional() }),
+  settings: z.object({
+    title: z.string().max(200).optional(), description: z.string().max(1000).optional(), submitText: z.string().max(40).optional(), successMessage: z.string().max(500).optional(),
+    redirectUrl: z.string().url().optional().or(z.literal("")), showProgress: z.boolean().optional(),
+    es: z.object({ title: z.string().max(200).optional(), description: z.string().max(1000).optional(), submitText: z.string().max(40).optional(), successMessage: z.string().max(500).optional() }).optional(),
+  }),
 });
 export const onSubmitZ = z.object({
   stage: z.string().max(40).optional(),
@@ -202,3 +209,43 @@ export const onSubmitZ = z.object({
   task: z.boolean().optional(),
   sendDriverForm: z.boolean().optional(),
 });
+
+// ---------------- language ----------------
+
+export type FormLocale = "en" | "es";
+
+/** What the driver sees for one field in their language (falls back to English). */
+export function fieldText(f: FormField, l: FormLocale) {
+  const es = l === "es" ? f.es : undefined;
+  const label = f.type === "consent" && l === "es" ? es?.label || SMS_CONSENT_TEXT.es : es?.label || f.label;
+  const opts = f.options ?? [];
+  return {
+    label,
+    description: es?.description || f.description,
+    placeholder: es?.placeholder || f.placeholder,
+    /** [stored value, shown text] */
+    options: opts.map((o, i) => [o, es?.options?.[i] || o] as const),
+  };
+}
+
+export function settingsText(s: FormSettings, l: FormLocale) {
+  const es = l === "es" ? s.es : undefined;
+  return { title: es?.title || s.title, description: es?.description || s.description, submitText: es?.submitText || s.submitText, successMessage: es?.successMessage || s.successMessage };
+}
+
+export const UI: Record<FormLocale, Record<string, string>> = {
+  en: { next: "Next", back: "Back", submit: "Submit", sending: "Sending…", choose: "Choose…", yes: "Yes", no: "No", thanks: "Thanks! We got it.", empty: "This form has no questions yet." },
+  es: { next: "Siguiente", back: "Atrás", submit: "Enviar", sending: "Enviando…", choose: "Elige…", yes: "Sí", no: "No", thanks: "¡Gracias! Lo recibimos.", empty: "Este formulario aún no tiene preguntas." },
+};
+const ERR_ES: Record<string, string> = {
+  Required: "Obligatorio",
+  "Please tick the box to continue.": "Marca la casilla para continuar.",
+  "Enter a valid email": "Escribe un correo válido",
+  "Enter a valid US phone number": "Escribe un número de EE. UU. válido",
+  "Enter a number": "Escribe un número",
+  "Too long": "Demasiado largo",
+  "Pick one of the options": "Elige una opción",
+  "Pick from the options": "Elige de las opciones",
+  "Pick yes or no": "Elige sí o no",
+};
+export const tErr = (m: string, l: FormLocale) => (l === "es" ? ERR_ES[m] ?? m.replace(/^At least/, "Mínimo").replace(/^At most/, "Máximo") : m);

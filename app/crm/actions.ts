@@ -148,11 +148,13 @@ export async function approveDraft(formData: FormData) {
   const { supabase, staff } = await requireStaff();
   const parsed = z.object({ id, contact_id: id, body: z.string().trim().min(1).max(1500) }).safeParse(Object.fromEntries(formData));
   if (!parsed.success) return;
+  const { data: orig } = await supabase.from("outbox").select("body").eq("id", parsed.data.id).maybeSingle();
   // A person approved it: send now, no quiet-hour hold.
   await supabase.from("outbox").update({ status: "pending", body: parsed.data.body, send_after: new Date().toISOString(), author_id: staff.id, is_reply: true, error: null }).eq("id", parsed.data.id).in("status", ["draft", "pending"]);
   const { processRow } = await import("@/lib/crm/outbox");
   const out = await processRow(parsed.data.id);
-  await supabase.from("activities").insert({ contact_id: parsed.data.contact_id, type: out.ok ? "draft_approved" : "draft_failed", data: out.ok ? {} : { reason: out.reason }, actor: `user:${staff.id}` });
+  await supabase.from("activities").insert({ contact_id: parsed.data.contact_id, type: out.ok ? "draft_approved" : "draft_failed", data: out.ok ? { edited: (orig?.body ?? "").trim() !== parsed.data.body } : { reason: out.reason }, actor: `user:${staff.id}` });
+  if (out.ok) await maybeLeaveDraftMode();
   revalidatePath(`/crm/contacts/${parsed.data.contact_id}`);
   revalidatePath("/crm/inbox");
 }
@@ -238,4 +240,25 @@ export async function askAssistant(formData: FormData) {
     action: "queued",
   });
   revalidatePath(`/crm/contacts/${contactId}`);
+}
+
+/**
+ * Launch safety: the assistant starts in draft mode and switches itself to automatic after
+ * `auto_after` approved drafts (default 50), as long as few of them needed edits.
+ */
+async function maybeLeaveDraftMode() {
+  const { adminDb } = await import("@/lib/crm/admin");
+  const { getAssistantSettings } = await import("@/lib/crm/settings");
+  const s = await getAssistantSettings();
+  if (!s.draft_mode || !s.auto_after) return;
+  const db = adminDb();
+  const { data: rows } = await db.from("activities").select("data").eq("type", "draft_approved").limit(5000);
+  const approved = rows?.length ?? 0;
+  const edited = (rows ?? []).filter((r) => (r.data as { edited?: boolean } | null)?.edited).length;
+  if (approved < s.auto_after || edited / approved > 0.2) return; // too many corrections: stay in draft mode
+  const { data: cur } = await db.from("app_settings").select("value").eq("key", "assistant").maybeSingle();
+  await db.from("app_settings").upsert({ key: "assistant", value: { ...((cur?.value as object) ?? {}), draft_mode: false }, updated_at: new Date().toISOString() });
+  const { sendTelegram } = await import("@/lib/integrations/telegram");
+  await sendTelegram(`🤖 <b>The assistant is now automatic.</b> ${approved} drafts approved (${edited} edited), so it replies on its own from here. Switch draft mode back on in Assistant anytime.`);
+  revalidatePath("/crm/assistant");
 }

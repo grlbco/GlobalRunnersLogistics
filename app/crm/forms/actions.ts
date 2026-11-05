@@ -60,3 +60,38 @@ export async function deleteForm(formData: FormData) {
   revalidatePath("/crm/forms");
   redirect("/crm/forms");
 }
+
+/** AI translation of a form to Spanish (fills only what's missing; answers stay in English). */
+export async function translateFormToSpanish(input: unknown): Promise<{ ok: boolean; schema?: z.infer<typeof schemaZ>; error?: string }> {
+  await requireStaff();
+  const p = schemaZ.safeParse(input);
+  if (!p.success) return { ok: false, error: "Invalid form" };
+  const s = p.data;
+  const src = {
+    settings: { title: s.settings.title, description: s.settings.description, submitText: s.settings.submitText, successMessage: s.settings.successMessage },
+    fields: s.pages.flatMap((pg) => pg.fields).filter((f) => f.type !== "consent").map((f) => ({ id: f.id, label: f.label, description: f.description, placeholder: f.placeholder, options: f.options })),
+    pages: s.pages.map((pg) => ({ id: pg.id, title: pg.title })),
+  };
+  const { chatJson, extractJson } = await import("@/lib/integrations/deepseek");
+  try {
+    const r = await chatJson([
+      { role: "system", content: "Translate this trucking job form from English to natural Mexican/US Spanish that truck drivers use (tú, casual, short). Keep CDL-A, OTR, MC, DOT and numbers as they are. Return JSON with the same shape: {settings:{title,description,submitText,successMessage}, fields:[{id,label,description,placeholder,options}], pages:[{id,title}]}. Keep ids. Options must stay in the same order and count. Omit keys that were empty." },
+      { role: "user", content: JSON.stringify(src) },
+    ], { temperature: 0.2, maxTokens: 3000 });
+    const t = extractJson(r.content) as { settings?: Record<string, string>; fields?: { id: string; label?: string; description?: string; placeholder?: string; options?: string[] }[]; pages?: { id: string; title?: string }[] };
+    const byId = new Map((t.fields ?? []).map((f) => [f.id, f]));
+    const out = structuredClone(s);
+    out.settings.es = { ...Object.fromEntries(Object.entries(t.settings ?? {}).filter(([, v]) => typeof v === "string" && v)), ...(s.settings.es ?? {}) };
+    for (const pg of out.pages) {
+      for (const f of pg.fields) {
+        const tr = byId.get(f.id);
+        if (!tr || f.type === "consent") continue;
+        const opts = Array.isArray(tr.options) && tr.options.length === (f.options ?? []).length ? tr.options.map(String) : undefined;
+        f.es = { label: tr.label, description: tr.description, placeholder: tr.placeholder, options: opts, ...(f.es ?? {}) };
+      }
+    }
+    return { ok: true, schema: out };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Translation failed" };
+  }
+}

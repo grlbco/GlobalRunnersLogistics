@@ -25,10 +25,13 @@ async function Body() {
   const { supabase, staff } = await requireStaff("/crm/assistant");
   const s = await getAssistantSettings();
   const since = new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
-  const [{ data: runs }, { data: today }] = await Promise.all([
+  const [{ data: runs }, { data: today }, { data: approvals }] = await Promise.all([
     supabase.from("agent_runs").select("trigger, action, reply, decision, cost_usd, created_at, contact:contacts(id, first_name, last_name)").order("created_at", { ascending: false }).limit(15),
     supabase.from("agent_runs").select("action, cost_usd").gte("created_at", since),
+    supabase.from("activities").select("data").eq("type", "draft_approved").limit(5000),
   ]);
+  const approved = approvals?.length ?? 0;
+  const edits = (approvals ?? []).filter((a) => (a.data as { edited?: boolean } | null)?.edited).length;
   const spent = (today ?? []).reduce((t, r) => t + Number(r.cost_usd ?? 0), 0);
   const replied = (today ?? []).filter((r) => r.action === "replied" || r.action === "draft").length;
   const handed = (today ?? []).filter((r) => r.action === "handed_off").length;
@@ -54,7 +57,7 @@ async function Body() {
           <form action={saveAssistantSettings} className="mt-4 space-y-4 text-sm">
             <input type="hidden" name="enabled" value={s.enabled ? "on" : ""} />
             <label className="flex items-center justify-between gap-3">
-              <span>Draft mode<span className="block text-xs text-white/45">You approve every message before it sends</span></span>
+              <span>Draft mode<span className="block text-xs text-white/45">You approve every message before it sends{s.draft_mode && s.auto_after ? ` · ${Math.min(approved, s.auto_after)} of ${s.auto_after} approved${edits ? ` (${edits} edited)` : ""}, then it switches to automatic by itself if under 20% needed edits` : ""}</span></span>
               <input type="checkbox" name="draft_mode" defaultChecked={s.draft_mode} disabled={!admin} className="h-5 w-5 accent-[#e8401c]" />
             </label>
             <div className="grid grid-cols-2 gap-3">

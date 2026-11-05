@@ -4,7 +4,7 @@ import { activity, contactByEmail, contactByPhone, moveStage, type Contact } fro
 import { stateTimezone } from "@/lib/crm/timezones";
 import { STAGE_KEYS, type Stage } from "@/lib/crm/stages";
 import { siteUrl } from "@/lib/site";
-import { allFields, normPhone, validate, type Answers, type FormField, type FormSchema, type OnSubmit } from "./schema";
+import { allFields, normPhone, settingsText, validate, type Answers, type FormField, type FormSchema, type OnSubmit } from "./schema";
 
 const STATES: Record<string, string> = { alabama: "AL", alaska: "AK", arizona: "AZ", arkansas: "AR", california: "CA", colorado: "CO", connecticut: "CT", delaware: "DE", florida: "FL", georgia: "GA", hawaii: "HI", idaho: "ID", illinois: "IL", indiana: "IN", iowa: "IA", kansas: "KS", kentucky: "KY", louisiana: "LA", maine: "ME", maryland: "MD", massachusetts: "MA", michigan: "MI", minnesota: "MN", mississippi: "MS", missouri: "MO", montana: "MT", nebraska: "NE", nevada: "NV", "new hampshire": "NH", "new jersey": "NJ", "new mexico": "NM", "new york": "NY", "north carolina": "NC", "north dakota": "ND", ohio: "OH", oklahoma: "OK", oregon: "OR", pennsylvania: "PA", "rhode island": "RI", "south carolina": "SC", "south dakota": "SD", tennessee: "TN", texas: "TX", utah: "UT", vermont: "VT", virginia: "VA", washington: "WA", "west virginia": "WV", wisconsin: "WI", wyoming: "WY" };
 const stateCode = (v: string) => {
@@ -22,7 +22,7 @@ export type SubmitResult = { ok: true; message?: string; redirect?: string } | {
  * One public submission → CRM. Order matters: validate, find/create the contact, save answers,
  * then the side effects (stage, tags, consent, note, automations, assistant, Telegram).
  */
-export async function handleSubmission(input: { slug: string; answers: Answers; token?: string | null; meta: Record<string, unknown> }): Promise<SubmitResult> {
+export async function handleSubmission(input: { slug: string; answers: Answers; token?: string | null; meta: Record<string, unknown>; locale?: "en" | "es" }): Promise<SubmitResult> {
   const db = adminDb();
   const { data: form } = await db.from("crm_forms").select("id, name, slug, status, schema, on_submit").eq("slug", input.slug).maybeSingle();
   if (!form || form.status !== "published") return { ok: false, error: "This form isn't taking answers right now." };
@@ -68,8 +68,8 @@ export async function handleSubmission(input: { slug: string; answers: Answers; 
   if (!contact) {
     if (!profile.cell_phone && !profile.email) {
       // anonymous submission (no phone or email field): store it without a contact
-      await db.from("crm_form_submissions").insert({ form_id: form.id, data: answers, meta: input.meta });
-      return { ok: true, message: schema.settings.successMessage, redirect: schema.settings.redirectUrl || undefined };
+      await db.from("crm_form_submissions").insert({ form_id: form.id, data: answers, meta: { ...input.meta, locale: input.locale ?? "en" } });
+      return { ok: true, message: settingsText(schema.settings, input.locale ?? "en").successMessage, redirect: schema.settings.redirectUrl || undefined };
     }
     const { data, error } = await db
       .from("contacts")
@@ -96,7 +96,7 @@ export async function handleSubmission(input: { slug: string; answers: Answers; 
   const tags = Array.from(new Set([...(full?.tags ?? []), ...(rules.tags ?? []), `form:${form.slug}`]));
   patch.tags = tags;
 
-  const { data: sub } = await db.from("crm_form_submissions").insert({ form_id: form.id, contact_id: contact.id, data: answers, meta: input.meta }).select("id").single();
+  const { data: sub } = await db.from("crm_form_submissions").insert({ form_id: form.id, contact_id: contact.id, data: answers, meta: { ...input.meta, locale: input.locale ?? "en" } }).select("id").single();
 
   const stage = rules.stage && STAGE_KEYS.includes(rules.stage as Stage) ? (rules.stage as Stage) : contact.stage;
   contact = await moveStage(contact, stage, `form:${form.slug}`, patch);
@@ -130,5 +130,5 @@ export async function handleSubmission(input: { slug: string; answers: Answers; 
         `${profile.cell_phone ?? full?.cell_phone ? `📞 ${esc(profile.cell_phone ?? full?.cell_phone)}\n` : ""}\n${esc(qa).slice(0, 2500)}\n\n<a href="${siteUrl()}/crm/contacts/${contact.id}">Open in GRL Command</a>`,
     );
   }
-  return { ok: true, message: schema.settings.successMessage, redirect: schema.settings.redirectUrl || undefined };
+  return { ok: true, message: settingsText(schema.settings, input.locale ?? "en").successMessage, redirect: schema.settings.redirectUrl || undefined };
 }

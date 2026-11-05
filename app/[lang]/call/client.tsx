@@ -8,7 +8,7 @@ const readToken = () => {
   return t && /^[0-9a-f]{24}$/.test(t) ? t : "";
 };
 
-export function CallPageClient() {
+export function CallPageClient({ locale }: { locale: "en" | "es" }) {
   const token = useSyncExternalStore(() => () => {}, readToken, () => "");
-  return <CallMeNow key={token} token={token || null} source="call_page" />;
+  return <CallMeNow key={token} token={token || null} source="call_page" locale={locale} />;
 }
