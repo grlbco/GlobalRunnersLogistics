@@ -201,3 +201,40 @@ export async function testAssistant(_prev: TestState, formData: FormData): Promi
   const r = await runAgent({ contactId, trigger: "test", dryRunMessage: { channel: f.channel === "email" ? "email" : "sms", body } });
   return { reply: r.reply, action: r.action, channel: r.channel, json: r.decision ? JSON.stringify(r.decision, null, 2) : undefined, problems: r.problems, cost: r.costUsd, error: r.reason };
 }
+
+/** Big on/off switch. Turning on answers drivers whose last message (48h) is still unanswered. */
+export async function setAssistantEnabled(formData: FormData) {
+  const { supabase, staff } = await requireStaff();
+  if (staff.role !== "admin") return;
+  const on = formData.get("on") === "1";
+  const { data } = await supabase.from("app_settings").select("value").eq("key", "assistant").maybeSingle();
+  await supabase.from("app_settings").upsert({ key: "assistant", value: { ...((data?.value as object) ?? {}), enabled: on }, updated_at: new Date().toISOString() });
+  if (on) {
+    const since = new Date(Date.now() - 48 * 3600_000).toISOString();
+    const { data: recent } = await supabase.from("messages").select("contact_id, id, direction, channel, created_at").gte("created_at", since).order("created_at", { ascending: false }).limit(500);
+    const latest = new Map<string, { id: string; direction: string; channel: string }>();
+    for (const m of recent ?? []) if (!latest.has(m.contact_id)) latest.set(m.contact_id, m);
+    for (const [contactId, m] of latest) {
+      if (m.direction !== "inbound") continue;
+      await supabase.from("agent_runs").insert({ contact_id: contactId, trigger: m.channel === "sms" ? "text_received" : "email_received", input_message_id: m.id, action: "queued" });
+    }
+  }
+  revalidatePath("/crm/assistant");
+  revalidatePath("/crm", "layout");
+}
+
+/** "Reply now" on a profile: queue an assistant run for this driver right away. */
+export async function askAssistant(formData: FormData) {
+  const { supabase } = await requireStaff();
+  const contactId = String(formData.get("id"));
+  if (!id.safeParse(contactId).success) return;
+  const { data: last } = await supabase.from("messages").select("id, channel, direction").eq("contact_id", contactId).order("created_at", { ascending: false }).limit(1).maybeSingle();
+  await supabase.from("contacts").update({ agent_mode: "auto" }).eq("id", contactId);
+  await supabase.from("agent_runs").insert({
+    contact_id: contactId,
+    trigger: last?.direction === "inbound" ? (last.channel === "sms" ? "text_received" : "email_received") : "followup",
+    input_message_id: last?.id ?? null,
+    action: "queued",
+  });
+  revalidatePath(`/crm/contacts/${contactId}`);
+}

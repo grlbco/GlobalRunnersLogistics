@@ -2,7 +2,8 @@ import { Suspense } from "react";
 import { requireStaff } from "@/lib/crm/auth";
 import { getAssistantSettings } from "@/lib/crm/settings";
 import { OFFER_FACTS } from "@/lib/agent/knowledge";
-import { saveAssistantSettings } from "@/app/crm/actions";
+import { saveAssistantSettings, setAssistantEnabled } from "@/app/crm/actions";
+import { clsx } from "clsx";
 import { Card, Label, PageHead, Skeleton, btnCls, inputCls } from "@/components/crm/ui";
 import { AssistantTest } from "@/components/crm/AssistantTest";
 import { ago, n } from "@/lib/crm/format";
@@ -25,7 +26,7 @@ async function Body() {
   const s = await getAssistantSettings();
   const since = new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
   const [{ data: runs }, { data: today }] = await Promise.all([
-    supabase.from("agent_runs").select("trigger, action, reply, cost_usd, created_at, contact:contacts(id, first_name, last_name)").order("created_at", { ascending: false }).limit(15),
+    supabase.from("agent_runs").select("trigger, action, reply, decision, cost_usd, created_at, contact:contacts(id, first_name, last_name)").order("created_at", { ascending: false }).limit(15),
     supabase.from("agent_runs").select("action, cost_usd").gte("created_at", since),
   ]);
   const spent = (today ?? []).reduce((t, r) => t + Number(r.cost_usd ?? 0), 0);
@@ -35,14 +36,23 @@ async function Body() {
 
   return (
     <div className="grid gap-6 p-5 md:p-8 xl:grid-cols-[24rem_1fr]">
+      <form action={setAssistantEnabled} className={clsx("flex flex-wrap items-center justify-between gap-4 rounded-[8px] border p-5 xl:col-span-2", s.enabled ? "border-emerald-400/30 bg-emerald-400/[0.06]" : "border-signal/40 bg-signal/[0.07]")}>
+        <input type="hidden" name="on" value={s.enabled ? "0" : "1"} />
+        <div>
+          <p className="text-lg font-semibold tracking-[-0.02em]">{s.enabled ? "Assistant is ON" : "Assistant is OFF"}</p>
+          <p className="mt-1 text-sm text-white/60">
+            {s.enabled
+              ? s.draft_mode ? "It writes replies as drafts; you approve each one." : "It replies and follows up automatically (9am–8pm driver time, never Sunday)."
+              : "Nobody gets automatic replies. Turning it on also answers drivers waiting from the last 48 hours."}
+          </p>
+        </div>
+        {admin && <button className={clsx("h-12 rounded-[4px] px-6 text-sm font-semibold", s.enabled ? "border border-white/25 text-white hover:border-white" : "bg-signal text-white hover:bg-signal-ink")}>{s.enabled ? "Turn off" : "Turn on"}</button>}
+      </form>
       <div className="space-y-6">
         <Card className="p-5">
           <Label>Settings</Label>
           <form action={saveAssistantSettings} className="mt-4 space-y-4 text-sm">
-            <label className="flex items-center justify-between gap-3">
-              <span>Assistant on<span className="block text-xs text-white/45">Off = nobody gets automatic replies</span></span>
-              <input type="checkbox" name="enabled" defaultChecked={s.enabled} disabled={!admin} className="h-5 w-5 accent-[#e8401c]" />
-            </label>
+            <input type="hidden" name="enabled" value={s.enabled ? "on" : ""} />
             <label className="flex items-center justify-between gap-3">
               <span>Draft mode<span className="block text-xs text-white/45">You approve every message before it sends</span></span>
               <input type="checkbox" name="draft_mode" defaultChecked={s.draft_mode} disabled={!admin} className="h-5 w-5 accent-[#e8401c]" />
@@ -81,7 +91,7 @@ async function Body() {
                 const c = r.contact as unknown as { id: string; first_name: string | null; last_name: string | null } | null;
                 return (
                   <li key={i} className="py-2.5">
-                    <div className="flex justify-between gap-3 text-xs"><a href={c ? `/crm/contacts/${c.id}` : "#"} className="text-white/70 hover:text-white">{c ? [c.first_name, c.last_name].filter(Boolean).join(" ") : "—"} · {r.trigger.replace(/_/g, " ")} → {r.action}</a><span className="text-white/40">{ago(r.created_at)}</span></div>
+                    <div className="flex justify-between gap-3 text-xs"><a href={c ? `/crm/contacts/${c.id}` : "#"} className="text-white/70 hover:text-white">{c ? [c.first_name, c.last_name].filter(Boolean).join(" ") : "—"} · {r.trigger.replace(/_/g, " ")} → {r.action}{(r.decision as { reason?: string } | null)?.reason ? ` (${(r.decision as { reason?: string }).reason})` : ""}</a><span className="text-white/40">{ago(r.created_at)}</span></div>
                     {r.reply && <p className="mt-1 line-clamp-2 text-white/60">{r.reply}</p>}
                   </li>
                 );

@@ -6,7 +6,8 @@ import { requireStaff } from "@/lib/crm/auth";
 import { STAGES, TIERS } from "@/lib/crm/stages";
 import { localTime } from "@/lib/crm/timezones";
 import { ago, fullName, initials, phoneDisplay } from "@/lib/crm/format";
-import { addNote, addTask, setAgentMode, setStage, toggleTask, updateContact } from "@/app/crm/actions";
+import { addNote, addTask, askAssistant, setAgentMode, setStage, toggleTask, updateContact } from "@/app/crm/actions";
+import { getAssistantSettings } from "@/lib/crm/settings";
 import { Card, Label, Skeleton, StageBadge, btnCls, btnGhostCls, inputCls } from "@/components/crm/ui";
 import { Composer } from "@/components/crm/Composer";
 import { Drafts } from "@/components/crm/Drafts";
@@ -25,14 +26,15 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
   const { supabase } = await requireStaff(`/crm/contacts/${id}`);
 
-  const [{ data: c }, items, memory, runs, followups, forms, tasks] = await Promise.all([
+  const [{ data: c }, items, memory, runs, followups, forms, tasks, assistant] = await Promise.all([
     supabase.from("contacts").select("*").eq("id", id).maybeSingle(),
     loadTimeline(supabase, id),
     supabase.from("agent_memory").select("*").eq("contact_id", id).maybeSingle(),
-    supabase.from("agent_runs").select("trigger, action, created_at").eq("contact_id", id).order("created_at", { ascending: false }).limit(10),
+    supabase.from("agent_runs").select("trigger, action, decision, created_at").eq("contact_id", id).order("created_at", { ascending: false }).limit(10),
     supabase.from("followups").select("due_at, reason, attempt").eq("contact_id", id).eq("status", "pending").order("due_at").limit(5),
     supabase.from("form_links").select("sent_at, opened_at, step_reached, completed_at").eq("contact_id", id).order("created_at", { ascending: false }).limit(1),
     supabase.from("tasks").select("id, title, due_at, done_at").eq("contact_id", id).order("done_at", { nullsFirst: true }).order("due_at", { nullsFirst: false }).limit(20),
+    getAssistantSettings(),
   ]);
   if (!c) notFound();
 
@@ -165,7 +167,17 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
             <Label>Assistant</Label>
             <span className={clsx("rounded-full px-2 py-0.5 text-[0.7rem]", c.agent_mode === "auto" ? "bg-emerald-400/15 text-emerald-300" : "bg-dusk/15 text-dusk")}>{c.agent_mode === "auto" ? "Auto" : "Manual"}</span>
           </div>
-          <form action={setAgentMode} className="mt-3">
+          {!assistant.enabled && (
+            <p className="mt-3 rounded-[4px] border border-signal/30 bg-signal/[0.08] px-3 py-2 text-xs text-white/80">
+              The assistant is off for everyone. <Link href="/crm/assistant" className="underline underline-offset-2">Turn it on</Link>
+            </p>
+          )}
+          {assistant.enabled && assistant.draft_mode && <p className="mt-3 text-xs text-white/45">Draft mode: replies wait for your OK.</p>}
+          <form action={askAssistant} className="mt-3">
+            <input type="hidden" name="id" value={c.id} />
+            <button disabled={!assistant.enabled || c.do_not_contact} className={clsx(btnCls, "w-full")}>Reply now</button>
+          </form>
+          <form action={setAgentMode} className="mt-2">
             <input type="hidden" name="id" value={c.id} />
             <input type="hidden" name="mode" value={c.agent_mode === "auto" ? "manual" : "auto"} />
             <button className={clsx(btnGhostCls, "w-full")}>{c.agent_mode === "auto" ? "Take over" : "Hand back to assistant"}</button>
@@ -205,7 +217,7 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
         <Card className="p-4">
           <Label>Assistant log</Label>
           {runs.data?.length ? (
-            <ul className="mt-3 space-y-2 text-xs">{runs.data.map((r, i) => <li key={i} className="flex justify-between gap-3"><span className="text-white/70">{r.trigger.replace(/_/g, " ")} → {r.action}</span><span className="text-white/40">{ago(r.created_at)}</span></li>)}</ul>
+            <ul className="mt-3 space-y-2 text-xs">{runs.data.map((r, i) => <li key={i} className="flex justify-between gap-3"><span className="text-white/70">{r.trigger.replace(/_/g, " ")} → {r.action}{(r.decision as { reason?: string } | null)?.reason ? <span className="text-white/40"> ({(r.decision as { reason?: string }).reason})</span> : null}</span><span className="text-white/40">{ago(r.created_at)}</span></li>)}</ul>
           ) : <p className="mt-3 text-sm text-white/40">No runs yet.</p>}
         </Card>
       </aside>

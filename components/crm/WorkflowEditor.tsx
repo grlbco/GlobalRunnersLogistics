@@ -5,7 +5,7 @@ import { clsx } from "clsx";
 import { saveWorkflow } from "@/app/crm/automations/actions";
 import { CONDITION_FIELDS, STEP_LABELS, TEMPLATE_VARS, TRIGGERS, type Step, type TriggerType } from "@/lib/automations/types";
 import { STAGES } from "@/lib/crm/stages";
-import { Card, Label, btnCls, btnGhostCls, inputCls } from "./ui";
+import { Card, Label, btnCls, inputCls } from "./ui";
 
 type WF = { id: string; name: string; description: string | null; trigger_type: string; trigger_filter: Record<string, string>; steps: Step[]; active: boolean };
 
