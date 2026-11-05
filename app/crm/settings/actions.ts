@@ -88,5 +88,25 @@ export async function changeMyPassword(input: { password: string; confirm: strin
   if (input.password !== input.confirm) return { ok: false, error: "The two passwords don't match." };
   if (/^(.)\1+$/.test(input.password) || /^(1234|password|qwerty)/i.test(input.password)) return { ok: false, error: "Pick a harder password." };
   const { error } = await supabase.auth.updateUser({ password: input.password });
-  return error ? { ok: false, error: error.message } : { ok: true, message: "Password changed" };
+  if (error) return { ok: false, error: error.message };
+  const { staff } = await requireStaff();
+  const db = adminDb();
+  const { data } = await db.from("app_settings").select("value").eq("key", "golive").maybeSingle();
+  const v = (data?.value ?? {}) as { password_changed?: Record<string, string> };
+  await db.from("app_settings").upsert({ key: "golive", value: { ...v, password_changed: { ...(v.password_changed ?? {}), [staff.id]: new Date().toISOString() } }, updated_at: new Date().toISOString() });
+  return { ok: true, message: "Password changed" };
+}
+
+const MANUAL = ["leaked_pw", "ken_facts", "pilot_tested", "call_tested"] as const;
+/** Ticks a manual item on the go-live checklist. */
+export async function toggleGoLive(item: string, done: boolean): Promise<R> {
+  const { staff } = await requireStaff();
+  if (staff.role !== "admin") return { ok: false, error: "Only admins." };
+  if (!(MANUAL as readonly string[]).includes(item)) return { ok: false, error: "Unknown item" };
+  const db = adminDb();
+  const { data } = await db.from("app_settings").select("value").eq("key", "golive").maybeSingle();
+  const v = (data?.value ?? {}) as { manual?: Record<string, boolean> };
+  await db.from("app_settings").upsert({ key: "golive", value: { ...v, manual: { ...(v.manual ?? {}), [item]: done } }, updated_at: new Date().toISOString() });
+  revalidatePath("/crm");
+  return { ok: true };
 }

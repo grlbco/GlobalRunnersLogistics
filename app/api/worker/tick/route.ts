@@ -24,6 +24,11 @@ async function run(req: Request) {
   const sent = await processDue();
   const digest = await maybeSendDigest().catch(() => false);
   const campaigns = await syncCampaignStats().catch(() => 0);
+  // heartbeat for the go-live checklist (production worker only)
+  if (!devLocal) {
+    const { adminDb } = await import("@/lib/crm/admin");
+    await adminDb().from("app_settings").upsert({ key: "worker", value: { last_tick: new Date().toISOString(), ms: Date.now() - started }, updated_at: new Date().toISOString() }).then(() => {}, () => {});
+  }
   return Response.json({ ok: true, ms: Date.now() - started, sync, nudges, workflows, agent, sent, digest, campaigns }, { headers: { "Cache-Control": "no-store" } });
 }
 

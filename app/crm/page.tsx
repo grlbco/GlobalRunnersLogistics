@@ -4,6 +4,7 @@ import { requireStaff } from "@/lib/crm/auth";
 import { FUNNEL, STAGES, TIERS, stageLabel } from "@/lib/crm/stages";
 import { ago, fullName, n } from "@/lib/crm/format";
 import { Card, Label, PageHead, Skeleton, StageBadge, Stat } from "@/components/crm/ui";
+import { GoLive } from "@/components/crm/GoLive";
 
 export default function Dashboard() {
   return (
@@ -29,7 +30,7 @@ async function count(q: PromiseLike<{ count: number | null }>) {
 }
 
 async function Body() {
-  const { supabase } = await requireStaff("/crm");
+  const { supabase, staff } = await requireStaff("/crm");
   const head = { count: "exact" as const, head: true };
   const since = hoursAgo(24);
 
@@ -52,6 +53,9 @@ async function Body() {
 
   return (
     <div className="space-y-6 p-5 md:p-8">
+      <Suspense fallback={<Skeleton className="h-40" />}>
+        <GoLive isAdmin={staff.role === "admin"} />
+      </Suspense>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Contacts" value={n(total)} hint="Imported driver leads" />
         <Stat label="Replies · 24h" value={n(repliesToday)} hint="Email + text" />
