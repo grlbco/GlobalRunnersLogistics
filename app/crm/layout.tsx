@@ -3,7 +3,7 @@ import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import { Suspense } from "react";
 import "../globals.css";
-import { Sidebar } from "@/components/crm/Sidebar";
+import { SidebarServer } from "@/components/crm/SidebarServer";
 import { LiveSync } from "@/components/crm/LiveSync";
 
 export const metadata: Metadata = {
@@ -20,7 +20,7 @@ export default function CrmLayout({ children }: { children: React.ReactNode }) {
       <body className="min-h-dvh bg-ink text-white">
         <div className="flex min-h-dvh">
           <Suspense fallback={<div className="hidden w-60 shrink-0 border-r border-white/[0.07] bg-[#0b1424] md:block" />}>
-            <Sidebar />
+            <SidebarServer />
           </Suspense>
           <main className="min-w-0 flex-1 pb-20 md:pb-0">{children}</main>
           <LiveSync dev={process.env.NODE_ENV !== "production"} />

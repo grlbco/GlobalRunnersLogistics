@@ -22,7 +22,7 @@ async function Body({ params, searchParams }: { params: Promise<{ id: string }>;
   const { id } = await params;
   const { tab = "build" } = await searchParams;
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
-  const { supabase, staff } = await requireStaff(`/crm/forms/${id}`);
+  const { supabase, staff } = await requireStaff(`/crm/forms/${id}`, "forms.view");
   const [{ data: form }, { count }] = await Promise.all([
     supabase.from("crm_forms").select("id, name, slug, status, schema, on_submit").eq("id", id).maybeSingle(),
     supabase.from("crm_form_submissions").select("*", { count: "exact", head: true }).eq("form_id", id),
@@ -41,7 +41,7 @@ async function Body({ params, searchParams }: { params: Promise<{ id: string }>;
       ) : (
         <>
           <FormEditor initial={{ id: form.id, name: form.name, slug: form.slug, status: form.status as "draft" | "published" | "closed", schema: form.schema as FormSchema, on_submit: (form.on_submit ?? {}) as OnSubmit }} siteUrl={siteUrl()} />
-          {staff.role === "admin" && (
+          {staff.can("forms.manage") && (
             <form action={deleteForm} className="mt-8">
               <input type="hidden" name="id" value={form.id} />
               <button className="text-xs text-red-300/80 hover:text-red-300">Delete this form and its submissions</button>
@@ -54,7 +54,7 @@ async function Body({ params, searchParams }: { params: Promise<{ id: string }>;
 }
 
 async function Submissions({ id, schema }: { id: string; schema: FormSchema }) {
-  const { supabase } = await requireStaff(`/crm/forms/${id}?tab=submissions`);
+  const { supabase } = await requireStaff(`/crm/forms/${id}?tab=submissions`, "forms.view");
   const { data: subs } = await supabase
     .from("crm_form_submissions")
     .select("id, data, created_at, contact:contacts(id, first_name, last_name, company_name, stage)")

@@ -30,7 +30,7 @@ async function count(q: PromiseLike<{ count: number | null }>) {
 }
 
 async function Body() {
-  const { supabase, staff } = await requireStaff("/crm");
+  const { supabase, staff } = await requireStaff("/crm", "dashboard.view");
   const head = { count: "exact" as const, head: true };
   const since = hoursAgo(24);
 
@@ -54,7 +54,7 @@ async function Body() {
   return (
     <div className="space-y-6 p-5 md:p-8">
       <Suspense fallback={<Skeleton className="h-40" />}>
-        <GoLive isAdmin={staff.role === "admin"} />
+        <GoLive isAdmin={staff.can("settings.manage")} />
       </Suspense>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Contacts" value={n(total)} hint="Imported driver leads" />

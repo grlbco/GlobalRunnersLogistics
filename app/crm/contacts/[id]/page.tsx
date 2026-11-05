@@ -25,7 +25,7 @@ export default function ContactPage({ params }: { params: Promise<{ id: string }
 async function Profile({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
-  const { supabase } = await requireStaff(`/crm/contacts/${id}`);
+  const { supabase } = await requireStaff(`/crm/contacts/${id}`, "contacts.view");
 
   const [{ data: c }, items, memory, runs, followups, forms, tasks, assistant] = await Promise.all([
     supabase.from("contacts").select("*").eq("id", id).maybeSingle(),

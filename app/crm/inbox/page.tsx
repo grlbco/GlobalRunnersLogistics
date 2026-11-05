@@ -35,7 +35,7 @@ type Contact = { id: string; first_name: string | null; last_name: string | null
 async function Inbox({ searchParams }: { searchParams: SP }) {
   const sp = await searchParams;
   const f = FILTERS.some((x) => x.key === sp.f) ? sp.f! : "all";
-  const { supabase } = await requireStaff("/crm/inbox");
+  const { supabase } = await requireStaff("/crm/inbox", "inbox.view");
 
   let q = supabase
     .from("messages")
@@ -119,7 +119,7 @@ async function Inbox({ searchParams }: { searchParams: SP }) {
 }
 
 async function Thread({ contact: c, unread, back }: { contact: Contact; unread: boolean; back: string }) {
-  const { supabase } = await requireStaff("/crm/inbox");
+  const { supabase } = await requireStaff("/crm/inbox", "inbox.view");
   const items = await loadTimeline(supabase, c.id);
   const hasEmailThread = items.some((m) => m.kind === "message" && m.channel === "email");
   return (

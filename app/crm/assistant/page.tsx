@@ -22,7 +22,7 @@ export default function AssistantPage() {
 }
 
 async function Body() {
-  const { supabase, staff } = await requireStaff("/crm/assistant");
+  const { supabase, staff } = await requireStaff("/crm/assistant", "assistant.view");
   const s = await getAssistantSettings();
   const since = new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
   const [{ data: runs }, { data: today }, { data: approvals }] = await Promise.all([
@@ -35,7 +35,7 @@ async function Body() {
   const spent = (today ?? []).reduce((t, r) => t + Number(r.cost_usd ?? 0), 0);
   const replied = (today ?? []).filter((r) => r.action === "replied" || r.action === "draft").length;
   const handed = (today ?? []).filter((r) => r.action === "handed_off").length;
-  const admin = staff.role === "admin";
+  const admin = staff.can("assistant.manage");
 
   return (
     <div className="grid gap-6 p-5 md:p-8 xl:grid-cols-[24rem_1fr]">

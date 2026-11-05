@@ -3,15 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { requireStaff } from "@/lib/crm/auth";
+import { requirePerm } from "@/lib/crm/auth";
 
 type Res = { ok: boolean; message: string };
 const fail = (e: unknown): Res => ({ ok: false, message: e instanceof Error ? e.message : String(e) });
 
 async function admin() {
-  const ctx = await requireStaff();
-  if (ctx.staff.role !== "admin") throw new Error("Only admins can manage campaigns");
-  return ctx;
+  return requirePerm("campaigns.manage");
 }
 
 export async function createDraft() {
@@ -92,7 +90,7 @@ export async function setCampaignState(id: string, action: "activate" | "pause")
 
 export async function refreshStats(id: string): Promise<Res> {
   try {
-    await requireStaff();
+    await requirePerm("campaigns.view");
     const { syncCampaignStats } = await import("@/lib/crm/campaigns");
     await syncCampaignStats(true);
     revalidatePath(`/crm/campaigns/${id}`);

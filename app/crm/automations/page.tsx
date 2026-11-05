@@ -25,7 +25,7 @@ export default function AutomationsPage() {
 }
 
 async function List() {
-  const { supabase } = await requireStaff("/crm/automations");
+  const { supabase } = await requireStaff("/crm/automations", "automations.view");
   const [{ data: flows }, { data: runs }] = await Promise.all([
     supabase.from("workflows").select("id, name, description, trigger_type, trigger_filter, steps, active, builtin").order("builtin", { ascending: false }).order("created_at"),
     supabase.from("workflow_runs").select("workflow_id, status"),

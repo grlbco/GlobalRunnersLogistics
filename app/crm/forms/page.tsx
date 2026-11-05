@@ -32,7 +32,7 @@ export default function FormsPage() {
 const STATUS: Record<string, string> = { draft: "bg-white/[0.06] text-white/55", published: "bg-emerald-400/15 text-emerald-300", closed: "bg-white/[0.04] text-white/35" };
 
 async function List() {
-  const { supabase } = await requireStaff("/crm/forms");
+  const { supabase } = await requireStaff("/crm/forms", "forms.view");
   const [{ data: forms }, { data: subs }, { data: links }] = await Promise.all([
     supabase.from("crm_forms").select("id, name, slug, status, updated_at").order("created_at", { ascending: false }),
     supabase.from("crm_form_submissions").select("form_id, created_at").order("created_at", { ascending: false }).limit(5000),

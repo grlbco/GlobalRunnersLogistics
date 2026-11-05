@@ -24,7 +24,7 @@ export default function CampaignsPage() {
 }
 
 async function List() {
-  const { supabase } = await requireStaff("/crm/campaigns");
+  const { supabase } = await requireStaff("/crm/campaigns", "campaigns.view");
   const { data } = await supabase.from("campaigns").select("id, name, status, leads_added, stats, stats_synced_at, created_at").order("created_at", { ascending: false });
   if (!data?.length) return <div className="p-5 md:p-8"><div className="rounded-[6px] border border-dashed border-white/10 p-16 text-center text-sm text-white/50">No campaigns yet. Start one: it comes with a ready-to-edit sequence (3 emails, 3 versions of the first one).</div></div>;
   return (

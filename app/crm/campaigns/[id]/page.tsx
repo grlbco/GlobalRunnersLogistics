@@ -23,7 +23,7 @@ const pct = (a: number, b: number) => (b ? `${((a / b) * 100).toFixed(1)}%` : "â
 async function Body({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
-  const { supabase, staff } = await requireStaff(`/crm/campaigns/${id}`);
+  const { supabase, staff } = await requireStaff(`/crm/campaigns/${id}`, "campaigns.view");
   const { data: c } = await supabase.from("campaigns").select("*").eq("id", id).maybeSingle();
   if (!c) notFound();
 
@@ -43,7 +43,7 @@ async function Body({ params }: { params: Promise<{ id: string }> }) {
   const contacted = num(o, "contacted_count") || sent;
   const seq = c.sequence as SeqStep[];
   const settings = { ...DEFAULT_SETTINGS, ...(c.settings as Partial<CampaignSettings>) };
-  const isAdmin = staff.role === "admin";
+  const isAdmin = staff.can("campaigns.manage");
 
   return (
     <div className="space-y-6 p-5 md:p-8">

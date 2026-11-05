@@ -18,7 +18,7 @@ export default function WorkflowPage({ params }: { params: Promise<{ id: string 
 async function Body({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
-  const { supabase, staff } = await requireStaff(`/crm/automations/${id}`);
+  const { supabase, staff } = await requireStaff(`/crm/automations/${id}`, "automations.view");
   const [{ data: wf }, { data: runs }] = await Promise.all([
     supabase.from("workflows").select("*").eq("id", id).maybeSingle(),
     supabase.from("workflow_runs").select("id, status, step_index, wake_at, created_at, contact:contacts(id, first_name, last_name, company_name)").eq("workflow_id", id).order("created_at", { ascending: false }).limit(25),
@@ -29,9 +29,9 @@ async function Body({ params }: { params: Promise<{ id: string }> }) {
       <div>
         <Link href="/crm/automations" className="text-xs text-white/45 hover:text-white">← Automations</Link>
         <div className="mt-4">
-          <WorkflowEditor initial={{ id: wf.id, name: wf.name, description: wf.description, trigger_type: wf.trigger_type, trigger_filter: wf.trigger_filter, steps: wf.steps, active: wf.active }} canEdit={staff.role === "admin"} />
+          <WorkflowEditor initial={{ id: wf.id, name: wf.name, description: wf.description, trigger_type: wf.trigger_type, trigger_filter: wf.trigger_filter, steps: wf.steps, active: wf.active }} canEdit={staff.can("automations.manage")} />
         </div>
-        {!wf.builtin && staff.role === "admin" && (
+        {!wf.builtin && staff.can("automations.manage") && (
           <form action={deleteWorkflow} className="mt-6">
             <input type="hidden" name="id" value={wf.id} />
             <button className="text-xs text-red-300/80 hover:text-red-300">Delete this automation</button>

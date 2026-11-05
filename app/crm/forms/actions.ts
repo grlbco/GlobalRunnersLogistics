@@ -3,13 +3,13 @@
 import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { requireStaff } from "@/lib/crm/auth";
+import { requirePerm } from "@/lib/crm/auth";
 import { TEMPLATES, emptySchema, onSubmitZ, schemaZ } from "@/lib/formbuilder/schema";
 
 const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48) || "form";
 
 export async function createForm(formData: FormData) {
-  const { supabase, staff } = await requireStaff();
+  const { supabase, staff } = await requirePerm("forms.manage");
   const key = String(formData.get("template") ?? "blank");
   const t = TEMPLATES[key];
   const name = t?.name ?? "New form";
@@ -33,7 +33,7 @@ const saveZ = z.object({
 });
 
 export async function saveForm(input: unknown): Promise<{ ok: boolean; error?: string }> {
-  const { supabase } = await requireStaff();
+  const { supabase } = await requirePerm("forms.manage");
   const p = saveZ.safeParse(input);
   if (!p.success) return { ok: false, error: p.error.issues[0]?.message ?? "Invalid form" };
   const f = p.data;
@@ -53,8 +53,7 @@ export async function saveForm(input: unknown): Promise<{ ok: boolean; error?: s
 }
 
 export async function deleteForm(formData: FormData) {
-  const { supabase, staff } = await requireStaff();
-  if (staff.role !== "admin") return;
+  const { supabase } = await requirePerm("forms.manage");
   const { data: gone } = await supabase.from("crm_forms").delete().eq("id", String(formData.get("id"))).select("slug").maybeSingle();
   if (gone?.slug) updateTag(`form:${gone.slug}`);
   revalidatePath("/crm/forms");
@@ -63,7 +62,7 @@ export async function deleteForm(formData: FormData) {
 
 /** AI translation of a form to Spanish (fills only what's missing; answers stay in English). */
 export async function translateFormToSpanish(input: unknown): Promise<{ ok: boolean; schema?: z.infer<typeof schemaZ>; error?: string }> {
-  await requireStaff();
+  await requirePerm("forms.manage");
   const p = schemaZ.safeParse(input);
   if (!p.success) return { ok: false, error: "Invalid form" };
   const s = p.data;

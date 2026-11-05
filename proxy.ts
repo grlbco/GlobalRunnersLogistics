@@ -6,6 +6,8 @@ const NON_DEFAULT_LOCALES = ["es"];
 // Routes that need a fresh Supabase session (auth pages + driver portal).
 const AUTH_PATHS = /^\/(?:es\/)?(dashboard|login|register|reset-password|update-password|auth)(\/|$)/;
 const PROTECTED = /^\/(?:es\/)?dashboard(\/|$)/;
+// CRM pages that work signed out: staff sign-in, forgot password, the reset-link landing.
+const CRM_PUBLIC = /^\/crm\/(login|forgot|auth\/callback)(\/|$)/;
 
 /**
  * 1. English lives at "/" (no prefix), Spanish at "/es". Everything sits under app/[lang] internally,
@@ -37,15 +39,15 @@ export async function proxy(request: NextRequest) {
   if (pathname === "/crm" || pathname.startsWith("/crm/")) {
     const response = NextResponse.next({ request });
     const claims = await refreshSession(request, response);
-    if (!claims) {
+    response.headers.set("X-Robots-Tag", "noindex, nofollow");
+    if (!claims && !CRM_PUBLIC.test(pathname)) {
       const url = request.nextUrl.clone();
-      url.pathname = "/login";
-      url.search = `?next=${encodeURIComponent(pathname)}`;
+      url.pathname = "/crm/login";
+      url.search = `?next=${encodeURIComponent(pathname + request.nextUrl.search)}`;
       const redirect = NextResponse.redirect(url);
       response.cookies.getAll().forEach((c) => redirect.cookies.set(c));
       return redirect;
     }
-    response.headers.set("X-Robots-Tag", "noindex, nofollow");
     return response;
   }
 

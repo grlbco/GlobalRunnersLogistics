@@ -23,7 +23,7 @@ export default function ContactsPage({ searchParams }: { searchParams: SP }) {
 
 async function Table({ searchParams }: { searchParams: SP }) {
   const sp = await searchParams;
-  const { supabase } = await requireStaff("/crm/contacts");
+  const { supabase } = await requireStaff("/crm/contacts", "contacts.view");
   const page = Math.max(1, Number(sp.page) || 1);
   const q = (sp.q ?? "").trim().toLowerCase();
 

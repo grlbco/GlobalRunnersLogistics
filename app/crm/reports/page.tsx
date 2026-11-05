@@ -38,7 +38,7 @@ export default function ReportsPage({ searchParams }: { searchParams: Promise<{ 
 async function Body({ searchParams }: { searchParams: Promise<{ range?: string }> }) {
   const { range = "30d" } = await searchParams;
   const sel = RANGES.find((r) => r[0] === range) ?? RANGES[1];
-  const { supabase, staff } = await requireStaff("/crm/reports");
+  const { supabase, staff } = await requireStaff("/crm/reports", "reports.view");
   const since = await sinceFor(sel[2]);
   const { data, error } = await supabase.rpc("crm_report", { p_since: since });
   if (error || !data) return <p className="p-8 text-sm text-red-300">Couldn&apos;t load the report: {error?.message}</p>;
@@ -116,7 +116,7 @@ async function Body({ searchParams }: { searchParams: Promise<{ range?: string }
         <Card className="p-5">
           <Label>Monthly costs (for cost per hire)</Label>
           <p className="mt-2 text-xs text-white/45">AI cost is counted automatically. Spend in this range: {usd(total)} ({usd(fixed)} fixed + {usd(Number(r.assistant.cost))} AI).</p>
-          <div className="mt-4"><CostsForm initial={r.costs} canEdit={staff.role === "admin"} /></div>
+          <div className="mt-4"><CostsForm initial={r.costs} canEdit={staff.can("settings.manage")} /></div>
         </Card>
       </div>
     </div>

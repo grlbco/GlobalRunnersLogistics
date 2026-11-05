@@ -2,13 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireStaff } from "@/lib/crm/auth";
+import { requirePerm } from "@/lib/crm/auth";
 import { STAGE_KEYS } from "@/lib/crm/stages";
 
 const id = z.string().uuid();
 
 export async function setStage(formData: FormData) {
-  const { supabase, staff } = await requireStaff();
+  const { supabase, staff } = await requirePerm("contacts.edit");
   const parsed = z.object({ id, stage: z.enum(STAGE_KEYS as [string, ...string[]]) }).safeParse(Object.fromEntries(formData));
   if (!parsed.success) return;
   const { data: before } = await supabase.from("contacts").select("stage").eq("id", parsed.data.id).single();
@@ -27,7 +27,7 @@ export async function setStage(formData: FormData) {
 }
 
 export async function addNote(formData: FormData) {
-  const { supabase, staff } = await requireStaff();
+  const { supabase, staff } = await requirePerm("contacts.edit");
   const parsed = z.object({ id, body: z.string().trim().min(1).max(5000) }).safeParse(Object.fromEntries(formData));
   if (!parsed.success) return;
   await supabase.from("notes").insert({ contact_id: parsed.data.id, author_id: staff.id, body: parsed.data.body });
@@ -35,7 +35,7 @@ export async function addNote(formData: FormData) {
 }
 
 export async function setAgentMode(formData: FormData) {
-  const { supabase, staff } = await requireStaff();
+  const { supabase, staff } = await requirePerm("contacts.edit");
   const parsed = z.object({ id, mode: z.enum(["auto", "manual"]) }).safeParse(Object.fromEntries(formData));
   if (!parsed.success) return;
   await supabase.from("contacts").update({ agent_mode: parsed.data.mode }).eq("id", parsed.data.id);
@@ -51,7 +51,7 @@ export type SendState = { ok: boolean; message: string } | null;
 
 /** Manual email/text from the profile. Goes through the outbox so every check applies. */
 export async function sendManual(_prev: SendState, formData: FormData): Promise<SendState> {
-  const { supabase, staff } = await requireStaff();
+  const { supabase, staff } = await requirePerm("contacts.message");
   const parsed = z
     .object({ id, channel: z.enum(["email", "sms"]), body: z.string().trim().min(1).max(1500), subject: z.string().trim().max(200).optional() })
     .safeParse(Object.fromEntries(formData));
@@ -79,7 +79,7 @@ const toE164 = (v: string) => {
 };
 
 export async function updateContact(formData: FormData) {
-  const { supabase, staff } = await requireStaff();
+  const { supabase, staff } = await requirePerm("contacts.edit");
   const f = Object.fromEntries(formData) as Record<string, string>;
   if (!id.safeParse(f.id).success) return;
   const opt = (v?: string) => (v ?? "").trim() || null;
@@ -102,7 +102,7 @@ export async function updateContact(formData: FormData) {
 }
 
 export async function addTask(formData: FormData) {
-  const { supabase, staff } = await requireStaff();
+  const { supabase, staff } = await requirePerm("contacts.edit");
   const parsed = z
     .object({ contact_id: id.optional(), title: z.string().trim().min(1).max(300), due_at: z.string().optional() })
     .safeParse(Object.fromEntries(formData));
@@ -119,7 +119,7 @@ export async function addTask(formData: FormData) {
 }
 
 export async function toggleTask(formData: FormData) {
-  const { supabase } = await requireStaff();
+  const { supabase } = await requirePerm("contacts.edit");
   const parsed = z.object({ id, contact_id: id.optional() }).safeParse(Object.fromEntries(formData));
   if (!parsed.success) return;
   const { data: t } = await supabase.from("tasks").select("done_at").eq("id", parsed.data.id).single();
@@ -138,14 +138,14 @@ export async function moveContact(contactId: string, stage: string) {
 
 /** Opening a thread marks it read. */
 export async function markRead(contactId: string) {
-  const { supabase } = await requireStaff();
+  const { supabase } = await requirePerm("inbox.view");
   if (!id.safeParse(contactId).success) return;
   await supabase.from("conversations").update({ unread: false }).eq("contact_id", contactId).eq("unread", true);
 }
 
 /** Approve an assistant draft (optionally edited) and send it now. */
 export async function approveDraft(formData: FormData) {
-  const { supabase, staff } = await requireStaff();
+  const { supabase, staff } = await requirePerm("contacts.message");
   const parsed = z.object({ id, contact_id: id, body: z.string().trim().min(1).max(1500) }).safeParse(Object.fromEntries(formData));
   if (!parsed.success) return;
   const { data: orig } = await supabase.from("outbox").select("body").eq("id", parsed.data.id).maybeSingle();
@@ -160,7 +160,7 @@ export async function approveDraft(formData: FormData) {
 }
 
 export async function discardDraft(formData: FormData) {
-  const { supabase, staff } = await requireStaff();
+  const { supabase, staff } = await requirePerm("contacts.message");
   const parsed = z.object({ id, contact_id: id }).safeParse(Object.fromEntries(formData));
   if (!parsed.success) return;
   await supabase.from("outbox").update({ status: "cancelled", error: "discarded by staff" }).eq("id", parsed.data.id).in("status", ["draft", "pending"]);
@@ -170,8 +170,7 @@ export async function discardDraft(formData: FormData) {
 }
 
 export async function saveAssistantSettings(formData: FormData) {
-  const { supabase, staff } = await requireStaff();
-  if (staff.role !== "admin") return;
+  const { supabase } = await requirePerm("assistant.manage");
   const f = Object.fromEntries(formData) as Record<string, string>;
   const num = (v: string, lo: number, hi: number, d: number) => Math.min(hi, Math.max(lo, Number(v) || d));
   const value = {
@@ -190,7 +189,7 @@ export type TestState = { reply?: string | null; action?: string; channel?: stri
 
 /** Dry run: what would the assistant answer? Nothing is saved or sent. */
 export async function testAssistant(_prev: TestState, formData: FormData): Promise<TestState> {
-  const { supabase } = await requireStaff();
+  const { supabase } = await requirePerm("assistant.view");
   const f = Object.fromEntries(formData) as Record<string, string>;
   const body = (f.message ?? "").trim();
   if (!body) return { error: "Type a driver message first." };
@@ -207,8 +206,7 @@ export async function testAssistant(_prev: TestState, formData: FormData): Promi
 
 /** Big on/off switch. Turning on answers drivers whose last message (48h) is still unanswered. */
 export async function setAssistantEnabled(formData: FormData) {
-  const { supabase, staff } = await requireStaff();
-  if (staff.role !== "admin") return;
+  const { supabase } = await requirePerm("assistant.manage");
   const on = formData.get("on") === "1";
   const { data } = await supabase.from("app_settings").select("value").eq("key", "assistant").maybeSingle();
   await supabase.from("app_settings").upsert({ key: "assistant", value: { ...((data?.value as object) ?? {}), enabled: on }, updated_at: new Date().toISOString() });
@@ -228,7 +226,7 @@ export async function setAssistantEnabled(formData: FormData) {
 
 /** "Reply now" on a profile: queue an assistant run for this driver right away. */
 export async function askAssistant(formData: FormData) {
-  const { supabase } = await requireStaff();
+  const { supabase } = await requirePerm("assistant.view");
   const contactId = String(formData.get("id"));
   if (!id.safeParse(contactId).success) return;
   const { data: last } = await supabase.from("messages").select("id, channel, direction").eq("contact_id", contactId).order("created_at", { ascending: false }).limit(1).maybeSingle();

@@ -14,9 +14,17 @@ Everything runs locally today. This is the exact order to put it on globalrunner
 4. Deploy. Check `https://globalrunnerslogistics.com/crm/settings` → Connections are green.
 
 ## 2. Supabase
-- Auth → URL configuration: Site URL `https://globalrunnerslogistics.com`, redirect `https://globalrunnerslogistics.com/**`.
-- Auth → Passwords: turn on **leaked password protection**.
-- Change the `1234` admin password in CRM → Settings → Your password.
+- Auth → URL configuration: Site URL `https://globalrunnerslogistics.com`, redirect `https://globalrunnerslogistics.com/**`
+  (covers the staff reset link `/crm/auth/callback` and the driver portal `/auth/callback`).
+- Auth → Passwords: turn on **leaked password protection**, minimum length 10.
+- Staff sign in at `/crm/login`. There is no sign-up: people are added on **CRM → Team** (temporary password, changed at first sign-in).
+
+## Staff access (CRM → Team)
+- Roles: **Admin** (everything, fixed), **Recruiter**, **Viewer**, plus any custom role an Admin creates. Each role is a set of permissions (`lib/crm/permissions.ts`).
+- Per person: tick or untick single permissions on top of their role (stored as extras/removals).
+- Rules: you can only give access you have; you can't change your own access; at least one person must keep "manage the team".
+- Suspend blocks sign-in at once; Remove takes CRM access away but keeps the login (they may also be a driver).
+- Every sign-in and team change is logged (Team → Activity, table `staff_audit`).
 
 ## 3. Background worker (every minute)
 Open the Supabase SQL editor, paste `supabase/deploy/worker-cron.sql`, replace `<WORKER_SECRET>`, run.

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Suspense } from "react";
 import { clsx } from "clsx";
 import { requireStaff } from "@/lib/crm/auth";
@@ -5,15 +6,15 @@ import { adminDb } from "@/lib/crm/admin";
 import { getCallHours, inCallHours } from "@/lib/crm/callme";
 import { sendingEnvOn } from "@/lib/crm/sending";
 import { healthChecks } from "@/lib/crm/health";
-import { Card, Label, PageHead, Skeleton } from "@/components/crm/ui";
-import { CallHoursForm, PasswordForm, SendingSwitch, TeamPanel } from "@/components/crm/SettingsPanels";
+import { Card, Label, PageHead, Skeleton, btnGhostCls } from "@/components/crm/ui";
+import { CallHoursForm, SendingSwitch } from "@/components/crm/SettingsPanels";
 
 export const metadata = { title: "Settings" };
 
 export default function SettingsPage() {
   return (
     <>
-      <PageHead title="Settings" sub="Sending, Ken's call hours, your team, your password and every connection." />
+      <PageHead title="Settings" sub="Sending, Ken's call hours and every connection." />
       <Suspense fallback={<div className="p-8"><Skeleton className="h-96" /></div>}>
         <Body />
       </Suspense>
@@ -22,18 +23,14 @@ export default function SettingsPage() {
 }
 
 async function Body() {
-  const { staff } = await requireStaff("/crm/settings");
+  const { staff } = await requireStaff("/crm/settings", "settings.view");
   const db = adminDb();
-  const [{ data: sending }, hours, { data: team }, { data: users }] = await Promise.all([
+  const [{ data: sending }, hours] = await Promise.all([
     db.from("app_settings").select("value, updated_at").eq("key", "sending").maybeSingle(),
     getCallHours(),
-    db.from("profiles").select("id, full_name, role, created_at").in("role", ["recruiter", "admin"]).order("created_at"),
-    db.auth.admin.listUsers({ page: 1, perPage: 1000 }),
   ]);
-  const emailOf = (id: string) => users?.users.find((u) => u.id === id)?.email ?? "";
-  const lastSeen = (id: string) => users?.users.find((u) => u.id === id)?.last_sign_in_at ?? null;
   const switchOn = (sending?.value as { enabled?: boolean } | null)?.enabled !== false;
-  const isAdmin = staff.role === "admin";
+  const isAdmin = staff.can("settings.manage");
   return (
     <div className="grid gap-6 p-5 md:p-8 xl:grid-cols-2">
       <Card className="p-5 xl:col-span-2">
@@ -47,15 +44,11 @@ async function Body() {
       </Card>
 
       <Card className="p-5">
-        <Label>Your password</Label>
-        <p className="mt-2 text-sm text-white/55">Signed in as {staff.email} ({staff.role}).</p>
-        <div className="mt-4"><PasswordForm /></div>
-      </Card>
-
-      <Card className="p-5 xl:col-span-2">
-        <Label>Team</Label>
-        <div className="mt-4">
-          <TeamPanel me={staff.id} canEdit={isAdmin} members={(team ?? []).map((m) => ({ id: m.id, name: m.full_name ?? "", role: m.role as "recruiter" | "admin", email: emailOf(m.id), lastSeen: lastSeen(m.id) }))} />
+        <Label>Team and your account</Label>
+        <p className="mt-2 text-sm text-white/55">Signed in as {staff.email} ({staff.roleName}).</p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link href="/crm/account" className={btnGhostCls}>My account and password</Link>
+          {staff.can("team.manage") && <Link href="/crm/team" className={btnGhostCls}>Team and permissions</Link>}
         </div>
       </Card>
 

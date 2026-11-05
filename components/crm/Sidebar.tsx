@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { clsx } from "clsx";
+import { crmSignOut } from "@/app/crm/auth-actions";
 
 const NAV: { href: string; label: string; icon: string; soon?: boolean }[] = [
   { href: "/crm", label: "Dashboard", icon: "M3 13h8V3H3zm10 8h8V11h-8zM3 21h8v-6H3zm10-18v6h8V3z" },
@@ -15,8 +16,11 @@ const NAV: { href: string; label: string; icon: string; soon?: boolean }[] = [
   { href: "/crm/automations", label: "Automations", icon: "M5 4v6h6M19 20v-6h-6M5 10a7 7 0 0 1 12-3M19 14a7 7 0 0 1-12 3" },
   { href: "/crm/reports", label: "Reports", icon: "M4 20V10M10 20V4M16 20v-7M22 20H2" },
   { href: "/crm/assistant", label: "Assistant", icon: "M4 6h16v10H8l-4 4z" },
+  { href: "/crm/team", label: "Team", icon: "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 6.5M18 14.5a6.5 6.5 0 0 1 3.5 5.5" },
   { href: "/crm/settings", label: "Settings", icon: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19 12l2-1-2-4-2 1-2-2V4h-4v2L9 8 7 7l-2 4 2 1v0l-2 1 2 4 2-1 2 2v2h4v-2l2-2 2 1 2-4z" },
 ];
+
+const ACCOUNT = { href: "/crm/account", label: "Account", icon: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm-8 9a8 8 0 0 1 16 0" };
 
 function Icon({ d }: { d: string }) {
   return (
@@ -26,10 +30,10 @@ function Icon({ d }: { d: string }) {
   );
 }
 
-export function Sidebar() {
+export function Sidebar({ allowed, me }: { allowed: string[]; me: { name: string; role: string } }) {
   const path = usePathname();
   const active = (href: string) => (href === "/crm" ? path === "/crm" : path.startsWith(href));
-  if (path === "/crm/no-access") return null;
+  const items = NAV.filter((i) => allowed.includes(i.href));
   return (
     <>
       <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-white/[0.07] bg-[#0b1424] md:flex">
@@ -38,7 +42,7 @@ export function Sidebar() {
           <span className="text-[0.95rem] font-semibold tracking-[-0.02em]">Command</span>
         </Link>
         <nav className="mt-2 flex flex-col gap-0.5 px-3">
-          {NAV.map((item) => (
+          {items.map((item) => (
             <Link
               key={item.href}
               href={item.soon ? "#" : item.href}
@@ -55,13 +59,19 @@ export function Sidebar() {
             </Link>
           ))}
         </nav>
-        <div className="mt-auto border-t border-white/[0.07] px-5 py-4 font-mono text-[0.65rem] uppercase tracking-[0.14em] text-white/35">
-          Global Runners Logistics
+        <div className="mt-auto border-t border-white/[0.07] px-3 py-3">
+          <Link href="/crm/account" className={clsx("block rounded-[4px] px-3 py-2 transition-colors", active("/crm/account") ? "bg-white/[0.07]" : "hover:bg-white/[0.04]")}>
+            <span className="block truncate text-[0.85rem] text-white/85">{me.name}</span>
+            <span className="block font-mono text-[0.62rem] uppercase tracking-[0.14em] text-white/40">{me.role}</span>
+          </Link>
+          <form action={crmSignOut}>
+            <button className="mt-1 w-full rounded-[4px] px-3 py-2 text-left text-[0.8rem] text-white/45 transition-colors hover:bg-white/[0.04] hover:text-white">Sign out</button>
+          </form>
         </div>
       </aside>
       {/* Mobile bottom tabs */}
       <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-white/10 bg-[#0b1424]/95 backdrop-blur md:hidden">
-        {NAV.filter((i) => !i.soon).slice(0, 5).map((item) => (
+        {[...items.filter((i) => !i.soon).slice(0, 4), ACCOUNT].map((item) => (
           <Link key={item.href} href={item.href} className={clsx("flex flex-col items-center gap-1 py-2.5 text-[0.7rem]", active(item.href) ? "text-white" : "text-white/45")}>
             <Icon d={item.icon} />
             {item.label}

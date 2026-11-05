@@ -10,7 +10,7 @@ const cell = (v: unknown) => {
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/.test(id)) return new Response("Not found", { status: 404 });
-  const { supabase } = await requireStaff(`/crm/forms/${id}`);
+  const { supabase } = await requireStaff(`/crm/forms/${id}`, "forms.view");
   const { data: form } = await supabase.from("crm_forms").select("slug, schema").eq("id", id).maybeSingle();
   if (!form) return new Response("Not found", { status: 404 });
   const { data: subs } = await supabase.from("crm_form_submissions").select("created_at, data, contact_id").eq("form_id", id).order("created_at", { ascending: false }).limit(10000);

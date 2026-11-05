@@ -19,7 +19,7 @@ export default function PipelinePage() {
 }
 
 async function Data() {
-  const { supabase } = await requireStaff("/crm/pipeline");
+  const { supabase } = await requireStaff("/crm/pipeline", "pipeline.view");
   const columns = await Promise.all(
     BOARD.map(async (stage) => {
       const { data, count } = await supabase
