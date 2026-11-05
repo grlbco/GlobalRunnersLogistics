@@ -12,7 +12,16 @@ import { checkReply } from "./checks";
 import { STAGES_AGENT_MAY_SET, buildMessages, type Turn } from "./prompt";
 
 const str = z.preprocess((v) => (v === undefined || v === null ? null : String(v)), z.string().nullable());
-const Decision = z.object({
+// Models sometimes put an email body under "body"/"email"/"message": fold those into replies.
+const foldBody = (v: unknown) => {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return v;
+  const o = v as Record<string, unknown>;
+  const has = Array.isArray(o.replies) ? o.replies.some((x) => typeof x === "string" && x.trim()) : typeof o.replies === "string" && o.replies.trim();
+  if (has) return o;
+  const alt = [o.body, o.email, o.email_body, o.message, o.text].find((x) => typeof x === "string" && x.trim());
+  return alt ? { ...o, replies: [alt] } : o;
+};
+const Decision = z.preprocess(foldBody, z.object({
   intent: z.preprocess((v) => (typeof v === "string" ? v : "other"), z.string()),
   replies: z.preprocess((v) => (Array.isArray(v) ? v.filter((x) => typeof x === "string" && x.trim()) : typeof v === "string" && v.trim() ? [v] : []), z.array(z.string())).default([]),
   reply: str.optional(),
@@ -25,7 +34,7 @@ const Decision = z.object({
   handoff: str.optional(),
   mood: str.optional(),
   sms_replies: z.preprocess((v) => (Array.isArray(v) ? v.filter((x) => typeof x === "string" && x.trim()) : typeof v === "string" && v.trim() ? [v] : []), z.array(z.string())).default([]),
-});
+}));
 export type Decision = z.infer<typeof Decision>;
 
 // Before the form link is out: a light ladder (most replies come from follow-ups, 3-day median gaps).
@@ -168,7 +177,10 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
     const track = (r: { costUsd: number; tokensIn: number; tokensOut: number; latencyMs: number; model: string }) => {
       costUsd += r.costUsd; tokensIn += r.tokensIn; tokensOut += r.tokensOut; latency += r.latencyMs; model = r.model;
     };
-    const partsOf = (d: Decision) => (d.replies.length ? d.replies : d.reply ? [d.reply] : []).map(clean).filter(Boolean).slice(0, channel === "sms" ? 3 : 1);
+    const partsOf = (d: Decision) => {
+      const raw = (d.replies.length ? d.replies : d.reply ? [d.reply] : []).map(clean).filter(Boolean);
+      return channel === "email" ? (raw.length ? [raw.join("\n\n")] : []) : raw.slice(0, 3);
+    };
     for (let attempt = 0; attempt < 2 && !decision; attempt++) {
       const r = await chatJson(messages, { temperature: attempt ? 0.5 : 0.8 });
       track(r);
