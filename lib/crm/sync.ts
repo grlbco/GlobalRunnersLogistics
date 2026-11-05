@@ -11,7 +11,7 @@ import * as instantly from "@/lib/integrations/instantly";
  * Pull-based sync (works locally with no public URL) + the handlers webhooks call.
  * Cursors live in app_settings.cursors. First run starts "now": no history import.
  */
-type Cursors = { quo?: string; instantly?: string };
+type Cursors = { quo?: string; instantly?: string; calls?: string };
 
 async function getCursors(): Promise<Cursors> {
   const { data } = await adminDb().from("app_settings").select("value").eq("key", "cursors").maybeSingle();
@@ -21,7 +21,7 @@ async function setCursors(c: Cursors) {
   await adminDb().from("app_settings").upsert({ key: "cursors", value: c, updated_at: new Date().toISOString() });
 }
 
-export type SyncResult = { quo: { conversations: number; newMessages: number; error?: string }; instantly: { scanned: number; newMessages: number; error?: string } };
+export type SyncResult = { quo: { conversations: number; newMessages: number; error?: string }; instantly: { scanned: number; newMessages: number; error?: string }; calls?: { calls: number; changed: number; error?: string } };
 
 // ---------------- Quo (texts) ----------------
 
@@ -219,6 +219,16 @@ export async function syncAll(): Promise<SyncResult> {
     next.quo = now;
   } catch (e) {
     res.quo.error = e instanceof Error ? e.message : String(e);
+  }
+  // calls: at most once a minute (webhooks do it instantly in production)
+  if (!cur.calls || Date.now() - new Date(cur.calls).getTime() > 60_000) {
+    try {
+      const { syncQuoCalls } = await import("./calls");
+      res.calls = await syncQuoCalls();
+      next.calls = now;
+    } catch (e) {
+      res.calls = { calls: 0, changed: 0, error: e instanceof Error ? e.message : String(e) };
+    }
   }
   try {
     res.instantly = await syncInstantly(back(start.instantly));

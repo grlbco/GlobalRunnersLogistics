@@ -59,6 +59,56 @@ export async function sendText(to: string, content: string): Promise<{ id?: stri
   return { id: r.data?.id };
 }
 
+// ---------------- calls (API version 2026-03-30: summaries + voicemail in one call) ----------------
+
+export type QuoCall = {
+  id: string;
+  phoneNumberId: string | null;
+  direction: "incoming" | "outgoing";
+  status: string;
+  participants: { phoneNumber: string; actorId: string | null }[];
+  answeredAt: string | null;
+  answeredBy: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  duration: number;
+  aiHandled: string | null;
+  summary?: { status: string; type: string | null; summary: string[] | null; nextSteps: string[] | null; title: string | null } | null;
+  voicemail?: { id: string; status: string; duration: number | null; recordingUrl: string | null; transcript: string | null } | null;
+};
+const V2 = "https://api.quo.com";
+const getV2 = <T>(path: string) => callJson<T>("quo", `${V2}${path}`, { headers: { Authorization: key(), "Quo-Api-Version": "2026-03-30" } });
+
+/** Calls on our number since `since` (newest first), with summary + voicemail. */
+export async function callsSince(since: string): Promise<QuoCall[]> {
+  const out: QuoCall[] = [];
+  let after: string | undefined;
+  const pn = await phoneNumberId();
+  for (let i = 0; i < 6; i++) {
+    const q = new URLSearchParams({ include: "summary,voicemail", phoneNumberId: pn, "createdAt[gte]": since, limit: "50" });
+    if (after) q.set("after", after);
+    const r = await getV2<{ data: QuoCall[]; nextCursor?: string | null }>(`/calls?${q}`);
+    out.push(...(r.data ?? []));
+    if (!r.nextCursor) break;
+    after = r.nextCursor;
+  }
+  return out;
+}
+
+export async function getCall(id: string): Promise<QuoCall | null> {
+  if (!/^AC/.test(id)) return null;
+  const r = await getV2<{ data: QuoCall }>(`/calls/${id}?include=summary,voicemail`).catch(() => null);
+  return r?.data ?? null;
+}
+
+/** Call id from any call.* webhook (v1 or newer envelopes). */
+export function callIdFromEvent(body: unknown): string | null {
+  const b = body as { data?: { object?: Record<string, unknown>; resource?: Record<string, unknown> } };
+  const o = b?.data?.object ?? b?.data?.resource ?? {};
+  const id = (o.callId ?? (String(o.id ?? "").startsWith("AC") ? o.id : null)) as string | null;
+  return id && /^AC/.test(id) ? id : null;
+}
+
 /** Webhook payload → message (legacy data.object and newer data.resource envelopes). */
 export function parseQuoEvent(body: unknown): { type: string; message?: QuoMessage } {
   const b = body as { type?: string; data?: { object?: Record<string, unknown>; resource?: Record<string, unknown>; context?: Record<string, unknown> } };

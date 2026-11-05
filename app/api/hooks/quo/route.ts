@@ -2,7 +2,8 @@ import { after } from "next/server";
 import { adminDb } from "@/lib/crm/admin";
 import { logEvent } from "@/lib/crm/ingest";
 import { ingestQuoMessage } from "@/lib/crm/sync";
-import { parseQuoEvent, verifyQuoSignature } from "@/lib/integrations/quo";
+import { callIdFromEvent, getCall, parseQuoEvent, verifyQuoSignature } from "@/lib/integrations/quo";
+import { ingestQuoCall } from "@/lib/crm/calls";
 
 export const maxDuration = 60;
 
@@ -19,6 +20,12 @@ export async function POST(req: Request) {
   }
   if (type === "message.received" && message) {
     after(() => ingestQuoMessage(message).then(() => {}));
+    return Response.json({ ok: true });
+  }
+  if (type.startsWith("call.")) {
+    // call.completed / call.summary.completed / call.transcript.completed / call.recording.completed: fetch the full call and ingest
+    const id = callIdFromEvent(body);
+    if (id) after(async () => { const c = await getCall(id); if (c) await ingestQuoCall(c); });
     return Response.json({ ok: true });
   }
   await logEvent("quo", type || "unknown", body);
