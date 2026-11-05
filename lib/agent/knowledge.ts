@@ -18,6 +18,7 @@ export const OFFER_FACTS = [
   `Requirements: ${requirements.join(". ")}.`,
   `Orientation: ${hiring.orientationDays} day in Henderson, NV; first load in ${hiring.timeToFirstLoad.toLowerCase()}. Travel to orientation paid for drivers who live far away.`,
   `Dispatch: dedicated dispatcher, 24/7, in ${hiring.dispatchLanguages.join(" and ")}.`,
+  `Home time: drivers can take the truck home. The exact home-time schedule is not confirmed in writing, Ken goes over it on the call.`,
   `Ken (owner) calls drivers himself, usually within the hour during the day (Pacific time). Ken's number: ${company.phone.display}.`,
 ].join("\n");
 
