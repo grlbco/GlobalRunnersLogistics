@@ -13,6 +13,7 @@ const NAV: { href: string; label: string; icon: string; soon?: boolean }[] = [
   { href: "/crm/forms", label: "Forms", icon: "M6 3h9l4 4v14H6zM15 3v4h4M9 12h7M9 16h7M9 8h3" },
   { href: "/crm/campaigns", label: "Campaigns", icon: "M3 11l18-8-8 18-2-8z" },
   { href: "/crm/automations", label: "Automations", icon: "M5 4v6h6M19 20v-6h-6M5 10a7 7 0 0 1 12-3M19 14a7 7 0 0 1-12 3" },
+  { href: "/crm/reports", label: "Reports", icon: "M4 20V10M10 20V4M16 20v-7M22 20H2" },
   { href: "/crm/assistant", label: "Assistant", icon: "M4 6h16v10H8l-4 4z" },
   { href: "/crm/settings", label: "Settings", icon: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19 12l2-1-2-4-2 1-2-2V4h-4v2L9 8 7 7l-2 4 2 1v0l-2 1 2 4 2-1 2 2v2h4v-2l2-2 2 1 2-4z" },
 ];
