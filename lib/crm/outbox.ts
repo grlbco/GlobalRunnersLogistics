@@ -18,7 +18,7 @@ type Row = { id: string; contact_id: string; channel: "email" | "sms"; author: "
  * Quiet hours apply only to texts WE start (follow-ups, automations): 8am–9pm driver time.
  * Replies to a driver who just messaged us go out 24/7. Email has no quiet hours.
  */
-function inQuietHours(tz: string | null, at = new Date()) {
+export function inQuietHours(tz: string | null, at = new Date()) {
   if (!tz) return false;
   const parts = new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", hour12: false }).formatToParts(at);
   const hour = Number(parts.find((p) => p.type === "hour")?.value ?? 12) % 24;

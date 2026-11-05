@@ -204,7 +204,7 @@ export async function ingestDirectEmail(e: { id: string; from: string; subject: 
 }
 
 /** The driver's own text of an email reply, without the quoted thread below it. */
-function ownWords(body: string) {
+export function ownWords(body: string) {
   const lines = body.split(/\r?\n/);
   const out: string[] = [];
   for (const l of lines) {

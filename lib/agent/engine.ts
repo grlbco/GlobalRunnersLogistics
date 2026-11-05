@@ -62,14 +62,14 @@ export type FollowupKind = "nudge" | "chase" | "chase_extra" | "nurture";
 const HUMAN_WORDS = /\b(human|real person|manager|supervisor|lawyer|attorney|sue|lawsuit|complaint|harass|scam|police|report you)\b/i;
 
 /** Moves a follow-up time into a good texting window in the driver's zone: 10-11am or 5-6:30pm, Mon-Sat. */
-function inGoodWindow(due: Date, tz: string | null): Date {
+export function inGoodWindow(due: Date, tz: string | null): Date {
   if (!tz) return due;
   const local = (d: Date) => {
     const p = new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", minute: "numeric", hour12: false, weekday: "short" }).formatToParts(d);
     return { h: Number(p.find((x) => x.type === "hour")?.value) % 24, m: Number(p.find((x) => x.type === "minute")?.value), wd: p.find((x) => x.type === "weekday")?.value };
   };
   let d = new Date(due);
-  for (let i = 0; i < 96; i++) {
+  for (let i = 0; i < 96 * 3; i++) { // up to 3 days ahead (Saturday evening → Monday morning)
     const { h, m, wd } = local(d);
     const mins = h * 60 + m;
     if (wd !== "Sun" && ((mins >= 600 && mins <= 660) || (mins >= 1020 && mins <= 1110))) return new Date(d.getTime() + Math.random() * 20 * 60_000);
