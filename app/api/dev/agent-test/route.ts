@@ -14,6 +14,7 @@ const SCENARIOS: Record<string, string[]> = {
   bot: ["am I talking to a bot?"],
   owner_op: ["I have my own truck, do you take owner operators?"],
   stop: ["STOP"],
+  call_me: ["can you just call me? I hate typing"],
 };
 
 export async function GET(req: Request) {
@@ -35,6 +36,7 @@ export async function GET(req: Request) {
       cost += r.costUsd ?? 0;
       if (r.problems?.length) problems.push(...r.problems);
       const parts = (r.decision?.replies ?? []) as string[];
+      if (r.decision?.intent === "call_request") transcript.push("  → intent call_request (Ken gets the Call now alert)");
       if (!parts.length) transcript.push(`  → (${r.action}${r.decision?.handoff ? `: handoff "${r.decision.handoff}"` : ""}${r.decision?.intent ? `, intent ${r.decision.intent}` : ""}${r.decision?.stage ? `, stage ${r.decision.stage}` : ""})`);
       for (const t of parts) {
         transcript.push(`US: ${t}`);
