@@ -1,6 +1,8 @@
+import { company } from "@/content/facts";
 import { OFFER_FACTS } from "./knowledge";
 import type { ChatMsg } from "@/lib/integrations/deepseek";
 
+const KEN_PHONE = company.phone.display;
 export const STAGES_AGENT_MAY_SET = ["replied", "interested", "form_sent", "not_interested", "not_fit", "nurture"] as const;
 
 /**
@@ -52,6 +54,7 @@ If someone sincerely asks whether they're talking to a real person or a bot: don
 
 RULES
 - You never call anyone yourself and never offer to ("I'll call you" is wrong). Ken calls drivers after they fill out the form, or at a time they give you.
+- If they ask to be called or want to talk on the phone: intent "call_request". Ken gets an alert right away. Reply in one short text: if "Ken available now" is yes, Ken will call them in a few minutes from his number; if no, first thing in the morning. Mention the form is still the fastest way to get the rate and details, without pushing.
 - If something isn't in the facts (like the home-time schedule), say Ken goes over it on the call, don't dodge.
 - Never promise a job, a rate, miles or home time. Never promise when Ken calls beyond "usually within the hour during the day" (no "today", no "right now").
 - Never ask about immigration, citizenship, race, religion, health, family plans. Work authorization is just a yes/no on the form.
@@ -64,7 +67,7 @@ RULES
 - STOP / unsubscribe: intent "stop", replies = [].
 
 OUTPUT: one JSON object only:
-{"intent":"interested|question|objection|not_interested|not_fit|wrong_person|stop|owner_operator|small_talk|ready|other",
+{"intent":"interested|question|objection|not_interested|not_fit|wrong_person|stop|owner_operator|call_request|small_talk|ready|other",
  "replies":["text 1","optional text 2","optional text 3"],
  "subject":null,
  "stage":null or one of ${STAGES_AGENT_MAY_SET.join("|")},
@@ -85,7 +88,7 @@ export type PromptCtx = {
   memory: { facts: Record<string, unknown>; summary?: string | null; next_step?: string | null };
   turns: Turn[]; trigger: string; followupAttempt?: number;
   hasPhone?: boolean; followupKind?: string; chaseTotal?: number; alsoText?: boolean;
-  formSubmitted?: { form: string; sendDriverForm?: boolean }; otherForms?: string[];
+  formSubmitted?: { form: string; sendDriverForm?: boolean }; otherForms?: string[]; kenAvailable?: boolean;
 };
 
 /** One fresh angle per chase step, so no two follow-ups say the same thing. Direct, a little pushy, never fake urgency. */
@@ -109,7 +112,7 @@ Form link: ${p.formUrl}
 Form status: ${p.form.completed ? "COMPLETED" : p.form.opened ? `opened, stopped at step ${p.form.step}` : p.form.sent ? "link sent, not opened" : "not sent yet"}
 What we know: ${JSON.stringify(p.memory.facts)}
 Summary so far: ${p.memory.summary ?? "(first conversation)"}
-Note from last time: ${p.memory.next_step ?? "(none)"}${p.otherForms?.length ? `\nForms they sent us: ${p.otherForms.join(", ")}` : ""}`;
+Note from last time: ${p.memory.next_step ?? "(none)"}\nKen available now: ${p.kenAvailable === false ? "no (after hours)" : "yes"} · Ken's number: ${KEN_PHONE}${p.otherForms?.length ? `\nForms they sent us: ${p.otherForms.join(", ")}` : ""}`;
 
   const msgs: ChatMsg[] = [{ role: "system", content: systemPrompt() }, { role: "system", content: card }];
   // collapse consecutive same-side turns so roles alternate

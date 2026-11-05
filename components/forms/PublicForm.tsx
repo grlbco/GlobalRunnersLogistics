@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { clsx } from "clsx";
 import { getFormPrefill, submitPublicForm } from "@/app/actions/publicForms";
-import { validate, type Answers, type FormField, type FormSchema } from "@/lib/formbuilder/schema";
+import { allFields, validate, type Answers, type FormField, type FormSchema } from "@/lib/formbuilder/schema";
+import { CallMeNow } from "./CallMeNow";
 
 /**
  * Renders a Forms-module schema. Mobile first: big tap targets, one page at a time, progress bar.
@@ -74,6 +75,16 @@ export function PublicForm({ slug, schema, prefill, preview = false }: { slug: s
           <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" aria-hidden><path d="M5 12.5l4.5 4.5L19 7.5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </span>
         <p className="h3 mt-8">{done}</p>
+        {!preview && (
+          <div className="mt-8">
+            <CallMeNow
+              token={null}
+              phone={String(a[allFields(schema).find((f) => f.type === "phone")?.id ?? ""] ?? "") || null}
+              name={allFields(schema).filter((f) => f.map === "first_name" || f.map === "last_name" || f.map === "full_name").map((f) => String(a[f.id] ?? "")).join(" ").trim() || null}
+              source="form_success"
+            />
+          </div>
+        )}
       </div>
     );
 

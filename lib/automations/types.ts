@@ -7,6 +7,8 @@ export const TRIGGERS = {
   form_opened: { label: "Driver opens the form", filter: null },
   form_completed: { label: "Driver completes the driver application", filter: null },
   form_submitted: { label: "A form is submitted (Forms)", filter: "form" },
+  call_requested: { label: "Driver taps Call me now", filter: null },
+  call_missed: { label: "Missed call from a driver", filter: null },
   email_opened: { label: "Driver opens an email", filter: null },
   link_clicked: { label: "Driver clicks a link", filter: null },
   tag_added: { label: "Tag added", filter: "tag" },

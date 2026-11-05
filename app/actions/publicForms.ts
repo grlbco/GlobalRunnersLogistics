@@ -16,6 +16,26 @@ function limited(key: string, max = 6, windowMs = 10 * 60_000) {
   return list.length > max;
 }
 
+/** "Call me now" from a public page: personal token, or a phone number typed in. */
+export async function callMeNow(input: { token?: string | null; phone?: string | null; name?: string | null; source?: string }): Promise<{ ok: boolean; inHours?: boolean; kenPhone?: string; error?: string }> {
+  const h = await headers();
+  const ip = (h.get("x-forwarded-for") ?? "").split(",")[0].trim().slice(0, 64);
+  if (limited(`call:${ip}`, 4)) return { ok: false, error: "Already requested. Ken will call you shortly." };
+  const { requestCall } = await import("@/lib/crm/callme");
+  const { normPhone } = await import("@/lib/formbuilder/schema");
+  let contactId: string | null = null;
+  if (input.token && /^[0-9a-f]{24}$/.test(input.token)) {
+    const { adminDb } = await import("@/lib/crm/admin");
+    const { data } = await adminDb().from("form_links").select("contact_id").eq("token", input.token).maybeSingle();
+    contactId = data?.contact_id ?? null;
+  }
+  const phone = input.phone ? normPhone(input.phone) : null;
+  if (!contactId && !phone) return { ok: false, error: "Enter a valid US phone number" };
+  const source = ["form", "application", "call_page", "form_success"].includes(input.source ?? "") ? `call_me_now:${input.source}` : "call_me_now";
+  const r = await requestCall({ contactId, phone, name: input.name?.slice(0, 80) ?? null, source });
+  return r.ok ? { ok: true, inHours: r.inHours, kenPhone: r.kenPhone } : { ok: false, error: r.error };
+}
+
 /** Personal link (?t=): the driver's known details for the form's mapped questions. */
 export async function getFormPrefill(slug: string, token: string): Promise<Answers> {
   if (!/^[a-z0-9-]{2,61}$/.test(slug) || !/^[0-9a-f]{24}$/.test(token)) return {};

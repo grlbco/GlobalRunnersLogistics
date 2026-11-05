@@ -180,8 +180,10 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
 
     const name = [c.first_name, c.last_name].filter(Boolean).join(" ") || "the driver";
     const { data: subs } = await db.from("crm_form_submissions").select("created_at, form:crm_forms(name)").eq("contact_id", c.id).order("created_at", { ascending: false }).limit(3);
+    const { getCallHours, inCallHours } = await import("@/lib/crm/callme");
+    const kenAvailable = inCallHours(await getCallHours());
     const otherForms = (subs ?? []).map((s) => `${(s.form as unknown as { name: string } | null)?.name ?? "form"} (${s.created_at.slice(0, 10)})`);
-    const base = { name, city: c.city, state: c.state, localTime: localTime(c.timezone), stage: c.stage, channel, smsConsent: c.sms_consent, hasPhone: !!(c.cell_phone || c.phone), formUrl: link.url, form: link.form, memory: { facts: (mem?.facts as Record<string, unknown>) ?? {}, summary: mem?.summary, next_step: mem?.next_step }, turns, trigger: promptTrigger, followupAttempt: input.followupAttempt, followupKind: input.followupKind, chaseTotal: CHASE.length, alsoText, formSubmitted: input.formSubmitted, otherForms };
+    const base = { name, city: c.city, state: c.state, localTime: localTime(c.timezone), stage: c.stage, channel, smsConsent: c.sms_consent, hasPhone: !!(c.cell_phone || c.phone), formUrl: link.url, form: link.form, memory: { facts: (mem?.facts as Record<string, unknown>) ?? {}, summary: mem?.summary, next_step: mem?.next_step }, turns, trigger: promptTrigger, followupAttempt: input.followupAttempt, followupKind: input.followupKind, chaseTotal: CHASE.length, alsoText, formSubmitted: input.formSubmitted, otherForms, kenAvailable };
 
     // Decide: JSON first (2 tries with the checker's feedback), then a plain-text fallback so a driver is never left hanging.
     const messages: ChatMsg[] = buildMessages(base);
@@ -253,6 +255,10 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
       await moveStage(c as Contact, "unsubscribed", "agent");
       await log({ action: "unsubscribed", decision, ...meta });
       return { action: "unsubscribed", decision };
+    }
+    if (decision.intent === "call_request") {
+      const { requestCall } = await import("@/lib/crm/callme");
+      await requestCall({ contactId: c.id, source: "assistant", notifyDriver: false }); // the assistant's own reply tells the driver
     }
     if (decision.intent === "wrong_person") {
       await suppress(c as Contact, channel, "wrong_person");

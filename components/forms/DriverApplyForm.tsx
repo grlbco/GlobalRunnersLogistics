@@ -10,6 +10,7 @@ import { SMS_CONSENT_TEXT, type DriverLeadInput } from "@/lib/forms";
 import { Checkbox, Chips, ErrorText, Honeypot, TextField, useAttribution } from "./fields";
 import { Arrow } from "@/components/ui/Button";
 import { company } from "@/content/facts";
+import { CallMeNow } from "./CallMeNow";
 import type { Locale } from "@/lib/i18n";
 
 type State = Partial<DriverLeadInput> & { endorsements: NonNullable<DriverLeadInput["endorsements"]>; run_types: NonNullable<DriverLeadInput["run_types"]> };
@@ -217,6 +218,7 @@ export function DriverApplyForm({
         <h2 className="h2 mt-8">{L.doneTitle}</h2>
         <p className="body-lg mt-4 max-w-xl text-white/70">{L.doneSub(data.first_name ?? "")}</p>
         <p className="mt-8 max-w-xl text-white/60">{L.doneNext}</p>
+        <div className="mt-6 max-w-xl"><CallMeNow token={token ?? null} phone={data.phone ?? null} name={[data.first_name, data.last_name].filter(Boolean).join(" ")} source="application" /></div>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link href={`${paths.register}?email=${encodeURIComponent(data.email ?? "")}`} className="inline-flex h-12 items-center gap-2 rounded bg-signal px-6 font-medium">
             {L.register} <Arrow />
