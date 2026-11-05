@@ -184,6 +184,25 @@ export async function handleInstantlyStatus(event: { event_type: string; lead_em
   }
 }
 
+/** A driver's reply to a direct (Resend) email, received on RESEND_INBOUND_ADDRESS. */
+export async function ingestDirectEmail(e: { id: string; from: string; subject: string; text: string }): Promise<string | null> {
+  const email = (e.from.match(/<([^>]+)>/)?.[1] ?? e.from).trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+$/.test(email)) return null;
+  const contact = (await contactByEmail(email)) ?? (await createInboundContact({ email, source: "inbound_email" }));
+  const body = ownWords(e.text).trim() || e.text.trim();
+  const id = await recordMessage({ contactId: contact.id, channel: "email", direction: "inbound", author: "lead", subject: e.subject || null, body, externalId: `resend-in:${e.id}`, status: "received", meta: { via: "resend" } });
+  if (!id) return null;
+  if (isOptOut(body)) {
+    await suppress(contact, "email", "unsubscribe");
+    await moveStage(contact, "unsubscribed", "email");
+    return id;
+  }
+  await moveStage(contact, "replied", "email");
+  await enqueueAgent(contact.id, id, "email_received");
+  await emit("email_received", contact.id, {});
+  return id;
+}
+
 /** The driver's own text of an email reply, without the quoted thread below it. */
 function ownWords(body: string) {
   const lines = body.split(/\r?\n/);

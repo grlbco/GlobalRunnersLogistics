@@ -163,7 +163,7 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
     let channel: "email" | "sms" = (lastInbound?.channel as "email" | "sms") ?? (c.sms_consent ? "sms" : "email");
     if (input.trigger === "form_submitted") channel = c.sms_consent ? "sms" : "email";
     if (input.trigger === "followup") channel = input.followupChannel ?? (c.sms_consent && (input.followupAttempt ?? 1) <= MAX_TEXT_FOLLOWUPS ? "sms" : "email");
-    if (channel === "email" && !(c.email && (dry || (await hasEmailThread(c.id))))) channel = "sms";
+    if (channel === "email" && !(c.email && (dry || (await canEmailContact(c.id))))) channel = "sms";
     // First chase touch: the card moves to "Following up".
     if (!dry && input.followupKind === "chase" && (input.followupAttempt ?? 1) === 1) await moveStage(c as Contact, "chasing", "agent");
     // Driver answered an email and we may text them: send a short text too (multi-channel, like a recruiter would).
@@ -175,7 +175,7 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
     // "Reply now" from staff: answer the driver if they wrote last, otherwise a fresh nudge.
     const promptTrigger = input.trigger === "manual" ? (turns.at(-1)?.direction === "inbound" ? "text_received" : "followup") : input.trigger === "test" ? "text_received" : input.trigger;
     if (channel === "sms" && !c.sms_consent) channel = "email";
-    if (!dry && channel === "email" && !(c.email && (await hasEmailThread(c.id))))
+    if (!dry && channel === "email" && !(c.email && (await canEmailContact(c.id))))
       return (await log({ action: "ignored", decision: { reason: "no way to reach: no text consent and no email thread" } }), { action: "ignored", reason: "Can't text (no consent) and no email thread yet" });
 
     const name = [c.first_name, c.last_name].filter(Boolean).join(" ") || "the driver";
@@ -325,6 +325,12 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
 }
 
 /** Email can only go out as a reply in an existing Instantly thread (the first email always comes from a campaign). */
+/** Can we email this driver at all? An Instantly thread, or direct email through Resend. */
+async function canEmailContact(contactId: string) {
+  const { resendConfigured } = await import("@/lib/integrations/resend");
+  return resendConfigured() || hasEmailThread(contactId);
+}
+
 async function hasEmailThread(contactId: string) {
   const { data } = await adminDb().from("messages").select("meta").eq("contact_id", contactId).eq("channel", "email").not("external_id", "is", null).order("created_at", { ascending: false }).limit(1).maybeSingle();
   return !!(data?.meta as { eaccount?: string } | null)?.eaccount;
@@ -339,7 +345,7 @@ export async function scheduleNext(
   const add = (attempt: number, kind: FollowupKind, channel: "email" | "sms", due: Date, label: string) =>
     db.from("followups").insert({ contact_id: c.id, due_at: due.toISOString(), attempt, kind, channel, reason: label });
   const canText = c.sms_consent;
-  const canEmail = !!c.email && (await hasEmailThread(c.id));
+  const canEmail = !!c.email && (await canEmailContact(c.id));
 
   if (p.kind === "nurture" || (p.kind === "chase" && p.attempt >= CHASE.length)) {
     const n = p.kind === "nurture" ? p.attempt + 1 : 1;

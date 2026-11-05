@@ -50,10 +50,20 @@ async function sendOne(row: Row): Promise<SendOutcome> {
   const { data: last } = await db
     .from("messages")
     .select("external_id, subject, meta")
-    .eq("contact_id", c.id).eq("channel", "email").not("external_id", "is", null)
+    .eq("contact_id", c.id).eq("channel", "email").not("external_id", "is", null).not("meta->>eaccount", "is", null)
     .order("created_at", { ascending: false }).limit(1).maybeSingle();
   const eaccount = (last?.meta as { eaccount?: string } | null)?.eaccount;
-  if (!last?.external_id || !eaccount) return { ok: false, reason: "No email thread yet: the first email comes from a campaign" };
+  if (!last?.external_id || !eaccount) {
+    // no campaign thread (driver came by text, website or a form): send directly through Resend
+    const { resendConfigured, sendDirectEmail } = await import("@/lib/integrations/resend");
+    if (!c.email) return { ok: false, reason: "No email address" };
+    if (!resendConfigured()) return { ok: false, reason: "No email thread yet and Resend isn't set up" };
+    const { data: prev } = await db.from("messages").select("subject").eq("contact_id", c.id).eq("channel", "email").not("subject", "is", null).order("created_at", { ascending: false }).limit(1).maybeSingle();
+    const subject = row.subject ?? (prev?.subject ? (/^re:/i.test(prev.subject) ? prev.subject : `Re: ${prev.subject}`) : "Driving with Global Runners");
+    const r = await sendDirectEmail({ to: c.email, subject, text: row.body });
+    const messageId = await recordMessage({ contactId: c.id, channel: "email", direction: "outbound", author: row.author === "workflow" ? "system" : row.author, authorId: row.author_id, subject, body: row.body, externalId: r.id ? `resend:${r.id}` : null, meta: { via: "resend" }, status: "sent" });
+    return { ok: true, messageId };
+  }
   const r = await instantly.replyToEmail({ eaccount, replyToUuid: last.external_id, subject: row.subject ?? last.subject ?? "Driving with Global Runners", text: row.body });
   const messageId = await recordMessage({ contactId: c.id, channel: "email", direction: "outbound", author: row.author === "workflow" ? "system" : row.author, authorId: row.author_id, subject: row.subject ?? last.subject, body: row.body, externalId: r.id ?? null, meta: { eaccount }, status: "sent" });
   return { ok: true, messageId };
