@@ -44,10 +44,10 @@ async function Body() {
   ]);
   const stage = Object.fromEntries(byStage) as Record<string, number>;
   const reached = (key: string) => {
-    // contacts at this stage or any later stage in the funnel
-    const i = FUNNEL.indexOf(key as never);
-    const later = FUNNEL.slice(i);
-    return later.reduce((s, k) => s + (stage[k] ?? 0), 0) + (key === "contacted" ? ["qualified", "sent_to_ken", "nurture", "not_fit", "not_interested", "unsubscribed", "bounced"].reduce((s, k) => s + (stage[k] ?? 0), 0) : 0);
+    // contacts at this stage or any later stage (every in-between stage counts, e.g. Following up, With Ken)
+    const ORDER = ["contacted", "replied", "interested", "form_sent", "chasing", "applied", "qualified", "sent_to_ken", "hired"];
+    const later = ORDER.slice(Math.max(0, ORDER.indexOf(key)));
+    return later.reduce((s, k) => s + (stage[k] ?? 0), 0) + (key === "contacted" ? ["nurture", "not_fit", "not_interested", "unsubscribed", "bounced"].reduce((s, k) => s + (stage[k] ?? 0), 0) : 0);
   };
   const top = Math.max(1, reached("contacted"), total);
 

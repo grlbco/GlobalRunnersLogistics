@@ -90,6 +90,11 @@ export async function ingestInstantlyEmail(e: instantly.InstantlyEmail): Promise
     contact = await createInboundContact({ email: lead, source: "inbound_email" });
   }
   const body = (e.body?.text ?? e.content_preview ?? "").trim();
+  if (!inbound && e.ue_type !== 1) {
+    // our own reply (sent through the API) coming back from Instantly: already on the timeline
+    const { data: dup } = await adminDb().from("messages").select("id").eq("contact_id", contact.id).eq("channel", "email").eq("direction", "outbound").gte("created_at", new Date(Date.now() - 30 * 60_000).toISOString()).ilike("body", `${body.slice(0, 60).replace(/[%_]/g, "")}%`).limit(1);
+    if (dup?.length) return null;
+  }
   const id = await recordMessage({
     contactId: contact.id, channel: "email", direction: inbound ? "inbound" : "outbound",
     author: inbound ? "lead" : e.ue_type === 1 ? "campaign" : "human",
@@ -214,12 +219,14 @@ export function ownWords(body: string) {
   return out.join("\n");
 }
 
-// ---------------- assistant hook (phase 4 fills this in) ----------------
+// ---------------- assistant hook ----------------
 
 export async function enqueueAgent(contactId: string, messageId: string, trigger: string) {
   const db = adminDb();
   // The driver just wrote: anything we had waiting for them is stale now, the next run answers with full context.
   await db.from("outbox").update({ status: "cancelled", error: "driver replied first" }).eq("contact_id", contactId).eq("author", "agent").in("status", ["draft", "pending"]);
+  // no follow-up may fire while their message waits for an answer; the reply plans the next ones
+  await db.from("followups").update({ status: "cancelled" }).eq("contact_id", contactId).eq("status", "pending");
   await db.from("agent_runs").insert({ contact_id: contactId, trigger, input_message_id: messageId, action: "queued" });
 }
 

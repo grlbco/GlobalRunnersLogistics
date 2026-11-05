@@ -94,6 +94,7 @@ async function runStep(step: Step, c: C, run: { id: string; created_at: string }
       if (c.stage !== step.stage) {
         await db.from("contacts").update({ stage: step.stage, stage_changed_at: new Date().toISOString() }).eq("id", c.id);
         await activity(c.id, "stage_changed", { from: c.stage, to: step.stage }, "workflow");
+        await emit("stage_changed", c.id, { from: c.stage, to: step.stage });
         c.stage = step.stage;
       }
       return "next";
@@ -115,6 +116,10 @@ async function runStep(step: Step, c: C, run: { id: string; created_at: string }
       const body = await render(step.body, c);
       const link = `${site()}/crm/contacts/${c.id}`;
       await notifyTeam(`Command: ${[c.first_name, c.last_name].filter(Boolean).join(" ") || "driver"}`, `${body}\n\n${link}`);
+      if (step.to === "ken") {
+        const { sendTelegram, esc } = await import("@/lib/integrations/telegram");
+        await sendTelegram(`🔔 ${esc(body)}\n\n<a href="${link}">Open in GRL Command</a>`);
+      }
       if (step.to === "ken" && process.env.NOTIFY_SMS_TO && (await (await import("@/lib/crm/sending")).isSendingOn())) {
         await quo.sendText(process.env.NOTIFY_SMS_TO, `${body} ${link}`.slice(0, 600)).catch(() => {});
       }

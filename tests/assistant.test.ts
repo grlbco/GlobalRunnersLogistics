@@ -30,8 +30,14 @@ describe("follow-up timing (10–11am or 5–6:30pm driver time, never Sunday)",
     const d = inGoodWindow(new Date("2026-11-08T15:00:00Z"), "America/Chicago"); // Sunday 9am
     expect(dayIn(d, "America/Chicago")).toBe("Mon");
   });
-  it("leaves the time alone when we don't know the zone", () => {
-    const t = new Date("2026-11-05T11:00:00Z");
-    expect(inGoodWindow(t, null)).toBe(t);
+  it("unknown zone is timed on Central", () => {
+    const d = inGoodWindow(new Date("2026-11-05T11:00:00Z"), null);
+    expect(hourIn(d, "America/Chicago")).toBe(10);
   });
+});
+
+describe("hand-off words", async () => {
+  const { HUMAN_WORDS } = await import("@/lib/agent/engine");
+  it.each(["can I talk to a real person", "let me speak with your manager", "my lawyer will call", "I'm filing a complaint"])("hands off %j", (t) => expect(HUMAN_WORDS.test(t)).toBe(true));
+  it.each(["are you human?", "is this a scam?", "am I talking to a bot", "how much do you pay"])("answers %j itself", (t) => expect(HUMAN_WORDS.test(t)).toBe(false));
 });

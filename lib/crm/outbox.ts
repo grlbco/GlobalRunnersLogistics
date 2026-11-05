@@ -19,9 +19,13 @@ type Row = { id: string; contact_id: string; channel: "email" | "sms"; author: "
  * Replies to a driver who just messaged us go out 24/7. Email has no quiet hours.
  */
 export function inQuietHours(tz: string | null, at = new Date()) {
-  if (!tz) return false;
-  const parts = new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", hour12: false }).formatToParts(at);
-  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? 12) % 24;
+  const hourIn = (zone: string) => Number(new Intl.DateTimeFormat("en-US", { timeZone: zone, hour: "numeric", hour12: false }).formatToParts(at).find((p) => p.type === "hour")?.value ?? 12) % 24;
+  // Unknown zone (new contact from a text, call or form): only when it's 8am–9pm everywhere in the lower 48 → 11am–9pm Eastern.
+  if (!tz) {
+    const ny = hourIn("America/New_York");
+    return ny < 11 || ny >= 21;
+  }
+  const hour = hourIn(tz);
   return hour < 8 || hour >= 21;
 }
 
@@ -37,6 +41,7 @@ async function sendOne(row: Row): Promise<SendOutcome> {
 
   if (row.channel === "sms") {
     const to = c.cell_phone ?? c.phone;
+    if (!to) return { ok: false, reason: "No phone number on this contact" };
     if (!c.sms_consent) return { ok: false, reason: "No text consent yet (driver must text us first or tick the form box)" };
     if (await isSuppressed("sms", to)) return { ok: false, reason: "Number is on the opt-out list" };
     const r = await quo.sendText(to!, row.body);
@@ -58,6 +63,10 @@ async function sendOne(row: Row): Promise<SendOutcome> {
     const { resendConfigured, sendDirectEmail } = await import("@/lib/integrations/resend");
     if (!c.email) return { ok: false, reason: "No email address" };
     if (!resendConfigured()) return { ok: false, reason: "No email thread yet and Resend isn't set up" };
+    // Direct email only to people who engaged with us. Cold leads are emailed by Instantly campaigns, never from our main domain.
+    const { count: engaged } = await db.from("messages").select("*", { count: "exact", head: true }).eq("contact_id", c.id).eq("direction", "inbound");
+    const { data: src } = await db.from("contacts").select("source").eq("id", c.id).single();
+    if (!engaged && (!src?.source || src.source === "toss_import" || src.source === "manual")) return { ok: false, reason: "Never wrote to us: cold leads get email only through an Instantly campaign" };
     const { data: prev } = await db.from("messages").select("subject").eq("contact_id", c.id).eq("channel", "email").not("subject", "is", null).order("created_at", { ascending: false }).limit(1).maybeSingle();
     const subject = row.subject ?? (prev?.subject ? (/^re:/i.test(prev.subject) ? prev.subject : `Re: ${prev.subject}`) : "Driving with Global Runners");
     const r = await sendDirectEmail({ to: c.email, subject, text: row.body });

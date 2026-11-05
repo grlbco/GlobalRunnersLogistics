@@ -59,11 +59,12 @@ const CHASE: ChaseStep[] = [
 const NURTURE_GAP_H = 30 * 24;
 const NURTURE_MAX = 3;
 export type FollowupKind = "nudge" | "chase" | "chase_extra" | "nurture";
-const HUMAN_WORDS = /\b(human|real person|manager|supervisor|lawyer|attorney|sue|lawsuit|complaint|harass|scam|police|report you)\b/i;
+// Asking for a person, legal words, threats. ("are you human?" / "is this a scam?" get an honest answer instead.)
+export const HUMAN_WORDS = /\b((talk|speak|chat)\s+(to|with)\s+(a\s+|an\s+)?(real\s+)?(person|human|manager|supervisor|someone|recruiter)|manager|supervisor|lawyer|attorney|sue you|lawsuit|complaint|harass\w*|police|report you)\b/i;
 
 /** Moves a follow-up time into a good texting window in the driver's zone: 10-11am or 5-6:30pm, Mon-Sat. */
 export function inGoodWindow(due: Date, tz: string | null): Date {
-  if (!tz) return due;
+  tz ??= "America/Chicago"; // unknown zone: Central keeps 10–11am / 5–6:30pm reasonable coast to coast
   const local = (d: Date) => {
     const p = new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", minute: "numeric", hour12: false, weekday: "short" }).formatToParts(d);
     return { h: Number(p.find((x) => x.type === "hour")?.value) % 24, m: Number(p.find((x) => x.type === "minute")?.value), wd: p.find((x) => x.type === "weekday")?.value };
@@ -109,8 +110,25 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
       if (!settings.enabled) return (await log({ action: "ignored", decision: { reason: "assistant is off" } }), { action: "ignored", reason: "Assistant is off" });
       if (c.agent_mode !== "auto") return (await log({ action: "ignored", decision: { reason: "manual" } }), { action: "ignored", reason: "A person is handling this driver" });
       if (c.do_not_contact) return (await log({ action: "ignored", decision: { reason: "do not contact" } }), { action: "ignored", reason: "Do not contact" });
-      if (input.trigger !== "manual" && c.agent_paused_until && new Date(c.agent_paused_until) > new Date())
+      if (input.trigger !== "manual" && c.agent_paused_until && new Date(c.agent_paused_until) > new Date()) {
+        if (input.trigger === "text_received" || input.trigger === "email_received")
+          await db.from("tasks").insert({ contact_id: c.id, title: `Driver replied while you were handling: ${[c.first_name, c.last_name].filter(Boolean).join(" ") || "driver"}`, due_at: new Date().toISOString(), created_by: "agent" });
         return (await log({ action: "ignored", decision: { reason: "a person replied recently (paused)" } }), { action: "ignored", reason: "Paused: a person replied recently" });
+      }
+      // 5) monthly AI budget
+      const cap = Number(process.env.DEEPSEEK_MONTHLY_CAP_USD ?? 0);
+      if (cap > 0) {
+        const month = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+        const { data: spent } = await db.from("agent_runs").select("cost_usd").gte("created_at", month).limit(50000);
+        const total = (spent ?? []).reduce((t, r) => t + Number(r.cost_usd ?? 0), 0);
+        if (total >= cap) {
+          const { count: warned } = await db.from("agent_runs").select("*", { count: "exact", head: true }).eq("action", "budget_cap").gte("created_at", month);
+          if (!warned) await sendTelegram(`💸 <b>Assistant paused:</b> this month's AI budget ($${cap}) is used up ($${total.toFixed(2)}). Drivers who write now go to the team as tasks. Raise DEEPSEEK_MONTHLY_CAP_USD to resume.`);
+          if (input.trigger === "text_received" || input.trigger === "email_received" || input.trigger === "form_submitted")
+            await db.from("tasks").insert({ contact_id: c.id, title: `Reply to driver (AI budget used up): ${[c.first_name, c.last_name].filter(Boolean).join(" ") || "driver"}`, due_at: new Date().toISOString(), created_by: "agent" });
+          return (await log({ action: "budget_cap", decision: { reason: `monthly AI budget $${cap} used` } }), { action: "ignored", reason: "Monthly AI budget used up" });
+        }
+      }
       const since = new Date(Date.now() - 86400_000).toISOString();
       // Daily cap is for messages we start (follow-ups). Answering a driver who wrote is never capped.
       const proactive = input.trigger === "followup" || input.trigger === "form_abandoned";

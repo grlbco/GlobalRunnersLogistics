@@ -15,7 +15,9 @@ describe("quiet hours (texts we start: 8am–9pm driver time)", () => {
   it("8:00am in Los Angeles is open", () => expect(inQuietHours("America/Los_Angeles", at("2026-11-05T16:00:00Z"))).toBe(false));
   it("8:59pm in New York is open", () => expect(inQuietHours("America/New_York", at("2026-11-06T01:59:00Z"))).toBe(false));
   it("9:00pm in New York is quiet", () => expect(inQuietHours("America/New_York", at("2026-11-06T02:00:00Z"))).toBe(true));
-  it("unknown time zone never blocks", () => expect(inQuietHours(null)).toBe(false));
+  it("unknown time zone: quiet at 9am Eastern (6am Pacific)", () => expect(inQuietHours(null, at("2026-11-05T14:00:00Z"))).toBe(true));
+  it("unknown time zone: open at noon Eastern", () => expect(inQuietHours(null, at("2026-11-05T17:00:00Z"))).toBe(false));
+  it("unknown time zone: quiet at 9pm Eastern", () => expect(inQuietHours(null, at("2026-11-06T02:00:00Z"))).toBe(true));
 });
 
 describe("pipeline stages only move forward automatically", () => {
