@@ -1,5 +1,5 @@
 import { adminDb } from "@/lib/crm/admin";
-import { runAgent } from "@/lib/agent/engine";
+import { formLinkFor, runAgent } from "@/lib/agent/engine";
 import type { Turn } from "@/lib/agent/prompt";
 
 export const maxDuration = 300;
@@ -42,6 +42,35 @@ export async function GET(req: Request) {
       }
     }
     out[name] = { transcript, problems, cost: Number(cost.toFixed(4)) };
+  }
+  // The form chase: driver asked for the form, got the link, went quiet. Plays every follow-up in order.
+  if (!only || only === "chase") {
+    const form = (await formLinkFor(test.id)).url;
+    const turns: Turn[] = [
+      { at: new Date(Date.now() - 3 * 3600_000).toISOString(), direction: "inbound", channel: "sms", author: "lead", body: "ok send me the application, I have 4 years otr" },
+      { at: new Date(Date.now() - 3 * 3600_000).toISOString(), direction: "outbound", channel: "sms", author: "agent", body: `4 years is solid. Here's the form, takes about 5 min: ${form}` },
+    ];
+    const plan: { kind: "chase" | "chase_extra" | "nurture"; n: number; ch: "sms" | "email" }[] = [
+      { kind: "chase", n: 1, ch: "sms" }, { kind: "chase_extra", n: 1, ch: "email" }, { kind: "chase", n: 2, ch: "sms" }, { kind: "chase", n: 3, ch: "email" },
+      { kind: "chase", n: 4, ch: "sms" }, { kind: "chase", n: 5, ch: "email" }, { kind: "chase", n: 6, ch: "sms" }, { kind: "chase", n: 7, ch: "email" },
+      { kind: "chase", n: 8, ch: "sms" }, { kind: "nurture", n: 1, ch: "email" },
+    ];
+    const transcript: string[] = [];
+    const problems: string[] = [];
+    let cost = 0;
+    for (const step of plan) {
+      const r = await runAgent({ contactId: test.id, trigger: "followup", followupKind: step.kind, followupAttempt: step.n, followupChannel: step.ch, simTurns: [...turns] });
+      cost += r.costUsd ?? 0;
+      if (r.problems?.length) problems.push(...r.problems);
+      const parts = (r.decision?.replies ?? []) as string[];
+      const label = `${step.kind} #${step.n} (${r.channel ?? step.ch})`;
+      if (!parts.length) transcript.push(`${label}: (${r.action})`);
+      for (const t of parts) {
+        transcript.push(`${label}${r.decision?.subject ? ` [${r.decision.subject}]` : ""}: ${t}`);
+        turns.push({ at: new Date().toISOString(), direction: "outbound", channel: r.channel ?? step.ch, author: "agent", body: t });
+      }
+    }
+    out.chase = { transcript, problems, cost: Number(cost.toFixed(4)) };
   }
   return Response.json(out, { headers: { "Cache-Control": "no-store" } });
 }

@@ -111,7 +111,17 @@ export async function ingestInstantlyEmail(e: instantly.InstantlyEmail): Promise
     await moveStage(contact, "unsubscribed", "instantly");
     return id;
   }
-  await moveStage(contact, "replied", "instantly");
+  // Consent to text from an email: they gave us their cell, or asked us to text them (TCPA prior express consent).
+  const own = ownWords(body);
+  const given = own.match(/(?:\+?1[\s.-]?)?\(?([2-9]\d{2})\)?[\s.-]?(\d{3})[\s.-]?(\d{4})\b/);
+  const askedText = /\b(text|txt|sms)\s+(me|is fine|works|is better|ok)\b|\byou can text\b|\bok(ay)?\s+to\s+text\b/i.test(own);
+  const extra: Record<string, unknown> = {};
+  if (given) Object.assign(extra, { cell_phone: `+1${given[1]}${given[2]}${given[3]}` });
+  if ((given || (askedText && (contact.cell_phone || contact.phone))) && !contact.sms_consent) {
+    Object.assign(extra, { sms_consent: true, sms_consent_source: given ? "gave cell by email" : "asked to be texted by email" });
+    await activity(contact.id, "sms_consent", { source: extra.sms_consent_source }, "instantly");
+  }
+  await moveStage(contact, "replied", "instantly", extra);
   await enqueueAgent(contact.id, id, "email_received");
   await emit("email_received", contact.id, {});
   return id;
@@ -172,6 +182,17 @@ export async function handleInstantlyStatus(event: { event_type: string; lead_em
       await moveStage(contact, "unsubscribed", "instantly");
       break;
   }
+}
+
+/** The driver's own text of an email reply, without the quoted thread below it. */
+function ownWords(body: string) {
+  const lines = body.split(/\r?\n/);
+  const out: string[] = [];
+  for (const l of lines) {
+    if (/^\s*>/.test(l) || /^On .+wrote:\s*$/i.test(l.trim()) || /^-{2,}\s*Original Message/i.test(l.trim()) || /^From:\s/i.test(l.trim())) break;
+    out.push(l);
+  }
+  return out.join("\n");
 }
 
 // ---------------- assistant hook (phase 4 fills this in) ----------------

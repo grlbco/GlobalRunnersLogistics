@@ -58,6 +58,7 @@ RULES
 - Only link allowed: the driver's FORM LINK.
 - Not a fit (no CDL-A, under 21, under 1 year experience, recent DUI): be kind, say it won't work right now. stage "not_fit", no follow-up.
 - Not interested: respect it, one friendly line, stage "not_interested", no follow-up.
+- Texting: when you're on email, the driver has a phone on file and texting isn't allowed yet, and they sound interested, ask once if it's ok to text them (or what the best cell is). Don't ask again if you already did.
 - Owner-operator: Ken handles O/O terms on a call; ask the best time to reach them; handoff "owner-operator wants a call".
 - Hand off (handoff = reason, replies = []) only for: anger/threats, legal/accident/injury/medical topics, asking for a manager, or something you truly can't answer from the facts.
 - STOP / unsubscribe: intent "stop", replies = [].
@@ -72,7 +73,8 @@ OUTPUT: one JSON object only:
  "next_step":"short",
  "followup_hours":number or null,
  "handoff":null,
- "mood":"warm|neutral|skeptical|annoyed"}`;
+ "mood":"warm|neutral|skeptical|annoyed",
+ "sms_replies":[] (only when the instruction asks for a text too: 1-2 short texts, same voice)}`;
 }
 
 export type Turn = { at: string; direction: "inbound" | "outbound"; channel: string; author: string; body: string };
@@ -82,7 +84,20 @@ export type PromptCtx = {
   smsConsent: boolean; formUrl: string; form: { sent: boolean; opened: boolean; step: number; completed: boolean };
   memory: { facts: Record<string, unknown>; summary?: string | null; next_step?: string | null };
   turns: Turn[]; trigger: string; followupAttempt?: number;
+  hasPhone?: boolean; followupKind?: string; chaseTotal?: number; alsoText?: boolean;
 };
+
+/** One fresh angle per chase step, so no two follow-ups say the same thing. Direct, a little pushy, never fake urgency. */
+const CHASE_ANGLES = [
+  "It's been a couple hours since you sent the form. Remind them it takes about 5 minutes on the phone and Ken calls back fast once it's in. Link included.",
+  "Short yes/no: are they still looking, or is now a bad time? If they're driving, tell them to fill it at their next stop. Link included.",
+  "Email: quick recap of the 2-3 facts that match what they told you (use the memory), then the link. Subject line short and casual.",
+  "Ask if anything on the form is holding them up or if they have a question first. No link unless they haven't had it in the last 2 messages.",
+  "Email: lead with one fact you haven't mentioned yet (truck home, automatic trucks, weekly Thursday pay, layover pay, anniversary bonus). Then the link.",
+  "Offer an easy way out of the form: if it's a pain, they can text a good time and Ken will call them. Still include the link.",
+  "Email: short and human, 'still want me to keep a spot open for a call with Ken?' plus the link.",
+  "Last one. Say it's the last message about this, the link stays open if they want it, no hard feelings. Keep it warm.",
+];
 
 /** Builds a real chat: driver turns as "user", our turns as "assistant", then the task. */
 export function buildMessages(p: PromptCtx): ChatMsg[] {
@@ -104,12 +119,19 @@ Note from last time: ${p.memory.next_step ?? "(none)"}`;
     if (last && last.role === role && msgs.length > 2) last.content += `\n${text}`;
     else msgs.push({ role, content: text });
   }
+  const chaseN = p.followupAttempt ?? 1;
   const task =
-    p.trigger === "followup"
+    p.trigger === "followup" && p.followupKind === "chase"
+      ? `[INSTRUCTION] Form follow-up ${chaseN} of ${p.chaseTotal ?? 8} on ${p.channel}. They got the form link but haven't finished it${p.form.opened ? ` (they opened it and stopped at step ${p.form.step}, so it's only a couple more minutes)` : " (not opened yet)"}. Angle for this one: ${CHASE_ANGLES[Math.min(chaseN, CHASE_ANGLES.length) - 1]} Be direct and confident, a bit persistent like a recruiter who wants them, never fake urgency or made-up deadlines, never guilt. Don't reuse wording from earlier messages. Output the JSON.`
+      : p.trigger === "followup" && (p.followupKind === "chase_extra")
+        ? `[INSTRUCTION] Email version of the text you're sending them right now about finishing the form${p.form.opened ? ` (they stopped at step ${p.form.step})` : ""}. 2-4 short lines, short casual subject, the link, sign "Ken". Output the JSON.`
+      : p.trigger === "followup" && p.followupKind === "nurture"
+        ? `[INSTRUCTION] Monthly check-in email #${chaseN}. They never finished the form. One or two short lines: still driving, still open to a change? Include the link. Casual subject. Output the JSON.`
+      : p.trigger === "followup"
       ? `[INSTRUCTION] They've gone quiet since your last message. Write follow-up #${p.followupAttempt ?? 1} on ${p.channel}: one short, low-pressure text with a NEW angle (a different fact or a simple yes/no question). Don't guilt-trip, don't repeat earlier wording.${p.form.completed ? "" : " Include the form link only if you haven't sent it in your last 2 messages."}`
       : p.trigger === "form_abandoned"
         ? `[INSTRUCTION] They opened the form but stopped at step ${p.form.step}. Send one short, friendly nudge to finish it (it's about one more minute). Include the link.`
-        : `[INSTRUCTION] Reply to their latest message on ${p.channel}, following HOW YOU TEXT. Output the JSON.`;
+        : `[INSTRUCTION] Reply to their latest message on ${p.channel}, following HOW YOU TEXT.${p.alsoText ? ` They answered by email and we can text them, so ALSO put 1-2 short texts in "sms_replies" (like "hey it's Ken's team, just replied to your email" plus the form link if you're sending it). Not a copy of the email.` : ""} Output the JSON.`;
   msgs.push({ role: "user", content: task });
   return msgs;
 }

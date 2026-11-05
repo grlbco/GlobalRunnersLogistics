@@ -91,18 +91,51 @@ export async function completeForm(f: Completion): Promise<string | null> {
   const { emit } = await import("@/lib/automations/engine");
   await emit("form_completed", contact.id, {});
   if (next === "applied") {
-    await db.from("tasks").insert({ contact_id: contact.id, title: `Call ${f.first_name} ${f.last_name} — form completed`, due_at: new Date(Date.now() + 3600_000).toISOString(), created_by: "workflow" });
+    await db.from("tasks").insert({ contact_id: contact.id, title: `Call ${f.first_name} ${f.last_name}: form completed`, due_at: new Date(Date.now() + 3600_000).toISOString(), created_by: "workflow" });
+    // Confirmation back to the driver, through the outbox so it shows in the timeline (texts only with consent).
+    const smsOk = f.sms_consent || contact.sms_consent;
+    if (smsOk && !contact.do_not_contact) {
+      const first = f.first_name.trim().split(/\s+/)[0];
+      const lines = [
+        `Got your form ${first}, thank you. Someone from our team will reach out to you soon.`,
+        `Thanks ${first}, your form came through. One of our team will call you soon.`,
+        `Got it ${first}, thanks for filling that out. Someone from the team will be in touch soon.`,
+      ];
+      await db.from("outbox").insert({ contact_id: contact.id, channel: "sms", author: "workflow", body: lines[Math.floor(Math.random() * lines.length)], status: "pending", send_after: new Date(Date.now() + 20_000).toISOString(), is_reply: true });
+    }
+  }
+  await db.from("agent_memory").upsert({ contact_id: contact.id, next_step: next === "applied" ? "Form completed. Waiting for Ken's call." : "Form completed, flagged as not a fit.", updated_at: now });
+
+  // Telegram alert to Ken's group
+  try {
+    const { sendTelegram, esc } = await import("@/lib/integrations/telegram");
+    const { siteUrl } = await import("@/lib/site");
+    const { data: full } = await db.from("contacts").select("state, city, tags").eq("id", contact.id).single();
+    await sendTelegram(
+      `${next === "applied" ? "✅ <b>New driver form submitted</b>" : "⚠️ <b>Form submitted, not a fit</b>"}\n` +
+        `<b>${esc(f.first_name)} ${esc(f.last_name)}</b>${full?.state ? ` · ${esc([full.city, full.state].filter(Boolean).join(", "))}` : ""}\n` +
+        `📞 ${esc(f.phone)}${f.email ? `\n✉️ ${esc(f.email)}` : ""}\n\n${esc(f.summary)}` +
+        `${f.flags.length ? `\n\nFlags: ${esc(f.flags.join(", "))}` : ""}\n\n<a href="${siteUrl()}/crm/contacts/${contact.id}">Open in GRL Command</a>`,
+    );
+  } catch (e) {
+    console.error("telegram alert", e);
   }
   return contact.id;
 }
 
-/** Worker: forms opened > 2h ago and not finished get one assistant nudge. */
+/**
+ * Worker. Unfinished forms are chased by the assistant's follow-up cadence (lib/agent/engine.ts),
+ * which already knows whether the form was opened and how far they got. This only covers links
+ * sent without the assistant (no pending follow-up): they get one nudge after 2h.
+ */
 export async function queueAbandonedNudges() {
   const db = adminDb();
   const cutoff = new Date(Date.now() - 2 * 3600_000).toISOString();
   const { data } = await db.from("form_links").select("token, contact_id").lte("opened_at", cutoff).is("completed_at", null).is("nudged_at", null).limit(20);
   for (const l of data ?? []) {
     await db.from("form_links").update({ nudged_at: new Date().toISOString() }).eq("token", l.token);
+    const { count } = await db.from("followups").select("*", { count: "exact", head: true }).eq("contact_id", l.contact_id).eq("status", "pending");
+    if (count) continue;
     await db.from("agent_runs").insert({ contact_id: l.contact_id, trigger: "form_abandoned", action: "queued" });
   }
   return data?.length ?? 0;

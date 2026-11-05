@@ -4,6 +4,7 @@ import { adminDb } from "@/lib/crm/admin";
 import { activity, moveStage, suppress, type Contact } from "@/lib/crm/ingest";
 import { getAssistantSettings } from "@/lib/crm/settings";
 import { notifyTeam } from "@/lib/crm/notify";
+import { sendTelegram, esc } from "@/lib/integrations/telegram";
 import { localTime } from "@/lib/crm/timezones";
 import { company } from "@/content/facts";
 import { chatJson, chatText, extractJson, type ChatMsg } from "@/lib/integrations/deepseek";
@@ -23,12 +24,32 @@ const Decision = z.object({
   followup_hours: z.preprocess((v) => (typeof v === "number" ? v : v == null ? null : Number(v) || null), z.number().min(1).max(720).nullable()).optional().catch(null),
   handoff: str.optional(),
   mood: str.optional(),
+  sms_replies: z.preprocess((v) => (Array.isArray(v) ? v.filter((x) => typeof x === "string" && x.trim()) : typeof v === "string" && v.trim() ? [v] : []), z.array(z.string())).default([]),
 });
 export type Decision = z.infer<typeof Decision>;
 
-// Research: 2-3 texts without a reply max, then slower email nurture; most replies come from follow-ups.
+// Before the form link is out: a light ladder (most replies come from follow-ups, 3-day median gaps).
 const FOLLOWUP_LADDER_H = [24, 72, 168, 336];
 const MAX_TEXT_FOLLOWUPS = 3;
+/**
+ * After the form link is out and 2h pass without it: the chase. Front-loaded like inbound-lead cadences
+ * (3 touches in the first 48h, 8 in 14 days, never more than 2 a day), texts and emails alternating,
+ * stops the second they fill it or reply. Then monthly nurture emails.
+ */
+type ChaseStep = { gapH: number; ch: "both" | "sms" | "email" };
+const CHASE: ChaseStep[] = [
+  { gapH: 2, ch: "both" },   // 2h after the link: text + email
+  { gapH: 20, ch: "sms" },   // next day
+  { gapH: 24, ch: "email" }, // day 2
+  { gapH: 24, ch: "sms" },   // day 3
+  { gapH: 48, ch: "email" }, // day 5
+  { gapH: 48, ch: "sms" },   // day 7
+  { gapH: 72, ch: "email" }, // day 10
+  { gapH: 96, ch: "both" },  // day 14: last one
+];
+const NURTURE_GAP_H = 30 * 24;
+const NURTURE_MAX = 3;
+export type FollowupKind = "nudge" | "chase" | "chase_extra" | "nurture";
 const HUMAN_WORDS = /\b(human|real person|manager|supervisor|lawyer|attorney|sue|lawsuit|complaint|harass|scam|police|report you)\b/i;
 
 /** Moves a follow-up time into a good texting window in the driver's zone: 10-11am or 5-6:30pm, Mon-Sat. */
@@ -58,13 +79,13 @@ export async function formLinkFor(contactId: string) {
   return { url: `${siteUrl()}/apply/driver?t=${row.token}`, token: row.token as string, form: { sent: !!row.sent_at, opened: !!row.opened_at, step: row.step_reached ?? 0, completed: !!row.completed_at } };
 }
 
-type RunInput = { simTurns?: Turn[]; contactId: string; trigger: "text_received" | "email_received" | "followup" | "form_abandoned" | "manual" | "test"; inputMessageId?: string | null; followupAttempt?: number; runId?: string; dryRunMessage?: { channel: "email" | "sms"; body: string } };
+type RunInput = { simTurns?: Turn[]; contactId: string; trigger: "text_received" | "email_received" | "followup" | "form_abandoned" | "manual" | "test"; inputMessageId?: string | null; followupAttempt?: number; followupKind?: FollowupKind; followupChannel?: "email" | "sms" | null; runId?: string; dryRunMessage?: { channel: "email" | "sms"; body: string } };
 export type RunResult = { action: string; reply?: string | null; channel?: "email" | "sms"; decision?: Decision; problems?: string[]; reason?: string; costUsd?: number };
 
 /** One assistant decision for one driver. Never throws: failures hand the driver to a person. */
 export async function runAgent(input: RunInput): Promise<RunResult> {
   const db = adminDb();
-  const dry = input.trigger === "test";
+  const dry = input.trigger === "test" || !!input.simTurns; // harness runs never write or send
   const log = async (patch: Record<string, unknown>) => {
     if (dry) return;
     if (input.runId) await db.from("agent_runs").update(patch).eq("id", input.runId);
@@ -82,8 +103,10 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
       if (input.trigger !== "manual" && c.agent_paused_until && new Date(c.agent_paused_until) > new Date())
         return (await log({ action: "ignored", decision: { reason: "a person replied recently (paused)" } }), { action: "ignored", reason: "Paused: a person replied recently" });
       const since = new Date(Date.now() - 86400_000).toISOString();
-      const { count } = await db.from("outbox").select("*", { count: "exact", head: true }).eq("contact_id", c.id).eq("author", "agent").gte("created_at", since).neq("status", "cancelled");
-      if ((count ?? 0) >= settings.max_per_day) return (await log({ action: "ignored", decision: { reason: "daily limit" } }), { action: "ignored", reason: "Daily message limit reached for this driver" });
+      // Daily cap is for messages we start (follow-ups). Answering a driver who wrote is never capped.
+      const proactive = input.trigger === "followup" || input.trigger === "form_abandoned";
+      const { count } = proactive ? await db.from("outbox").select("*", { count: "exact", head: true }).eq("contact_id", c.id).eq("author", "agent").eq("is_reply", false).gte("created_at", since).neq("status", "cancelled") : { count: 0 };
+      if (proactive && (count ?? 0) >= Math.max(settings.max_per_day, 4)) return (await log({ action: "ignored", decision: { reason: "daily limit" } }), { action: "ignored", reason: "Daily message limit reached for this driver" });
     }
 
     // Context
@@ -103,12 +126,12 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
       await log({ action: "handed_off", decision: { reason: "hand-off words" } });
       return { action: "handed_off", reason: "hand-off words" };
     }
-    // No endless loops: 10+ assistant texts in 7 days without the form → a person takes it from here.
-    if (!dry && !input.simTurns) {
+    // No endless loops: 14+ assistant messages in 7 days while the driver keeps talking but never fills the form → a person takes it.
+    if (!dry && !input.simTurns && (input.trigger === "text_received" || input.trigger === "email_received")) {
       const since7 = new Date(Date.now() - 7 * 86400_000).toISOString();
       const { count: sent7 } = await db.from("messages").select("*", { count: "exact", head: true }).eq("contact_id", c.id).eq("author", "agent").gte("created_at", since7);
-      if ((sent7 ?? 0) >= 10) {
-        await handoff(c, "Long conversation without the form (10+ assistant texts in 7 days)");
+      if ((sent7 ?? 0) >= 14) {
+        await handoff(c, "Long conversation without the form (14+ assistant messages in 7 days)");
         await log({ action: "handed_off", decision: { reason: "conversation limit" } });
         return { action: "handed_off", reason: "conversation limit" };
       }
@@ -119,13 +142,22 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
     // Reply on the channel they used; follow-ups prefer text when allowed.
     const lastInbound = [...turns].reverse().find((t) => t.direction === "inbound");
     let channel: "email" | "sms" = (lastInbound?.channel as "email" | "sms") ?? (c.sms_consent ? "sms" : "email");
-    if (input.trigger === "followup") channel = c.sms_consent && (input.followupAttempt ?? 1) <= MAX_TEXT_FOLLOWUPS ? "sms" : "email";
+    if (input.trigger === "followup") channel = input.followupChannel ?? (c.sms_consent && (input.followupAttempt ?? 1) <= MAX_TEXT_FOLLOWUPS ? "sms" : "email");
+    if (channel === "email" && !c.email) channel = "sms";
+    // First chase touch: the card moves to "Following up".
+    if (!dry && input.followupKind === "chase" && (input.followupAttempt ?? 1) === 1) await moveStage(c as Contact, "chasing", "agent");
+    // Driver answered an email and we may text them: send a short text too (multi-channel, like a recruiter would).
+    let alsoText = false;
+    if (!dry && input.trigger === "email_received" && c.sms_consent && (c.cell_phone || c.phone)) {
+      const { count: recentSms } = await db.from("messages").select("*", { count: "exact", head: true }).eq("contact_id", c.id).eq("channel", "sms").eq("direction", "outbound").gte("created_at", new Date(Date.now() - 12 * 3600_000).toISOString());
+      alsoText = !recentSms;
+    }
     // "Reply now" from staff: answer the driver if they wrote last, otherwise a fresh nudge.
     const promptTrigger = input.trigger === "manual" ? (turns.at(-1)?.direction === "inbound" ? "text_received" : "followup") : input.trigger === "test" ? "text_received" : input.trigger;
     if (channel === "sms" && !c.sms_consent) channel = "email";
 
     const name = [c.first_name, c.last_name].filter(Boolean).join(" ") || "the driver";
-    const base = { name, city: c.city, state: c.state, localTime: localTime(c.timezone), stage: c.stage, channel, smsConsent: c.sms_consent, formUrl: link.url, form: link.form, memory: { facts: (mem?.facts as Record<string, unknown>) ?? {}, summary: mem?.summary, next_step: mem?.next_step }, turns, trigger: promptTrigger, followupAttempt: input.followupAttempt };
+    const base = { name, city: c.city, state: c.state, localTime: localTime(c.timezone), stage: c.stage, channel, smsConsent: c.sms_consent, hasPhone: !!(c.cell_phone || c.phone), formUrl: link.url, form: link.form, memory: { facts: (mem?.facts as Record<string, unknown>) ?? {}, summary: mem?.summary, next_step: mem?.next_step }, turns, trigger: promptTrigger, followupAttempt: input.followupAttempt, followupKind: input.followupKind, chaseTotal: CHASE.length, alsoText };
 
     // Decide: JSON first (2 tries with the checker's feedback), then a plain-text fallback so a driver is never left hanging.
     const messages: ChatMsg[] = buildMessages(base);
@@ -218,7 +250,8 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
       // Human cadence (GoHighLevel uses ~60-90s for SMS): live chat 30-75s, reply after a silence 60-150s, plus "typing" time.
       const base = manual ? 5 : replying ? (live ? 30 + Math.random() * 45 : 60 + Math.random() * 90) + parts[0].length * 0.25 : settings.delay_min_s + Math.random() * Math.max(0, settings.delay_max_s - settings.delay_min_s);
       let at = Date.now() + 1000 * base;
-      await db.from("outbox").update({ status: "cancelled", error: "replaced by a newer reply" }).eq("contact_id", c.id).eq("author", "agent").in("status", ["draft", "pending"]);
+      if (input.followupKind !== "chase_extra")
+        await db.from("outbox").update({ status: "cancelled", error: "replaced by a newer reply" }).eq("contact_id", c.id).eq("author", "agent").in("status", ["draft", "pending"]);
       const isReply = input.trigger === "text_received" || input.trigger === "email_received" || manual;
       for (let i = 0; i < parts.length; i++) {
         if (i > 0) at += 1000 * (8 + Math.random() * 12 + parts[i].length * 0.15);
@@ -227,22 +260,26 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
           status: settings.draft_mode ? "draft" : "pending", send_after: new Date(at).toISOString(), is_reply: isReply,
         });
       }
-      if (parts.some((t) => t.includes(link.url)) && !link.form.sent) {
+      // The extra text that goes with an email reply.
+      const texts = alsoText ? decision.sms_replies.map(clean).filter((t) => t && checkReply(t, { channel: "sms", formUrl: link.url }).ok).slice(0, 2) : [];
+      let tAt = Date.now() + 1000 * (90 + Math.random() * 60);
+      for (const t of texts) {
+        await db.from("outbox").insert({ contact_id: c.id, channel: "sms", author: "agent", body: t, status: settings.draft_mode ? "draft" : "pending", send_after: new Date(tAt).toISOString(), is_reply: false });
+        tAt += 1000 * (10 + Math.random() * 15);
+      }
+      if ([...parts, ...texts].some((t) => t.includes(link.url)) && !link.form.sent) {
         await db.from("form_links").update({ sent_at: new Date().toISOString() }).eq("token", link.token);
         await moveStage(c as Contact, "form_sent", "agent");
       }
       action = settings.draft_mode ? "draft" : "replied";
     }
 
-    // Follow-up ladder: any run resets it.
-    await db.from("followups").update({ status: "cancelled" }).eq("contact_id", c.id).eq("status", "pending");
-    const attempt = input.trigger === "followup" ? (input.followupAttempt ?? 1) + 1 : 1; // manual/reply resets the ladder
-    const done = ["not_interested", "not_fit", "stop", "wrong_person"].includes(decision.intent) || decision.stage === "not_interested" || decision.stage === "not_fit";
-    if (!done && !link.form.completed && attempt <= Math.min(settings.max_followups, FOLLOWUP_LADDER_H.length)) {
-      const hours = FOLLOWUP_LADDER_H[attempt - 1];
-      const fuChannel: "email" | "sms" = c.sms_consent && attempt <= MAX_TEXT_FOLLOWUPS ? "sms" : "email";
-      const due = inGoodWindow(new Date(Date.now() + hours * 3600_000), c.timezone);
-      await db.from("followups").insert({ contact_id: c.id, due_at: due.toISOString(), attempt, reason: `Follow-up #${attempt} (${fuChannel === "sms" ? "text" : "email"})`, channel: fuChannel });
+    // Next touch. The extra email of a "text + email" chase step leaves the schedule alone.
+    if (input.followupKind !== "chase_extra") {
+      await db.from("followups").update({ status: "cancelled" }).eq("contact_id", c.id).eq("status", "pending");
+      const done = ["not_interested", "not_fit", "stop", "wrong_person", "owner_operator"].includes(decision.intent) || decision.stage === "not_interested" || decision.stage === "not_fit";
+      const linkOut = link.form.sent || [...parts].some((t) => t.includes(link.url)) || decision.sms_replies.some((t) => t.includes(link.url));
+      if (!done && !link.form.completed) await scheduleNext(c, { linkOut, kind: input.trigger === "followup" ? input.followupKind ?? "nudge" : null, attempt: input.followupAttempt ?? 0, maxNudges: settings.max_followups });
     }
 
     await log({ action, decision, reply: parts.join("\n\n") || null, checks: { problems }, ...meta });
@@ -254,12 +291,65 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
   }
 }
 
+/** Plans the next follow-up. Replies restart the chase from step 1 (2h later), the way a recruiter restarts after a conversation. */
+async function scheduleNext(
+  c: { id: string; sms_consent: boolean; email: string | null; timezone: string | null; stage: string },
+  p: { linkOut: boolean; kind: FollowupKind | null; attempt: number; maxNudges: number },
+) {
+  const db = adminDb();
+  const add = (attempt: number, kind: FollowupKind, channel: "email" | "sms", due: Date, label: string) =>
+    db.from("followups").insert({ contact_id: c.id, due_at: due.toISOString(), attempt, kind, channel, reason: label });
+  const canText = c.sms_consent;
+  const canEmail = !!c.email;
+
+  if (p.kind === "nurture" || (p.kind === "chase" && p.attempt >= CHASE.length)) {
+    const n = p.kind === "nurture" ? p.attempt + 1 : 1;
+    if (n > NURTURE_MAX || !canEmail) return;
+    if (n === 1) await moveStage(c as unknown as Contact, "nurture", "agent", {}, true);
+    await add(n, "nurture", "email", inGoodWindow(new Date(Date.now() + NURTURE_GAP_H * 3600_000), c.timezone), `Nurture email #${n}`);
+    return;
+  }
+
+  if (p.linkOut) {
+    // chase: next step (or step 1 after a reply), skipping text-only steps when we can't text
+    let i = p.kind === "chase" ? p.attempt : 0; // CHASE index of the next step
+    let gap = 0;
+    while (i < CHASE.length) {
+      gap += CHASE[i].gapH;
+      const ch = CHASE[i].ch;
+      if (ch === "both" || (ch === "sms" && canText) || (ch === "email" && canEmail)) break;
+      i++;
+    }
+    if (i >= CHASE.length) return;
+    const step = CHASE[i];
+    const raw = new Date(Date.now() + gap * 3600_000);
+    const due = i === 0 ? raw : inGoodWindow(raw, c.timezone);
+    const n = i + 1;
+    if (step.ch === "both") {
+      if (canText) await add(n, "chase", "sms", due, `Form follow-up #${n} (text)`);
+      if (canEmail) await add(n, canText ? "chase_extra" : "chase", "email", new Date(due.getTime() + (canText ? 4 * 60_000 : 0)), `Form follow-up #${n} (email)`);
+      if (!canText && !canEmail) return;
+    } else {
+      await add(n, "chase", step.ch, due, `Form follow-up #${n} (${step.ch === "sms" ? "text" : "email"})`);
+    }
+    return;
+  }
+
+  // before the link: gentle ladder
+  const n = p.kind === "nudge" ? p.attempt + 1 : 1;
+  if (n > Math.min(p.maxNudges, FOLLOWUP_LADDER_H.length)) return;
+  const ch: "email" | "sms" = canText && n <= MAX_TEXT_FOLLOWUPS ? "sms" : canEmail ? "email" : "sms";
+  if (ch === "sms" && !canText) return;
+  await add(n, "nudge", ch, inGoodWindow(new Date(Date.now() + FOLLOWUP_LADDER_H[n - 1] * 3600_000), c.timezone), `Follow-up #${n} (${ch === "sms" ? "text" : "email"})`);
+}
+
 async function handoff(c: { id: string; first_name: string | null; last_name: string | null }, reason: string) {
   const db = adminDb();
   await db.from("contacts").update({ agent_mode: "manual" }).eq("id", c.id);
   await db.from("tasks").insert({ contact_id: c.id, title: `Reply to driver: ${reason}`.slice(0, 300), created_by: "agent", due_at: new Date(Date.now() + 3600_000).toISOString() });
   await activity(c.id, "handed_to_person", { reason }, "agent");
   await notifyTeam(`Driver needs a person: ${[c.first_name, c.last_name].filter(Boolean).join(" ") || "unknown"}`, `${reason}\n\nOpen: ${siteUrl()}/crm/contacts/${c.id}`);
+  await sendTelegram(`🙋 <b>Driver needs a person</b>\n<b>${esc([c.first_name, c.last_name].filter(Boolean).join(" ") || "Unknown")}</b>\n${esc(reason)}\n\n<a href="${siteUrl()}/crm/contacts/${c.id}">Open in GRL Command</a>`);
 }
 
 /** Worker: queued runs (new inbound messages) + due follow-ups. */
@@ -282,10 +372,10 @@ export async function processAgentQueue(limit = 10) {
     const r = await runAgent({ contactId: q.contact_id, trigger: q.trigger as RunInput["trigger"], inputMessageId: q.input_message_id, runId: q.id });
     out.push({ contactId: q.contact_id, action: r.action });
   }
-  const { data: due } = await db.from("followups").select("id, contact_id, attempt").eq("status", "pending").lte("due_at", new Date().toISOString()).order("due_at").limit(limit);
+  const { data: due } = await db.from("followups").select("id, contact_id, attempt, kind, channel").eq("status", "pending").lte("due_at", new Date().toISOString()).order("due_at").limit(limit);
   for (const f of due ?? []) {
     await db.from("followups").update({ status: "done" }).eq("id", f.id);
-    const r = await runAgent({ contactId: f.contact_id, trigger: "followup", followupAttempt: f.attempt });
+    const r = await runAgent({ contactId: f.contact_id, trigger: "followup", followupAttempt: f.attempt, followupKind: (f.kind as FollowupKind) ?? "nudge", followupChannel: (f.channel as "email" | "sms" | null) ?? null });
     out.push({ contactId: f.contact_id, action: `followup:${r.action}` });
   }
   return out;

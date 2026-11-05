@@ -159,7 +159,8 @@ export async function submitDriverLead(input: DriverLeadInput): Promise<ActionRe
         ["CRM profile", crmLink],
       ],
     }),
-    d.sms_consent
+    // When the CRM handled it, the confirmation text goes through the CRM outbox instead (shows in the timeline).
+    d.sms_consent && !crmLink
       ? sendSms(
           phone,
           d.locale === "es"

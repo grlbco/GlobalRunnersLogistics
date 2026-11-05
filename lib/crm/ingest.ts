@@ -7,8 +7,8 @@ import type { Stage } from "./stages";
  * so a message is stored once (unique external id) and stage moves stay forward-only.
  */
 const RANK: Record<Stage, number> = {
-  new: 0, contacted: 1, replied: 2, interested: 3, form_sent: 4, applied: 5, qualified: 6, sent_to_ken: 7, hired: 8,
-  nurture: 2, not_fit: 9, not_interested: 9, unsubscribed: 10, bounced: 10,
+  new: 0, contacted: 1, replied: 2, interested: 3, form_sent: 4, chasing: 4.5, applied: 5, qualified: 6, sent_to_ken: 7, hired: 8,
+  nurture: 1.5, not_fit: 9, not_interested: 9, unsubscribed: 10, bounced: 10,
 };
 const TERMINAL = new Set<Stage>(["hired", "not_fit", "unsubscribed", "bounced"]);
 
@@ -44,8 +44,8 @@ export async function createInboundContact(p: { email?: string; phone?: string; 
   return data as Contact;
 }
 
-export async function moveStage(contact: Contact, next: Stage, actor = "system", extra: Record<string, unknown> = {}) {
-  const to = advance(contact.stage, next);
+export async function moveStage(contact: Contact, next: Stage, actor = "system", extra: Record<string, unknown> = {}, force = false) {
+  const to = force && !TERMINAL.has(contact.stage) && contact.stage !== "applied" ? next : advance(contact.stage, next);
   const patch: Record<string, unknown> = { ...extra };
   if (to !== contact.stage) Object.assign(patch, { stage: to, stage_changed_at: new Date().toISOString() });
   if (Object.keys(patch).length) await adminDb().from("contacts").update(patch).eq("id", contact.id);
