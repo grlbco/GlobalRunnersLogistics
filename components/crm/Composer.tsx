@@ -11,7 +11,7 @@ export function Composer({ contactId, email, sms, sendingOn }: { contactId: stri
   const [channel, setChannel] = useState<Channel>(sms.ok && !email.ok ? "sms" : "email");
   const [state, action, busy] = useActionState<SendState, FormData>(sendManual, null);
   const cur = channel === "email" ? email : sms;
-  const blocked = !sendingOn ? "Sending is off. Set SENDING_ENABLED=true in .env.local to send for real." : !cur.ok ? cur.why : null;
+  const blocked = !sendingOn ? "Sending is off (Settings → All sending)." : !cur.ok ? cur.why : null;
 
   return (
     <form action={action} className="rounded-[8px] border border-white/10 bg-white/[0.02]">

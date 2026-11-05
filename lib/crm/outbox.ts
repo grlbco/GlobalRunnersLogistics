@@ -8,6 +8,8 @@ import * as instantly from "@/lib/integrations/instantly";
  * The only place that sends. Every check runs here right before the API call:
  * kill switch, do-not-contact, suppression list, consent, quiet hours (automatic sends), thread availability.
  */
+import { isSendingOn } from "./sending";
+/** @deprecated use isSendingOn() (env + CRM switch). */
 export const sendingEnabled = () => process.env.SENDING_ENABLED === "true";
 
 type Row = { id: string; contact_id: string; channel: "email" | "sms"; author: "agent" | "human" | "workflow"; author_id: string | null; subject: string | null; body: string; attempts: number; is_reply: boolean };
@@ -27,7 +29,7 @@ export type SendOutcome = { ok: true; messageId: string | null } | { ok: false; 
 
 async function sendOne(row: Row): Promise<SendOutcome> {
   const db = adminDb();
-  if (!sendingEnabled()) return { ok: false, reason: "Sending is switched off (SENDING_ENABLED=false)" };
+  if (!(await isSendingOn())) return { ok: false, reason: "Sending is switched off (Settings → All sending, or SENDING_ENABLED)", retry: true };
   const { data: c } = await db.from("contacts").select("id, email, phone, cell_phone, timezone, do_not_contact, email_consent, sms_consent").eq("id", row.contact_id).single();
   if (!c) return { ok: false, reason: "Contact not found" };
   if (c.do_not_contact) return { ok: false, reason: "Contact is do-not-contact" };
@@ -86,6 +88,7 @@ export async function processRow(id: string): Promise<SendOutcome> {
 }
 
 export async function processDue(limit = 20) {
+  if (!(await isSendingOn())) return []; // everything waits while sending is off
   const { data } = await adminDb().from("outbox").select("id").eq("status", "pending").lte("send_after", new Date().toISOString()).order("send_after").limit(limit);
   const results = [];
   for (const r of data ?? []) results.push({ id: r.id, ...(await processRow(r.id)) });

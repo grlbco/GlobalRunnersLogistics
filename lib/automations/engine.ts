@@ -115,7 +115,7 @@ async function runStep(step: Step, c: C, run: { id: string; created_at: string }
       const body = await render(step.body, c);
       const link = `${site()}/crm/contacts/${c.id}`;
       await notifyTeam(`Command: ${[c.first_name, c.last_name].filter(Boolean).join(" ") || "driver"}`, `${body}\n\n${link}`);
-      if (step.to === "ken" && process.env.NOTIFY_SMS_TO && process.env.SENDING_ENABLED === "true") {
+      if (step.to === "ken" && process.env.NOTIFY_SMS_TO && (await (await import("@/lib/crm/sending")).isSendingOn())) {
         await quo.sendText(process.env.NOTIFY_SMS_TO, `${body} ${link}`.slice(0, 600)).catch(() => {});
       }
       return "next";

@@ -62,7 +62,8 @@ export async function requestCall(p: { contactId?: string | null; phone?: string
   const link = `${siteUrl()}/crm/contacts/${contact.id}`;
   await sendTelegram(`📞 <b>Call now: ${esc(name)}</b>${contact.state ? ` (${esc(contact.state)})` : ""}\n<a href="tel:${esc(phone)}">${esc(phoneDisplay(phone) ?? phone)}</a>\nAsked via ${esc(p.source.replace(/_/g, " "))}${inHours ? "" : "\n⏰ After hours: told them you'll call first thing."}\n\n<a href="${link}">Open in GRL Command</a>`);
   const kenCell = process.env.NOTIFY_SMS_TO;
-  if (kenCell && process.env.SENDING_ENABLED === "true") {
+  const { isSendingOn } = await import("./sending");
+  if (kenCell && (await isSendingOn())) {
     const { sendText } = await import("@/lib/integrations/quo");
     await sendText(kenCell, `CALL NOW: ${name} ${phoneDisplay(phone) ?? phone} wants a call${inHours ? "" : " (after hours, first thing tomorrow)"}. ${link}`).catch(() => {});
   }

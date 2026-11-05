@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { clsx } from "clsx";
 import { requireStaff } from "@/lib/crm/auth";
+import { isSendingOn } from "@/lib/crm/sending";
 import { STAGES, TIERS } from "@/lib/crm/stages";
 import { localTime } from "@/lib/crm/timezones";
 import { ago, fullName, initials, phoneDisplay } from "@/lib/crm/format";
@@ -120,7 +121,7 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
         <div className="mt-4">
           <Composer
             contactId={c.id}
-            sendingOn={process.env.SENDING_ENABLED === "true"}
+            sendingOn={await isSendingOn()}
             email={c.do_not_contact || !c.email_consent ? { ok: false, why: "Email is off for this driver" } : hasEmailThread ? { ok: true } : { ok: false, why: "No email thread yet: the first email comes from a campaign" }}
             sms={c.do_not_contact ? { ok: false, why: "Driver is do-not-contact" } : c.sms_consent ? { ok: true } : { ok: false, why: "No text consent yet: the driver must text us first or tick the form box" }}
           />

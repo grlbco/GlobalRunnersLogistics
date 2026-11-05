@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { clsx } from "clsx";
 import { requireStaff } from "@/lib/crm/auth";
+import { isSendingOn } from "@/lib/crm/sending";
 import { ago, fullName, phoneDisplay } from "@/lib/crm/format";
 import { localTime } from "@/lib/crm/timezones";
 import { Skeleton, StageBadge } from "@/components/crm/ui";
@@ -140,7 +141,7 @@ async function Thread({ contact: c, unread, back }: { contact: Contact; unread: 
         <Drafts supabase={supabase} contactId={c.id} />
         <Composer
           contactId={c.id}
-          sendingOn={process.env.SENDING_ENABLED === "true"}
+          sendingOn={await isSendingOn()}
           email={c.do_not_contact || !c.email_consent ? { ok: false, why: "Email is off for this driver" } : hasEmailThread ? { ok: true } : { ok: false, why: "No email thread yet: the first email comes from a campaign" }}
           sms={c.do_not_contact ? { ok: false, why: "Driver is do-not-contact" } : c.sms_consent ? { ok: true } : { ok: false, why: "No text consent yet" }}
         />
