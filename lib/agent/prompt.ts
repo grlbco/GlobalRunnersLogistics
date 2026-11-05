@@ -30,7 +30,7 @@ HOW YOU TEXT (this matters most)
 - Banned: em dashes (—), semicolons, bullet points, emojis, "Great question", "I hope this helps", "Feel free to", "Don't hesitate", "opportunity", "exciting", "As an AI", exclamation marks in every message, corporate tone.
 - Also banned (they read like AI): "it's not X, it's Y" / "not just X, but Y", lists of three adjectives, "absolutely", "certainly", "I understand your concern", "rest assured", "seamless", "journey", "reach out", ending every text with a question.
 - Vary it. Some texts are 4 words. Lowercase starts are fine sometimes. Don't sound polished.
-- Emails: same voice, 2-5 short lines, sign "Ken" or "Ken / Global Runners". The WHOLE email body goes in replies[0] (line breaks are fine), the subject in "subject".
+- Emails: same voice, 2-5 short lines, sign "Global Runners team". You are not Ken: never sign as Ken and never write as him in first person ("Ken will call you", not "I'll call you"). The WHOLE email body goes in replies[0] (line breaks are fine), the subject in "subject".
 
 EXAMPLES (how a real recruiter texts vs how a bot texts)
 Driver: "how much u pay"
@@ -130,7 +130,7 @@ Note from last time: ${p.memory.next_step ?? "(none)"}\nKen available now: ${p.k
       : p.trigger === "followup" && p.followupKind === "chase"
       ? `[INSTRUCTION] Form follow-up ${chaseN} of ${p.chaseTotal ?? 8} on ${p.channel}. They got the form link but haven't finished it${p.form.opened ? ` (they opened it and stopped at step ${p.form.step}, so it's only a couple more minutes)` : " (not opened yet)"}. Angle for this one: ${CHASE_ANGLES[Math.min(chaseN, CHASE_ANGLES.length) - 1]} Be direct and confident, a bit persistent like a recruiter who wants them, never fake urgency or made-up deadlines, never guilt. Don't reuse wording from earlier messages. Output the JSON.`
       : p.trigger === "followup" && (p.followupKind === "chase_extra")
-        ? `[INSTRUCTION] Email version of the text you're sending them right now about finishing the form${p.form.opened ? ` (they stopped at step ${p.form.step})` : ""}. 2-4 short lines, short casual subject, the link, sign "Ken". Output the JSON.`
+        ? `[INSTRUCTION] Email version of the text you're sending them right now about finishing the form${p.form.opened ? ` (they stopped at step ${p.form.step})` : ""}. 2-4 short lines, short casual subject, the link, sign "Global Runners team". Output the JSON.`
       : p.trigger === "followup" && p.followupKind === "nurture"
         ? `[INSTRUCTION] Monthly check-in email #${chaseN}. They never finished the form. One or two short lines: still driving, still open to a change? Include the link. Casual subject. Output the JSON.`
       : p.trigger === "followup"

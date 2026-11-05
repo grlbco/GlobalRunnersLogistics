@@ -12,6 +12,8 @@ describe("assistant safety checks (every message before it sends)", () => {
     ["AI giveaway", "As an AI, I can help"],
     ["claiming to be human", "So yeah, real person here, just not Ken"],
     ["denying being a bot", "I'm not a bot, promise"],
+    ["signing as Ken", "Form's here: https://globalrunnerslogistics.com/apply/driver?t=abc\n\nKen / Global Runners"],
+    ["offering to call", "Once it's in, I'll give you a call"],
     ["not X it's Y", "It's not just a job, it's a career"],
     ["buzzword", "Rest assured, we got you"],
     ["foreign link", "Apply at https://example.com/apply"],
