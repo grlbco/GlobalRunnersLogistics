@@ -18,10 +18,10 @@ export function AssistantTest() {
         <button className={btnCls} disabled={busy}>{busy ? "Thinking…" : "Test"}</button>
       </div>
       {state && (
-        <div className="space-y-2 rounded-[10px] border border-line bg-subtle p-3 text-sm">
+        <div className="space-y-2 rounded-[14px] border border-line bg-subtle p-3 text-sm">
           {state.error && <p className="text-red-600">{state.error}</p>}
           {state.action && <p className="text-xs text-faint">Result: {state.action} · {state.channel}{state.cost ? ` · $${state.cost.toFixed(4)}` : ""}</p>}
-          {state.reply && <p className="whitespace-pre-wrap rounded-[12px] rounded-tr-[4px] border border-navy/10 bg-navy-soft p-3 text-fg">{state.reply}</p>}
+          {state.reply && <p className="whitespace-pre-wrap rounded-[16px] rounded-tr-[4px] border border-navy/10 bg-navy-soft p-3 text-fg">{state.reply}</p>}
           {state.problems?.length ? <p className="text-xs text-[#8a4f0e]">Checks: {state.problems.join("; ")}</p> : null}
           {state.json && (
             <details>

@@ -34,7 +34,7 @@ export const FUNNEL: Stage[] = ["contacted", "replied", "interested", "form_sent
 
 export const toneClass: Record<Tone, string> = {
   cold: "bg-hover text-muted",
-  warm: "bg-[#fdf3e7] text-[#8a4f0e]",
+  warm: "bg-warm-soft text-warm-ink",
   hot: "bg-signal-soft text-signal-ink",
   won: "bg-emerald-50 text-emerald-700",
   lost: "bg-hover text-faint",

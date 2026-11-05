@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(html[data-theme="dark"] *));
+
 /* ---------- Design tokens (docs/plan/02-design-system.md) ---------- */
 @theme {
   --color-ink: #0a1220;
@@ -25,9 +27,12 @@
   --color-ghost: #bcc3ce;
   --color-signal-soft: #fdeee9;
   --color-navy-soft: #e9edf4;
+  --color-warm-soft: #fdf3e7;
+  --color-warm-ink: #8a4f0e;
 
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
+  /* Geist everywhere: the old mono utility now resolves to Geist Sans too. */
+  --font-mono: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 
   --ease-house: cubic-bezier(0.22, 1, 0.36, 1);
 
@@ -182,11 +187,62 @@ html.lenis body {
   100% { transform: translateY(200%); }
 }
 
-/* ---------- Command (CRM) light theme ---------- */
+/* ---------- Command (CRM) theme: scoped to html.crm so the public site is never affected ---------- */
 html.crm {
+  --color-canvas: #f6f6f6;
+  --color-surface: #ffffff;
+  --color-subtle: #fafafa;
+  --color-hover: #f1f1f1;
+  --color-line: #efefef;
+  --color-line-strong: #dfdfdf;
+  --color-fg: #121415;
+  --color-fg-2: #33363a;
+  --color-muted: #676c74;
+  --color-faint: #8d9198;
+  --color-ghost: #bfc1c5;
+  --color-navy: #121415;
+  --color-navy-soft: #f1f1f1;
+  --crm-shadow-card: 0 1px 2px rgb(18 20 21 / 0.02);
+  --crm-shadow-pop: 0 1px 2px rgb(18 20 21 / 0.04), 0 12px 32px -10px rgb(18 20 21 / 0.14);
   background: var(--color-canvas);
   color: var(--color-fg);
   color-scheme: light;
+}
+html.crm[data-theme="dark"] {
+  --color-canvas: #0d0e0f;
+  --color-surface: #161819;
+  --color-subtle: #1b1d1f;
+  --color-hover: #232527;
+  --color-line: #242628;
+  --color-line-strong: #36393b;
+  --color-fg: #f6f6f6;
+  --color-fg-2: #d8d9db;
+  --color-muted: #9b9fa5;
+  --color-faint: #73777c;
+  --color-ghost: #4c4f53;
+  --color-navy: #f6f6f6;
+  --color-navy-soft: #26282a;
+  --color-signal: #ff6a45;
+  --color-signal-ink: #ff8f72;
+  --color-signal-soft: rgb(255 106 69 / 0.14);
+  --color-warm-soft: rgb(242 166 90 / 0.14);
+  --color-warm-ink: #f2b070;
+  --color-emerald-50: rgb(16 185 129 / 0.14);
+  --color-emerald-200: rgb(16 185 129 / 0.3);
+  --color-emerald-700: #4cd6a4;
+  --color-emerald-800: #4cd6a4;
+  --color-amber-50: rgb(245 158 11 / 0.13);
+  --color-amber-200: rgb(245 158 11 / 0.28);
+  --color-amber-700: #f5bd52;
+  --color-amber-800: #f5bd52;
+  --color-amber-900: #f7cd7a;
+  --color-red-50: rgb(239 68 68 / 0.14);
+  --color-red-200: rgb(239 68 68 / 0.3);
+  --color-red-600: #f98080;
+  --color-red-700: #f98080;
+  --crm-shadow-card: none;
+  --crm-shadow-pop: 0 12px 32px -10px rgb(0 0 0 / 0.6);
+  color-scheme: dark;
 }
 html.crm body {
   background: var(--color-canvas);
@@ -194,30 +250,35 @@ html.crm body {
   font-feature-settings: "ss01", "cv11", "tnum" 0;
 }
 html.crm ::selection {
-  background: color-mix(in oklab, var(--color-signal) 22%, white);
+  background: color-mix(in oklab, var(--color-fg) 16%, transparent);
   color: var(--color-fg);
 }
 html.crm :is(input, textarea, select):focus-visible {
   outline: none;
 }
 html.crm :focus-visible {
-  outline: 2px solid color-mix(in oklab, var(--color-signal) 70%, white);
+  outline: 2px solid var(--color-fg);
   outline-offset: 2px;
-  border-radius: 6px;
+  border-radius: 10px;
 }
 /* thin, quiet scrollbars inside the app */
 html.crm * {
   scrollbar-width: thin;
   scrollbar-color: var(--color-line-strong) transparent;
 }
+/* Theme switch crossfades; nothing else in the CRM uses the root view transition. */
+html.crm::view-transition-old(root),
+html.crm::view-transition-new(root) {
+  animation-duration: 220ms;
+}
 @utility shadow-card {
-  box-shadow: 0 1px 2px rgb(10 18 32 / 0.04), 0 0 0 1px rgb(10 18 32 / 0.02);
+  box-shadow: var(--crm-shadow-card);
 }
 @utility shadow-pop {
-  box-shadow: 0 1px 2px rgb(10 18 32 / 0.05), 0 8px 24px -6px rgb(10 18 32 / 0.12), 0 0 0 1px rgb(10 18 32 / 0.04);
+  box-shadow: var(--crm-shadow-pop);
 }
 @utility bg-dots {
-  background-image: radial-gradient(circle at 1px 1px, rgb(10 18 32 / 0.07) 1px, transparent 0);
+  background-image: radial-gradient(circle at 1px 1px, color-mix(in oklab, var(--color-fg) 7%, transparent) 1px, transparent 0);
   background-size: 16px 16px;
 }
 @keyframes shimmer {
@@ -225,6 +286,6 @@ html.crm * {
   100% { background-position: 400px 0; }
 }
 @keyframes pulse-dot {
-  0%, 100% { box-shadow: 0 0 0 0 rgb(232 64 28 / 0.35); }
-  50% { box-shadow: 0 0 0 5px rgb(232 64 28 / 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgb(16 185 129 / 0.35); }
+  50% { box-shadow: 0 0 0 5px rgb(16 185 129 / 0); }
 }

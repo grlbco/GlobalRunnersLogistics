@@ -44,7 +44,7 @@ async function List() {
   const opened = (links ?? []).filter((l) => l.opened_at).length;
   const done = (links ?? []).filter((l) => l.completed_at).length;
   return (
-    <div className="space-y-8 p-5 md:p-8">
+    <div className="space-y-8 px-5 md:px-6">
       <Card className="p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>

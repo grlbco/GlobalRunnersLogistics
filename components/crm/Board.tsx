@@ -31,7 +31,7 @@ export function Board({ columns }: { columns: Col[] }) {
   const [dragging, setDragging] = useState<string | null>(null);
 
   return (
-    <div className="flex gap-3 overflow-x-auto p-5 md:px-8 md:py-6">
+    <div className="flex gap-3 overflow-x-auto px-5 pb-2 md:px-6">
       {cols.map((col) => (
         <section
           key={col.stage}
@@ -49,18 +49,18 @@ export function Board({ columns }: { columns: Col[] }) {
             });
           }}
           className={clsx(
-            "flex w-[17.5rem] shrink-0 flex-col rounded-[12px] border transition-all duration-200",
-            over === col.stage ? "border-signal/40 bg-signal-soft/60 ring-4 ring-signal/10" : "border-line bg-subtle",
+            "flex w-[17.5rem] shrink-0 flex-col rounded-[16px] border transition-all duration-200",
+            over === col.stage ? "border-fg bg-subtle shadow-[0_0_0_3px_var(--color-line-strong)]" : "border-line bg-surface",
           )}
         >
           <header className="flex items-center justify-between px-3.5 pb-2 pt-3">
-            <h2 className="flex items-center gap-2 text-[0.8rem] font-semibold tracking-[-0.01em]">
+            <h2 className="flex items-center gap-2 text-[0.875rem] font-medium tracking-[-0.01em]">
               <span className={clsx("h-2 w-2 rounded-full", toneDot[stageTone(col.stage)])} />
               {col.label}
             </h2>
-            <span className="rounded-full bg-surface px-2 py-0.5 text-[0.7rem] font-medium tabular-nums text-muted shadow-card">{col.count.toLocaleString("en-US")}</span>
+            <span className="rounded-[7px] bg-hover px-1.5 py-0.5 text-[0.72rem] font-medium tabular-nums text-muted">{col.count.toLocaleString("en-US")}</span>
           </header>
-          <ul className="flex max-h-[calc(100dvh-14rem)] min-h-28 flex-col gap-2 overflow-y-auto p-2 pt-1">
+          <ul className="flex max-h-[calc(100dvh-13rem)] min-h-28 flex-col gap-2 overflow-y-auto p-2 pt-1">
             <AnimatePresence initial={false}>
               {col.items.map((c) => (
                 <motion.li
@@ -82,7 +82,7 @@ export function Board({ columns }: { columns: Col[] }) {
                     onDragEnd={() => setDragging(null)}
                     className="cursor-grab active:cursor-grabbing"
                   >
-                  <Link href={`/crm/contacts/${c.id}`} draggable={false} className="group block rounded-[9px] border border-line bg-surface p-3 shadow-card transition-all duration-200 hover:-translate-y-px hover:border-line-strong hover:shadow-pop">
+                  <Link href={`/crm/contacts/${c.id}`} draggable={false} className="group block rounded-[12px] border border-line bg-subtle p-3 transition-[border-color,transform,background-color] duration-150 hover:-translate-y-px hover:border-line-strong hover:bg-surface">
                     <div className="flex items-start gap-2.5">
                       <Avatar name={c.name} className="h-7 w-7 text-[0.65rem]" />
                       <div className="min-w-0 flex-1">
@@ -103,7 +103,7 @@ export function Board({ columns }: { columns: Col[] }) {
                 </motion.li>
               ))}
             </AnimatePresence>
-            {col.items.length === 0 && <li className="rounded-[9px] border border-dashed border-line-strong px-2 py-8 text-center text-[0.75rem] text-faint">Drop a card here</li>}
+            {col.items.length === 0 && <li className="rounded-[12px] border border-dashed border-line-strong px-2 py-8 text-center text-[0.75rem] text-faint">Drop a card here</li>}
           </ul>
         </section>
       ))}

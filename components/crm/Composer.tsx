@@ -14,12 +14,12 @@ export function Composer({ contactId, email, sms, sendingOn }: { contactId: stri
   const blocked = !sendingOn ? "Sending is off (Settings → All sending)." : !cur.ok ? cur.why : null;
 
   return (
-    <form action={action} className="overflow-hidden rounded-[10px] border border-line bg-surface shadow-card focus-within:border-line-strong focus-within:shadow-pop">
+    <form action={action} className="overflow-hidden rounded-[14px] border border-line-strong bg-surface transition-[border-color,box-shadow] duration-150 focus-within:border-fg focus-within:shadow-[0_0_0_3px_var(--color-hover)]">
       <input type="hidden" name="id" value={contactId} />
       <input type="hidden" name="channel" value={channel} />
-      <div className="flex gap-1 border-b border-line px-2 pt-2 text-[0.8rem] font-medium">
+      <div className="flex gap-1 px-2 pt-2 text-[0.8rem] font-medium">
         {(["email", "sms"] as Channel[]).map((c) => (
-          <button key={c} type="button" onClick={() => setChannel(c)} className={clsx("-mb-px border-b-2 px-3 pb-2", channel === c ? "border-signal text-fg" : "border-transparent text-faint hover:text-fg")}>
+          <button key={c} type="button" onClick={() => setChannel(c)} className={clsx("rounded-[9px] px-3 py-1.5 transition-colors duration-150", channel === c ? "bg-fg text-surface" : "text-muted hover:text-fg")}>
             {c === "email" ? "Email" : "Text"}
           </button>
         ))}

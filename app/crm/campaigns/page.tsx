@@ -26,11 +26,11 @@ export default function CampaignsPage() {
 async function List() {
   const { supabase } = await requireStaff("/crm/campaigns", "campaigns.view");
   const { data } = await supabase.from("campaigns").select("id, name, status, leads_added, stats, stats_synced_at, created_at").order("created_at", { ascending: false });
-  if (!data?.length) return <div className="p-5 md:p-8"><Empty title="No campaigns yet">Start one: it comes with a ready-to-edit sequence (3 emails, 3 versions of the first one).</Empty></div>;
+  if (!data?.length) return <div className="px-5 md:px-6"><Empty title="No campaigns yet">Start one: it comes with a ready-to-edit sequence (3 emails, 3 versions of the first one).</Empty></div>;
   return (
-    <div className="p-5 md:p-8"><div className="overflow-x-auto rounded-[10px] border border-line shadow-card">
+    <div className="px-5 md:px-6"><div className="overflow-x-auto rounded-[14px] border border-line bg-surface shadow-card">
       <table className="w-full min-w-[820px] text-left text-[0.84rem]">
-        <thead className="border-b border-line bg-subtle text-[0.75rem] text-muted"><tr><th className="py-2.5 pl-5 font-medium">Campaign</th><th className="font-medium">Status</th><th className="font-medium">Leads</th><th className="font-medium">Sent</th><th className="font-medium">Opened</th><th className="font-medium">Replied</th><th className="font-medium">Bounced</th><th className="pr-5 text-right font-medium">Updated</th></tr></thead>
+        <thead className="text-[0.75rem] text-muted"><tr><th className="py-2.5 pl-5 font-medium">Campaign</th><th className="font-medium">Status</th><th className="font-medium">Leads</th><th className="font-medium">Sent</th><th className="font-medium">Opened</th><th className="font-medium">Replied</th><th className="font-medium">Bounced</th><th className="pr-5 text-right font-medium">Updated</th></tr></thead>
         <tbody className="divide-y divide-line">
           {data.map((c) => {
             const o = ((c.stats as { overall?: Record<string, unknown> })?.overall ?? {}) as Record<string, unknown>;

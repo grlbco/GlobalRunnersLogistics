@@ -11,7 +11,7 @@ export default function PipelinePage() {
   return (
     <>
       <PageHead title="Pipeline" sub="Drag a card to move a driver to the next stage" />
-      <Suspense fallback={<div className="flex gap-3 p-5 md:px-8 md:py-6">{BOARD.map((s) => <Skeleton key={s} className="h-96 w-[17.5rem] shrink-0" />)}</div>}>
+      <Suspense fallback={<div className="flex gap-3 p-5 md:px-6 md:py-6">{BOARD.map((s) => <Skeleton key={s} className="h-96 w-[17.5rem] shrink-0" />)}</div>}>
         <Data />
       </Suspense>
     </>

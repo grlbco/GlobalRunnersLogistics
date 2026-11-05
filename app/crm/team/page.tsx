@@ -11,7 +11,7 @@ export default function TeamPage() {
   return (
     <>
       <PageHead title="Team" sub="Who can sign in to the CRM and what each person can do. There is no sign-up: people get in only when they're added here." />
-      <Suspense fallback={<div className="p-5 md:p-8"><Skeleton className="h-[60vh]" /></div>}>
+      <Suspense fallback={<div className="px-5 md:px-6"><Skeleton className="h-[60vh]" /></div>}>
         <Body />
       </Suspense>
     </>

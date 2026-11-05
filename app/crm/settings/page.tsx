@@ -32,7 +32,7 @@ async function Body() {
   const switchOn = (sending?.value as { enabled?: boolean } | null)?.enabled !== false;
   const isAdmin = staff.can("settings.manage");
   return (
-    <div className="grid gap-6 p-5 md:p-8 xl:grid-cols-2">
+    <div className="grid gap-3 px-5 md:px-6 xl:grid-cols-2">
       <Card className="p-5 xl:col-span-2">
         <SendingSwitch on={switchOn} envOn={sendingEnvOn()} canEdit={isAdmin} />
       </Card>

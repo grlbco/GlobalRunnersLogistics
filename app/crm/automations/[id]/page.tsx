@@ -25,7 +25,7 @@ async function Body({ params }: { params: Promise<{ id: string }> }) {
   ]);
   if (!wf) notFound();
   return (
-    <div className="grid gap-6 p-5 md:p-8 xl:grid-cols-[1fr_22rem]">
+    <div className="grid gap-3 px-5 md:px-6 xl:grid-cols-[1fr_22rem]">
       <div>
         <Link href="/crm/automations" className="inline-flex items-center gap-1 text-[0.78rem] text-muted transition-colors hover:text-fg">← Automations</Link>
         <div className="mt-4">

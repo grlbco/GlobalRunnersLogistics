@@ -65,7 +65,7 @@ export function CallHoursForm({ initial, canEdit }: { initial: { start: string; 
       </div>
       <div className="flex flex-wrap gap-1.5">
         {DAYS.map((d, i) => (
-          <button key={d} disabled={!canEdit} onClick={() => setH({ ...h, days: h.days.includes(i) ? h.days.filter((x) => x !== i) : [...h.days, i].sort() })} className={clsx("h-9 w-12 rounded-[7px] border text-xs", h.days.includes(i) ? "border-signal bg-signal-soft text-signal-ink" : "border-line text-faint")}>{d}</button>
+          <button key={d} disabled={!canEdit} onClick={() => setH({ ...h, days: h.days.includes(i) ? h.days.filter((x) => x !== i) : [...h.days, i].sort() })} className={clsx("h-9 w-12 rounded-[10px] border text-xs", h.days.includes(i) ? "border-signal bg-signal-soft text-signal-ink" : "border-line text-faint")}>{d}</button>
         ))}
       </div>
       {canEdit && <button disabled={pending} onClick={() => start(async () => setR(await saveCallHours(h)))} className={btnGhostCls}>Save hours</button>}

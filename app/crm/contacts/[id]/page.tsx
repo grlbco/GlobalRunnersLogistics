@@ -9,14 +9,15 @@ import { localTime } from "@/lib/crm/timezones";
 import { ago, fullName, phoneDisplay } from "@/lib/crm/format";
 import { addNote, addTask, askAssistant, setAgentMode, setStage, toggleTask, updateContact } from "@/app/crm/actions";
 import { getAssistantSettings } from "@/lib/crm/settings";
-import { Avatar, Badge, Card, Label, Skeleton, StageBadge, btnCls, btnGhostCls, inputCls, selectCls } from "@/components/crm/ui";
+import { Avatar, Badge, Card, Label, Skeleton, StageBadge, Stat, btnCls, btnGhostCls, inputCls, selectCls } from "@/components/crm/ui";
+import { Stagger, StaggerItem } from "@/components/crm/motion";
 import { Composer } from "@/components/crm/Composer";
 import { Drafts } from "@/components/crm/Drafts";
 import { Timeline, loadTimeline } from "@/components/crm/Timeline";
 
 export default function ContactPage({ params }: { params: Promise<{ id: string }> }) {
   return (
-    <Suspense fallback={<div className="p-8"><Skeleton className="h-[70vh]" /></div>}>
+    <Suspense fallback={<div className="px-5 md:px-6"><Skeleton className="h-[70vh]" /></div>}>
       <Profile params={params} />
     </Suspense>
   );
@@ -44,18 +45,31 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
   const facts = (memory.data?.facts ?? {}) as Record<string, unknown>;
 
   return (
-    <div className="grid min-h-[calc(100dvh-1rem)] lg:grid-cols-[18rem_1fr_20rem]">
-      {/* Left: identity */}
-      <aside className="space-y-6 border-b border-line bg-subtle/60 p-5 lg:border-b-0 lg:border-r">
-        <Link href="/crm/contacts" className="inline-flex items-center gap-1 text-[0.78rem] text-muted transition-colors hover:text-fg">← Contacts</Link>
-        <div className="flex items-center gap-3">
-          <Avatar name={fullName(c)} className="h-12 w-12 text-sm" />
-          <div className="min-w-0">
-            <h1 className="truncate text-lg font-semibold tracking-[-0.02em]">{fullName(c)}</h1>
-            <p className="truncate text-xs text-faint">{c.company_name}</p>
-          </div>
+    <div className="space-y-3 px-5 md:px-6">
+      <div className="pt-1">
+        <Link href="/crm/contacts" className="text-[0.84rem] text-muted transition-colors hover:text-fg">Contacts</Link>
+        <h1 className="mt-1 text-[1.5rem] font-medium leading-tight tracking-[-0.025em]">Driver overview</h1>
+      </div>
+      <Card className="flex flex-wrap items-center gap-4 p-4">
+        <Avatar name={fullName(c)} className="h-14 w-14 rounded-[16px] text-base" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[1.1rem] font-medium tracking-[-0.015em]">{fullName(c)}</p>
+          <p className="truncate text-[0.84rem] text-muted">{[c.company_name, c.email, phoneDisplay(c.cell_phone ?? c.phone), [c.city, c.state].filter(Boolean).join(", ")].filter(Boolean).join("  ·  ")}</p>
         </div>
-
+        <div className="flex flex-wrap items-center gap-1.5">
+          <StageBadge stage={c.stage} />
+          <Badge dot tone={c.agent_mode === "auto" ? "info" : "warn"}>{c.agent_mode === "auto" ? "Assistant on" : "Manual"}</Badge>
+        </div>
+      </Card>
+      <Stagger className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <StaggerItem><Stat label="Messages" value={items.filter((m) => m.kind === "message").length} hint={`${items.filter((m) => m.kind === "message" && m.direction === "inbound").length} from the driver`} /></StaggerItem>
+        <StaggerItem><Stat label="Last reply" value={c.last_inbound_at ? ago(c.last_inbound_at) : "None"} hint={c.last_inbound_at ? "ago" : "Hasn't written back yet"} /></StaggerItem>
+        <StaggerItem><Stat label="Driver form" value={form?.completed_at ? "Done" : form?.opened_at ? "Opened" : form?.sent_at ? "Sent" : "Not sent"} hint={form && !form.completed_at && form.step_reached > 0 ? `Stopped at step ${form.step_reached}` : followups.data?.length ? `${followups.data.length} follow-ups scheduled` : "No follow-ups scheduled"} /></StaggerItem>
+        <StaggerItem><Stat label="Open tasks" value={(tasks.data ?? []).filter((t) => !t.done_at).length} hint={`In this stage for ${ago(c.stage_changed_at)}`} /></StaggerItem>
+      </Stagger>
+      <div className="grid items-start gap-3 lg:grid-cols-[18rem_minmax(0,1fr)] xl:grid-cols-[18rem_minmax(0,1fr)_20rem]">
+      {/* Left: identity */}
+      <aside className="space-y-6 rounded-[16px] border border-line bg-surface p-5 shadow-card">
         <form action={setStage} className="space-y-2">
           <input type="hidden" name="id" value={c.id} />
           <Label>Stage</Label>
@@ -85,7 +99,7 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
           ))}
         </dl>
 
-        <details className="group rounded-[10px] border border-line bg-surface shadow-card">
+        <details className="group rounded-[14px] border border-line bg-surface shadow-card">
           <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-[0.84rem] font-medium text-fg-2 hover:text-fg">Edit details<span className="text-faint transition-transform group-open:rotate-180">⌄</span></summary>
           <form action={updateContact} className="space-y-2 border-t border-line p-3">
             <input type="hidden" name="id" value={c.id} />
@@ -115,10 +129,9 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
       </aside>
 
       {/* Center: conversation + timeline */}
-      <section className="min-w-0 p-5 md:p-8">
-        <div className="flex flex-wrap items-center gap-3"><StageBadge stage={c.stage} /><span className="text-[0.78rem] text-faint">since {ago(c.stage_changed_at)} ago</span></div>
-        <div className="mt-6"><Drafts supabase={supabase} contactId={c.id} /></div>
-        <div className="mt-4">
+      <section className="min-w-0 space-y-3">
+        <Drafts supabase={supabase} contactId={c.id} />
+        <div>
           <Composer
             contactId={c.id}
             sendingOn={await isSendingOn()}
@@ -126,16 +139,16 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
             sms={c.do_not_contact ? { ok: false, why: "Driver is do-not-contact" } : c.sms_consent ? { ok: true } : { ok: false, why: "No text consent yet: the driver must text us first or tick the form box" }}
           />
         </div>
-        <form action={addNote} className="mt-4 flex gap-2">
+        <form action={addNote} className="flex gap-2">
           <input type="hidden" name="id" value={c.id} />
           <input name="body" required maxLength={5000} placeholder="Add a note…" className={inputCls} />
           <button className={btnGhostCls}>Save note</button>
         </form>
-        <div className="mt-8 rounded-[12px] border border-line bg-subtle/60 p-4 md:p-5"><Timeline items={items} /></div>
+        <Card className="p-4 md:p-5"><Timeline items={items} /></Card>
       </section>
 
       {/* Right: tasks + assistant */}
-      <aside className="space-y-4 border-t border-line bg-subtle/60 p-5 lg:border-l lg:border-t-0">
+      <aside className="space-y-3 lg:col-span-2 xl:col-span-1">
         <Card className="p-4">
           <Label>Tasks</Label>
           <form action={addTask} className="mt-3 space-y-2">
@@ -169,7 +182,7 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
             <Badge dot tone={c.agent_mode === "auto" ? "good" : "warn"}>{c.agent_mode === "auto" ? "Auto" : "Manual"}</Badge>
           </div>
           {!assistant.enabled && (
-            <p className="mt-3 rounded-[8px] border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            <p className="mt-3 rounded-[10px] border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
               The assistant is off for everyone. <Link href="/crm/assistant" className="underline underline-offset-2">Turn it on</Link>
             </p>
           )}
@@ -203,7 +216,7 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
           <ol className="relative mt-3 space-y-3 text-sm before:absolute before:bottom-2 before:left-[5px] before:top-2 before:w-px before:bg-line">
             {[["Sent", form?.sent_at], ["Opened", form?.opened_at], ["Completed", form?.completed_at]].map(([k, v]) => (
               <li key={k as string} className="relative flex items-center justify-between pl-6">
-                <span className={clsx("absolute left-0 h-[11px] w-[11px] rounded-full border-2", v ? (k === "Completed" ? "border-emerald-500 bg-emerald-500" : "border-navy bg-navy") : "border-line-strong bg-surface")} />
+                <span className={clsx("absolute left-0 h-[11px] w-[11px] rounded-full border-2", v ? (k === "Completed" ? "border-emerald-500 bg-emerald-500" : "border-fg bg-fg") : "border-line-strong bg-surface")} />
                 <span className={v ? "text-fg" : "text-faint"}>{k}</span><span className="text-[0.75rem] text-faint">{v ? ago(v as string) : "—"}</span>
               </li>
             ))}
@@ -225,6 +238,7 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
           ) : <p className="mt-3 text-sm text-faint">No runs yet.</p>}
         </Card>
       </aside>
+      </div>
     </div>
   );
 }

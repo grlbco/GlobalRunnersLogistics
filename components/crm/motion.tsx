@@ -14,7 +14,7 @@ export function FadeIn({ children, delay = 0, y = 8, className }: { children: Re
       className={className}
       initial={reduce ? false : { opacity: 0, y }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay, ease: EASE }}
+      transition={{ duration: 0.32, delay: Math.min(delay, 0.2), ease: EASE }}
     >
       {children}
     </motion.div>
@@ -22,7 +22,7 @@ export function FadeIn({ children, delay = 0, y = 8, className }: { children: Re
 }
 
 /** Children appear one after another (lists, card grids). */
-export function Stagger({ children, className, gap = 0.04, as = "div" }: { children: ReactNode; className?: string; gap?: number; as?: "div" | "ul" }) {
+export function Stagger({ children, className, gap = 0.035, as = "div" }: { children: ReactNode; className?: string; gap?: number; as?: "div" | "ul" }) {
   const reduce = useReducedMotion();
   const Comp = as === "ul" ? motion.ul : motion.div;
   return (
@@ -42,7 +42,7 @@ export function StaggerItem({ children, className, as = "div" }: { children: Rea
   return (
     <Comp
       className={className}
-      variants={{ hidden: { opacity: 0, y: 6 }, show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: EASE } } }}
+      variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0, transition: { duration: 0.3, ease: EASE } } }}
     >
       {children}
     </Comp>
@@ -53,7 +53,7 @@ const fmt = (v: number, decimals: number) =>
   v.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 
 /** Number that counts up when it scrolls into view. */
-export function CountUp({ value, decimals = 0, prefix = "", suffix = "", duration = 1.1 }: { value: number; decimals?: number; prefix?: string; suffix?: string; duration?: number }) {
+export function CountUp({ value, decimals = 0, prefix = "", suffix = "", duration = 0.7 }: { value: number; decimals?: number; prefix?: string; suffix?: string; duration?: number }) {
   const ref = useRef<HTMLSpanElement>(null);
   const inView = useInView(ref, { once: true, margin: "-40px" });
   const reduce = useReducedMotion();
@@ -80,7 +80,7 @@ export function GrowBar({ pct, className, delay = 0 }: { pct: number; className?
         style={{ originX: 0, height: "100%", width: `${Math.max(0, Math.min(100, pct))}%` }}
         initial={reduce ? false : { scaleX: 0 }}
         animate={inView ? { scaleX: 1 } : undefined}
-        transition={{ duration: 0.9, delay, ease: EASE }}
+        transition={{ duration: 0.6, delay, ease: EASE }}
       />
     </div>
   );
@@ -90,7 +90,7 @@ export function GrowBar({ pct, className, delay = 0 }: { pct: number; className?
 export function LiveDot({ on = true }: { on?: boolean }) {
   return (
     <span className="relative inline-flex h-2 w-2">
-      <span className={on ? "h-2 w-2 rounded-full bg-emerald-500" : "h-2 w-2 rounded-full bg-ghost"} style={on ? { animation: "pulse-dot 2s ease-in-out infinite", boxShadow: "0 0 0 0 rgb(16 185 129 / 0.4)" } : undefined} />
+      <span className={on ? "h-2 w-2 rounded-full bg-emerald-500" : "h-2 w-2 rounded-full bg-ghost"} style={on ? { animation: "pulse-dot 2s ease-in-out infinite" } : undefined} />
     </span>
   );
 }

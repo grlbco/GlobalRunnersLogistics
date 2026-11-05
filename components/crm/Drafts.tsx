@@ -14,7 +14,7 @@ export async function Drafts({ supabase, contactId }: { supabase: SupabaseClient
   return (
     <div className="space-y-3">
       {data.map((d) => (
-        <form key={d.id} action={approveDraft} className="rounded-[10px] border border-amber-200 bg-amber-50/70 p-3">
+        <form key={d.id} action={approveDraft} className="rounded-[14px] border border-amber-200 bg-amber-50/70 p-3">
           <input type="hidden" name="id" value={d.id} />
           <input type="hidden" name="contact_id" value={contactId} />
           <div className="mb-2 flex items-center justify-between text-xs">

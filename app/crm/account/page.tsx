@@ -24,7 +24,7 @@ async function Body() {
   const sections = SECTIONS.filter((s) => staff.can(s.perm));
   const groups = [...new Set(PERMISSIONS.map((p) => p.group))];
   return (
-    <div className="grid gap-6 p-5 md:p-8 xl:grid-cols-2">
+    <div className="grid gap-3 px-5 md:px-6 xl:grid-cols-2">
       <Card className="p-5">
         <Label>Signed in</Label>
         <p className="mt-3 text-lg font-medium">{staff.name}</p>
@@ -45,7 +45,7 @@ async function Body() {
         <Label>Sections</Label>
         <ul className="mt-3 grid grid-cols-2 gap-2">
           {sections.map((s) => (
-            <li key={s.href}><Link href={s.href} className="block rounded-[7px] border border-line px-3 py-2.5 text-sm text-fg-2">{s.label}</Link></li>
+            <li key={s.href}><Link href={s.href} className="block rounded-[10px] border border-line px-3 py-2.5 text-sm text-fg-2">{s.label}</Link></li>
           ))}
         </ul>
       </Card>

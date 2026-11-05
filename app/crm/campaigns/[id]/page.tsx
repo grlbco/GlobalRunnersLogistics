@@ -46,7 +46,7 @@ async function Body({ params }: { params: Promise<{ id: string }> }) {
   const isAdmin = staff.can("campaigns.manage");
 
   return (
-    <div className="space-y-6 p-5 md:p-8">
+    <div className="space-y-3 px-5 md:px-6">
       <div>
         <Link href="/crm/campaigns" className="inline-flex items-center gap-1 text-[0.78rem] text-muted transition-colors hover:text-fg">← Campaigns</Link>
         <div className="mt-2 flex flex-wrap items-center gap-3">

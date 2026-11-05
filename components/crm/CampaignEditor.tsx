@@ -43,7 +43,7 @@ export function CampaignEditor({ id, initial, accounts, locked }: { id: string; 
             <Label>Schedule</Label>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {DAYS.map((d, i) => (
-                <button key={d} type="button" disabled={locked} onClick={() => (dirty(), setS({ ...s, days: s.days.includes(i) ? s.days.filter((x) => x !== i) : [...s.days, i].sort() }))} className={clsx("rounded-full px-2.5 py-1 text-xs", s.days.includes(i) ? "bg-fg text-white" : "bg-hover text-muted")}>{d}</button>
+                <button key={d} type="button" disabled={locked} onClick={() => (dirty(), setS({ ...s, days: s.days.includes(i) ? s.days.filter((x) => x !== i) : [...s.days, i].sort() }))} className={clsx("rounded-full px-2.5 py-1 text-xs", s.days.includes(i) ? "bg-fg text-surface" : "bg-hover text-muted")}>{d}</button>
               ))}
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
@@ -73,7 +73,7 @@ export function CampaignEditor({ id, initial, accounts, locked }: { id: string; 
           </div>
           <div className={clsx("mt-4 grid gap-4", step.variants.length > 1 && "xl:grid-cols-2")}>
             {step.variants.map((v, k) => (
-              <div key={k} className="space-y-2 rounded-[10px] border border-line p-3">
+              <div key={k} className="space-y-2 rounded-[14px] border border-line p-3">
                 <div className="flex items-center justify-between text-xs text-faint">
                   <span>Version {LETTERS[k]}</span>
                   {!locked && step.variants.length > 1 && <button type="button" onClick={() => upStep(i, { variants: step.variants.filter((_, x) => x !== k) })} className="hover:text-red-600">Remove</button>}

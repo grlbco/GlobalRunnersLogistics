@@ -5,7 +5,8 @@ import { requireStaff } from "@/lib/crm/auth";
 import { isSendingOn } from "@/lib/crm/sending";
 import { ago, fullName, phoneDisplay } from "@/lib/crm/format";
 import { localTime } from "@/lib/crm/timezones";
-import { Avatar, Badge, Empty, Skeleton, StageBadge } from "@/components/crm/ui";
+import { Avatar, Badge, Card, Empty, Label, Skeleton, StageBadge } from "@/components/crm/ui";
+import { TIERS } from "@/lib/crm/stages";
 import { Composer } from "@/components/crm/Composer";
 import { Drafts } from "@/components/crm/Drafts";
 import { Timeline, loadTimeline } from "@/components/crm/Timeline";
@@ -24,13 +25,13 @@ const FILTERS = [
 
 export default function InboxPage({ searchParams }: { searchParams: SP }) {
   return (
-    <Suspense fallback={<div className="p-5 md:p-8"><Skeleton className="h-[80vh]" /></div>}>
+    <Suspense fallback={<div className="px-5 md:px-6"><Skeleton className="h-[80vh]" /></div>}>
       <Inbox searchParams={searchParams} />
     </Suspense>
   );
 }
 
-type Contact = { id: string; first_name: string | null; last_name: string | null; company_name: string | null; stage: string; agent_mode: string; cell_phone: string | null; phone: string | null; email: string | null; timezone: string | null; do_not_contact: boolean; email_consent: boolean; sms_consent: boolean };
+type Contact = { id: string; first_name: string | null; last_name: string | null; company_name: string | null; stage: string; agent_mode: string; cell_phone: string | null; phone: string | null; email: string | null; timezone: string | null; do_not_contact: boolean; email_consent: boolean; sms_consent: boolean; tier: number | null; city: string | null; state: string | null; last_inbound_at: string | null };
 
 async function Inbox({ searchParams }: { searchParams: SP }) {
   const sp = await searchParams;
@@ -39,7 +40,7 @@ async function Inbox({ searchParams }: { searchParams: SP }) {
 
   let q = supabase
     .from("messages")
-    .select("id, channel, direction, author, body, created_at, contact:contacts(id, first_name, last_name, company_name, stage, agent_mode, cell_phone, phone, email, timezone, do_not_contact, email_consent, sms_consent)")
+    .select("id, channel, direction, author, body, created_at, contact:contacts(id, first_name, last_name, company_name, stage, agent_mode, cell_phone, phone, email, timezone, do_not_contact, email_consent, sms_consent, tier, city, state, last_inbound_at)")
     .neq("channel", "call")
     .order("created_at", { ascending: false })
     .limit(500);
@@ -69,41 +70,44 @@ async function Inbox({ searchParams }: { searchParams: SP }) {
   };
 
   return (
-    <div className="grid h-[calc(100dvh-5rem)] grid-rows-[auto_1fr] md:h-[calc(100dvh-1rem-2px)] md:grid-cols-[22rem_1fr] md:grid-rows-1">
+    <div className="grid h-[calc(100dvh-11.5rem)] gap-3 px-5 md:h-[calc(100dvh-6.25rem)] md:grid-cols-[20rem_1fr] md:px-6 xl:grid-cols-[20rem_1fr_18rem]">
       {/* List */}
-      <section className={clsx("flex min-h-0 flex-col border-r border-line", sp.c && "hidden md:flex")}>
-        <header className="border-b border-line px-4 pb-3 pt-5">
+      <section className={clsx("flex min-h-0 flex-col rounded-[16px] border border-line bg-surface shadow-card", sp.c && "hidden md:flex")}>
+        <header className="px-4 pb-3 pt-4">
           <div className="flex items-baseline justify-between">
-            <h1 className="text-[1.375rem] font-semibold tracking-[-0.025em]">Inbox</h1>
-            {unreadSet.size > 0 && <span className="text-[0.75rem] font-medium text-signal-ink">{unreadSet.size} unread</span>}
+            <h1 className="text-[1.05rem] font-medium tracking-[-0.015em]">Conversations</h1>
+            {unreadSet.size > 0 && <span className="text-[0.78rem] font-medium text-red-600">{unreadSet.size} unread</span>}
           </div>
-          <nav className="mt-3 flex flex-wrap gap-0.5 rounded-[8px] border border-line bg-subtle p-0.5">
+          <nav className="mt-3 flex flex-wrap gap-1">
             {FILTERS.map((x) => (
-              <Link key={x.key} href={href({ f: x.key })} className={clsx("flex-1 rounded-[6px] px-2 py-1 text-center text-[0.75rem] font-medium transition-all", f === x.key ? "bg-surface text-fg shadow-card" : "text-muted hover:text-fg")}>
+              <Link key={x.key} href={href({ f: x.key })} className={clsx("rounded-[10px] border px-2.5 py-1.5 text-[0.78rem] font-medium transition-colors duration-150", f === x.key ? "border-fg bg-fg text-surface" : "border-line text-muted hover:text-fg")}>
                 {x.label}
               </Link>
             ))}
           </nav>
         </header>
-        <ul className="min-h-0 flex-1 space-y-px overflow-y-auto p-2">
+        <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2 pt-0">
           {threads.map((m) => {
             const c = m.contact as unknown as Contact;
             const unread = unreadSet.has(c.id);
             return (
               <li key={m.id}>
-                <Link href={href({ c: c.id })} className={clsx("flex gap-3 rounded-[9px] px-3 py-2.5 transition-colors", c.id === selectedId ? "bg-hover" : "hover:bg-subtle")}>
+                <Link href={href({ c: c.id })} className={clsx("flex gap-3 rounded-[14px] border px-3 py-3 transition-colors duration-150", c.id === selectedId ? "border-line-strong bg-subtle" : "border-transparent hover:bg-hover")}>
                   <span className="relative">
                     <Avatar name={fullName(c)} />
-                    {unread && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface bg-signal" />}
+                    {unread && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface bg-red-500" />}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center justify-between gap-2">
                       <span className={clsx("truncate text-[0.84rem]", unread ? "font-semibold text-fg" : "font-medium text-fg-2")}>{fullName(c)}</span>
                       <span className="shrink-0 text-[0.7rem] text-faint">{ago(m.created_at)}</span>
                     </span>
-                    <span className="mt-0.5 line-clamp-2 text-[0.78rem] leading-snug text-muted">
-                      <span className="mr-1.5 rounded-[4px] bg-hover px-1 py-px font-mono text-[0.58rem] uppercase text-faint">{m.channel === "sms" ? "text" : "email"}</span>
-                      {m.direction === "outbound" && <span className="text-faint">You: </span>}{m.body}
+                    <span className="mt-0.5 block truncate text-[0.8rem] leading-snug text-muted">
+                      {m.direction === "outbound" && <span className="text-faint">{m.author === "agent" ? "Assistant: " : "You: "}</span>}{m.body}
+                    </span>
+                    <span className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <Badge>{m.channel === "sms" ? "Text" : "Email"}</Badge>
+                      <StageBadge stage={c.stage} />
                     </span>
                   </span>
                 </Link>
@@ -115,12 +119,51 @@ async function Inbox({ searchParams }: { searchParams: SP }) {
       </section>
 
       {/* Thread */}
-      <section className={clsx("min-h-0 flex-col", sp.c ? "flex" : "hidden md:flex")}>
+      <section className={clsx("min-h-0 flex-col overflow-hidden rounded-[16px] border border-line bg-surface shadow-card", sp.c ? "flex" : "hidden md:flex")}>
         {selected ? <Thread contact={selected} unread={unreadSet.has(selected.id)} back={href({ c: "" }).replace(/[?&]c=$/, "")} /> : (
-          <div className="grid flex-1 place-items-center bg-subtle/60 text-sm text-faint">Select a conversation</div>
+          <div className="grid flex-1 place-items-center text-sm text-faint">Select a conversation</div>
         )}
       </section>
+
+      {/* Driver context */}
+      {selected && <aside className="hidden min-h-0 overflow-y-auto rounded-[16px] border border-line bg-surface p-4 shadow-card xl:block"><Context contact={selected} /></aside>}
     </div>
+  );
+}
+
+async function Context({ contact: c }: { contact: Contact }) {
+  const { supabase } = await requireStaff("/crm/inbox", "inbox.view");
+  const { data: form } = await supabase.from("form_links").select("sent_at, opened_at, completed_at").eq("contact_id", c.id).order("created_at", { ascending: false }).limit(1).maybeSingle();
+  const formState = form?.completed_at ? "Completed" : form?.opened_at ? "Opened" : form?.sent_at ? "Sent" : "Not sent";
+  return (
+    <>
+      <h2 className="text-[1.05rem] font-medium tracking-[-0.015em]">Driver context</h2>
+      <Link href={`/crm/contacts/${c.id}`} className="mt-4 flex items-center gap-3 rounded-[12px] transition-opacity hover:opacity-75">
+        <Avatar name={fullName(c)} className="h-11 w-11 text-sm" />
+        <span className="min-w-0">
+          <span className="block truncate text-[0.9rem] font-medium">{fullName(c)}</span>
+          <span className="block truncate text-[0.78rem] text-muted">{c.company_name}</span>
+        </span>
+      </Link>
+      <Card className="mt-4 grid grid-cols-2 gap-3 p-3 shadow-none">
+        <div><p className="text-[0.75rem] text-muted">Driver form</p><p className="mt-0.5 text-[0.95rem] font-medium">{formState}</p></div>
+        <div><p className="text-[0.75rem] text-muted">Last reply</p><p className="mt-0.5 text-[0.95rem] font-medium">{c.last_inbound_at ? ago(c.last_inbound_at) : "None"}</p></div>
+      </Card>
+      <div className="mt-5">
+        <Label>Status</Label>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          <StageBadge stage={c.stage} />
+          <Badge dot tone={c.agent_mode === "auto" ? "info" : "warn"}>{c.agent_mode === "auto" ? "Assistant on" : "Manual"}</Badge>
+          <Badge dot tone={c.sms_consent && !c.do_not_contact ? "good" : "neutral"}>{c.sms_consent && !c.do_not_contact ? "Can text" : "No text consent"}</Badge>
+          {c.do_not_contact && <Badge dot tone="bad">Do not contact</Badge>}
+        </div>
+      </div>
+      <dl className="mt-5 space-y-3 text-[0.84rem]">
+        {([["Email", c.email], ["Phone", phoneDisplay(c.cell_phone ?? c.phone)], ["Location", [c.city, c.state].filter(Boolean).join(", ")], ["Local time", localTime(c.timezone)], ["Lead tier", c.tier ? TIERS[c.tier] : null]] as const).map(([k, v]) => v ? (
+          <div key={k} className="flex justify-between gap-3"><dt className="shrink-0 text-muted">{k}</dt><dd className="min-w-0 truncate text-right text-fg" title={String(v)}>{v}</dd></div>
+        ) : null)}
+      </dl>
+    </>
   );
 }
 
@@ -131,7 +174,7 @@ async function Thread({ contact: c, unread, back }: { contact: Contact; unread: 
   return (
     <>
       <MarkRead contactId={c.id} unread={unread} />
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3.5">
         <div className="flex min-w-0 items-center gap-3">
           <Link href={back || "/crm/inbox"} className="text-sm text-faint md:hidden">←</Link>
           <Avatar name={fullName(c)} className="h-9 w-9" />
@@ -145,8 +188,8 @@ async function Thread({ contact: c, unread, back }: { contact: Contact; unread: 
           <Badge tone={c.agent_mode === "auto" ? "info" : "warn"} dot>{c.agent_mode === "auto" ? "Assistant on" : "Manual"}</Badge>
         </div>
       </header>
-      <div className="min-h-0 flex-1 overflow-y-auto bg-subtle/50 px-5 py-6"><Timeline items={items} oldestFirst /></div>
-      <div className="space-y-3 border-t border-line bg-surface p-4">
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5"><Timeline items={items} oldestFirst /></div>
+      <div className="space-y-3 p-3">
         <Drafts supabase={supabase} contactId={c.id} />
         <Composer
           contactId={c.id}

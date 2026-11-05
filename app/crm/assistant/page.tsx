@@ -39,8 +39,8 @@ async function Body() {
   const admin = staff.can("assistant.manage");
 
   return (
-    <div className="grid gap-6 p-5 md:p-8 xl:grid-cols-[24rem_1fr]">
-      <form action={setAssistantEnabled} className={clsx("flex flex-wrap items-center justify-between gap-4 rounded-[12px] border p-5 shadow-card xl:col-span-2", s.enabled ? "border-emerald-200 bg-emerald-50/70" : "border-amber-200 bg-amber-50/70")}>
+    <div className="grid gap-3 px-5 md:px-6 xl:grid-cols-[24rem_1fr]">
+      <form action={setAssistantEnabled} className={clsx("flex flex-wrap items-center justify-between gap-4 rounded-[16px] border p-5 shadow-card xl:col-span-2", s.enabled ? "border-emerald-200 bg-emerald-50/70" : "border-amber-200 bg-amber-50/70")}>
         <input type="hidden" name="on" value={s.enabled ? "0" : "1"} />
         <div>
           <p className="flex items-center gap-2.5 text-[1.05rem] font-semibold tracking-[-0.02em]"><LiveDot on={s.enabled} />{s.enabled ? "Assistant is on" : "Assistant is off"}</p>

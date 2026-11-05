@@ -28,10 +28,10 @@ async function Body({ searchParams }: { searchParams: SP }) {
   return (
     <AuthShell title="No access" sub={text}>
       <div className="flex flex-wrap gap-3">
-        {loaded.state === "ok" && <Link href="/crm/account" className="inline-flex h-10 items-center rounded-[7px] border border-line px-4 text-sm text-fg-2 hover:border-line-strong hover:text-fg">My account</Link>}
+        {loaded.state === "ok" && <Link href="/crm/account" className="inline-flex h-10 items-center rounded-[10px] border border-line px-4 text-sm text-fg-2 hover:border-line-strong hover:text-fg">My account</Link>}
         {loaded.state !== "signed_out" && (
           <form action={crmSignOut}>
-            <button className="inline-flex h-10 items-center rounded-[7px] border border-line px-4 text-sm text-fg-2 hover:border-line-strong hover:text-fg">Sign in as someone else</button>
+            <button className="inline-flex h-10 items-center rounded-[10px] border border-line px-4 text-sm text-fg-2 hover:border-line-strong hover:text-fg">Sign in as someone else</button>
           </form>
         )}
         <Link href="/" className="inline-flex h-10 items-center px-2 text-sm text-muted underline-offset-4 hover:text-fg hover:underline">Back to the website</Link>

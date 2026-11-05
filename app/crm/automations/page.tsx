@@ -32,7 +32,7 @@ async function List() {
   ]);
   const stat = (id: string, s: string) => (runs ?? []).filter((r) => r.workflow_id === id && r.status === s).length;
   return (
-    <div className="grid gap-4 p-5 md:p-8 lg:grid-cols-2">
+    <div className="grid gap-3 px-5 md:px-6 lg:grid-cols-2">
       {(flows ?? []).map((f) => {
         const filter = f.trigger_filter as Record<string, string>;
         return (

@@ -27,10 +27,10 @@ function Msg({ r }: { r: TeamResult | null }) {
 function Secret({ password, who, onClose }: { password: string; who: string; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
   return (
-    <div className="rounded-[10px] border border-amber-200 bg-amber-50 p-4">
+    <div className="rounded-[14px] border border-amber-200 bg-amber-50 p-4">
       <p className="text-sm text-amber-700">Temporary password for {who}. It won&apos;t be shown again. Send it privately (not in the same message as the email address). They&apos;ll be asked to choose their own at first sign-in at <span className="font-mono">/crm/login</span>.</p>
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <code className="rounded-[7px] bg-hover px-3 py-2 font-mono text-[0.95rem] tracking-wide">{password}</code>
+        <code className="rounded-[10px] bg-hover px-3 py-2 font-mono text-[0.95rem] tracking-wide">{password}</code>
         <button type="button" className={btnGhostCls} onClick={async () => { await navigator.clipboard.writeText(password); setCopied(true); }}>{copied ? "Copied" : "Copy"}</button>
         <button type="button" className="text-sm text-faint hover:text-fg" onClick={onClose}>Done</button>
       </div>
@@ -54,7 +54,7 @@ function PermChecklist({ value, onChange, base, mine, disabled }: { value: Perm[
               const tag = base ? (on && !fromRole ? "extra" : !on && fromRole ? "removed" : null) : null;
               return (
                 <label key={p.key} className={clsx("flex items-start gap-2.5 text-sm", locked ? "cursor-not-allowed opacity-50" : "cursor-pointer")}>
-                  <input type="checkbox" className="mt-[3px] accent-signal" checked={on} disabled={locked} onChange={() => toggle(p.key)} />
+                  <input type="checkbox" className="mt-[3px] accent-fg" checked={on} disabled={locked} onChange={() => toggle(p.key)} />
                   <span className="text-fg-2">
                     {p.label}
                     {tag && <span className={clsx("ml-2 rounded-full px-1.5 py-px font-mono text-[0.6rem] uppercase tracking-wider", tag === "extra" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600")}>{tag}</span>}
@@ -302,7 +302,7 @@ export function TeamManager({ me, members, roles, log }: { me: Me; members: Team
     { k: "activity" as const, label: "Activity" },
   ];
   return (
-    <div className="space-y-5 p-5 md:p-8">
+    <div className="space-y-5 px-5 md:px-6">
       <div role="tablist" className="flex gap-1 border-b border-line">
         {tabs.map((t) => (
           <button key={t.k} role="tab" aria-selected={tab === t.k} onClick={() => setTab(t.k)}

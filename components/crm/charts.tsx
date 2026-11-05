@@ -135,7 +135,7 @@ export function AreaChart({ labels, series, height = 240, format = (v: number) =
         {hover !== null && width > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}
-            className="pointer-events-none absolute top-1 z-10 min-w-36 rounded-[8px] border border-line bg-surface/95 px-3 py-2 text-xs shadow-pop backdrop-blur"
+            className="pointer-events-none absolute top-1 z-10 min-w-36 rounded-[10px] border border-line bg-surface/95 px-3 py-2 text-xs shadow-pop backdrop-blur"
             style={{ left: Math.min(Math.max(x(hover) + 12, 0), W - 160) }}
           >
             <p className="mb-1.5 font-medium text-fg">{labels[hover]}</p>
@@ -200,12 +200,74 @@ export function Sparkline({ values, color = CHART.navy, height = 36, className }
   );
 }
 
+// ─── grouped columns ────────────────────────────────────────────────────────
+
+/** Grouped columns with rounded tops. They rise in a wave, and hover shows the exact values. */
+export function BarChart({ groups, seriesNames, height = 232 }: { groups: { label: string; values: number[] }[]; seriesNames: string[]; height?: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { once: true, margin: "-40px" });
+  const reduce = useReducedMotion();
+  const [hover, setHover] = useState<number | null>(null);
+  const max = niceMax(Math.max(1, ...groups.flatMap((g) => g.values)));
+  const ticks = [1, 0.75, 0.5, 0.25, 0];
+  const fills = ["bg-fg", "bg-line-strong"];
+  const fmtTick = (t: number) => (t >= 1000 ? `${Math.round(t / 100) / 10}k` : String(Math.round(t)));
+  // Only some date labels fit when there are many groups.
+  const every = groups.length > 8 ? Math.ceil(groups.length / 6) : 1;
+
+  return (
+    <div ref={ref} className="relative select-none pl-8" style={{ height }}>
+      {ticks.map((t) => (
+        <div key={t} className="absolute inset-x-0 flex items-center" style={{ top: `calc((100% - 26px) * ${1 - t})` }}>
+          <span className="w-8 shrink-0 -translate-y-1/2 text-[0.7rem] tabular-nums text-faint">{fmtTick(t * max)}</span>
+          <span className="h-px flex-1 -translate-y-1/2 bg-line" />
+        </div>
+      ))}
+      <div className="absolute inset-y-0 left-8 right-0 flex">
+        {groups.map((g, i) => (
+          <div key={g.label + i} className="relative flex min-w-0 flex-1 flex-col" onPointerEnter={() => setHover(i)} onPointerLeave={() => setHover(null)}>
+            <div className="flex flex-1 items-end justify-center gap-[3px] pb-[26px]">
+              {g.values.map((v, si) => (
+                <motion.div
+                  key={si}
+                  className={clsx("w-[34%] max-w-6 rounded-t-[6px] transition-opacity duration-150", fills[si % fills.length], hover !== null && hover !== i && "opacity-40")}
+                  style={{ height: `${v ? Math.max(2, (v / max) * 100) : 0}%`, originY: 1 }}
+                  initial={reduce ? false : { scaleY: 0 }}
+                  animate={inView ? { scaleY: 1 } : undefined}
+                  transition={{ duration: 0.5, delay: i * 0.035 + si * 0.02, ease: EASE }}
+                />
+              ))}
+            </div>
+            {i % every === 0 && <span className="absolute inset-x-[-1rem] bottom-0 truncate text-center text-[0.7rem] text-faint">{g.label.split("–")[0]}</span>}
+            <AnimatePresence>
+              {hover === i && (
+                <motion.div
+                  initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.12 }}
+                  className={clsx("pointer-events-none absolute top-0 z-10 min-w-40 rounded-[11px] border border-line bg-surface px-3 py-2 text-xs shadow-pop", i > groups.length / 2 ? "right-1/2" : "left-1/2")}
+                >
+                  <p className="mb-1 font-medium text-fg">{g.label}</p>
+                  {g.values.map((v, si) => (
+                    <p key={si} className="flex items-center justify-between gap-4 py-0.5 text-muted">
+                      <span className="flex items-center gap-1.5"><span className={clsx("h-2 w-2 rounded-[2px]", fills[si % fills.length])} />{seriesNames[si]}</span>
+                      <span className="font-medium tabular-nums text-fg">{v.toLocaleString("en-US")}</span>
+                    </p>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── bars ───────────────────────────────────────────────────────────────────
 
 export type BarItem = { label: string; value: number; href?: string; hint?: string; tag?: string };
 
 /** Ranked horizontal bars (Stripe-style): label inside the bar track, value on the right. */
-export function BarList({ items, color = "bg-navy-soft", accentFirst, format = (v: number) => v.toLocaleString("en-US") }: { items: BarItem[]; color?: string; accentFirst?: boolean; format?: (v: number) => string }) {
+export function BarList({ items, color = "bg-hover", accentFirst, format = (v: number) => v.toLocaleString("en-US") }: { items: BarItem[]; color?: string; accentFirst?: boolean; format?: (v: number) => string }) {
   const max = Math.max(1, ...items.map((i) => i.value));
   return (
     <ul className="space-y-1.5">
@@ -213,7 +275,7 @@ export function BarList({ items, color = "bg-navy-soft", accentFirst, format = (
         const inner = (
           <div className="group relative flex h-8 items-center justify-between gap-3 rounded-[6px] px-2.5 transition-colors hover:bg-subtle">
             <div className="absolute inset-y-0 left-0 right-16 overflow-hidden rounded-[6px]">
-              <GrowBar pct={(it.value / max) * 100} delay={i * 0.06} className={clsx("rounded-[6px]", accentFirst && i === 0 ? "bg-signal-soft" : color)} />
+              <GrowBar pct={(it.value / max) * 100} delay={i * 0.06} className={clsx("rounded-[6px]", accentFirst && i === 0 ? "bg-line-strong" : color)} />
             </div>
             <span className="relative z-[1] flex min-w-0 items-center gap-2 truncate text-[0.84rem] text-fg-2">
               {it.tag && <span className="font-mono text-[0.7rem] text-faint">{it.tag}</span>}
@@ -248,7 +310,7 @@ export function Funnel({ steps }: { steps: { label: string; value: number }[] })
               </span>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-hover">
-              <GrowBar pct={s.value ? Math.max(2, (s.value / top) * 100) : 0} delay={i * 0.08} className={clsx("rounded-full", last ? "bg-signal" : i === 0 ? "bg-navy" : "bg-navy/70")} />
+              <GrowBar pct={s.value ? Math.max(2, (s.value / top) * 100) : 0} delay={i * 0.08} className={clsx("rounded-full", last ? "bg-fg" : i === 0 ? "bg-fg" : "bg-fg/70")} />
             </div>
           </li>
         );

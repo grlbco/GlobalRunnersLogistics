@@ -54,13 +54,13 @@ export async function GoLive({ isAdmin }: { isAdmin: boolean }) {
   if (done === items.length) return null;
   return (
     <Card className="overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3.5">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-4">
         <div>
-          <h2 className="text-[0.875rem] font-semibold tracking-[-0.01em]">Go-live checklist</h2>
+          <h2 className="text-[0.95rem] font-medium tracking-[-0.01em]">Go-live checklist</h2>
           <p className="text-[0.78rem] text-faint">Hides itself once everything is done.</p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="h-1.5 w-32 overflow-hidden rounded-full bg-hover"><GrowBar pct={(done / items.length) * 100} className="rounded-full bg-signal" /></div>
+          <div className="h-1.5 w-32 overflow-hidden rounded-full bg-hover"><GrowBar pct={(done / items.length) * 100} className="rounded-full bg-fg" /></div>
           <span className="text-[0.8rem] font-medium tabular-nums text-fg-2">{done}/{items.length}</span>
         </div>
       </div>

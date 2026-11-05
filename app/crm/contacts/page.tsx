@@ -14,7 +14,7 @@ export default function ContactsPage({ searchParams }: { searchParams: SP }) {
   return (
     <>
       <PageHead title="Contacts" sub="Every driver lead, one profile each" />
-      <Suspense fallback={<div className="p-5 md:p-8"><Skeleton className="h-[60vh]" /></div>}>
+      <Suspense fallback={<div className="px-5 md:px-6"><Skeleton className="h-[60vh]" /></div>}>
         <Table searchParams={searchParams} />
       </Suspense>
     </>
@@ -46,7 +46,7 @@ async function Table({ searchParams }: { searchParams: SP }) {
   const pages = Math.max(1, Math.ceil((count ?? 0) / PAGE));
 
   return (
-    <div className="p-5 md:p-8">
+    <div className="px-5 md:px-6">
       <form className="grid gap-3 md:grid-cols-[1fr_11rem_11rem_6rem_auto]" action="/crm/contacts">
         <label className="relative">
           <svg viewBox="0 0 24 24" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg>
@@ -68,9 +68,9 @@ async function Table({ searchParams }: { searchParams: SP }) {
         {error ? <span className="text-red-600">{error.message}</span> : <>~{n(count)} contacts{q || sp.stage || sp.tier || sp.state ? " match" : ""} · page {page} of {n(pages)}</>}
       </p>
 
-      <div className="mt-3 overflow-x-auto rounded-[10px] border border-line shadow-card">
+      <div className="mt-3 overflow-x-auto rounded-[14px] border border-line bg-surface shadow-card">
         <table className="w-full min-w-[860px] text-left text-[0.84rem]">
-          <thead className="border-b border-line bg-subtle text-[0.75rem] text-muted">
+          <thead className="text-[0.75rem] text-muted">
             <tr>
               <th className="px-4 py-3 font-medium">Name</th>
               <th className="px-4 py-3 font-medium">Company</th>

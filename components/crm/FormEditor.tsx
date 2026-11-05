@@ -79,13 +79,13 @@ export function FormEditor({ initial, siteUrl }: { initial: F; siteUrl: string }
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {msg && <span className={clsx("text-xs", msg.ok ? "text-emerald-700" : "text-red-600")}>{msg.text}</span>}
           {dirty && !msg && <span className="text-xs text-faint">Unsaved changes</span>}
-          <div className="flex rounded-[7px] border border-line p-0.5" aria-label="Language">
+          <div className="flex rounded-[10px] border border-line p-0.5" aria-label="Language">
             {(["en", "es"] as const).map((l) => (
               <button key={l} onClick={() => setLang(l)} className={clsx("rounded-[3px] px-2.5 py-1.5 text-xs uppercase", lang === l ? "bg-hover text-fg" : "text-faint")}>{l}</button>
             ))}
           </div>
           <button onClick={translate} disabled={pending} className="text-xs text-muted hover:text-fg">Translate to Spanish</button>
-          <div className="flex rounded-[7px] border border-line p-0.5">
+          <div className="flex rounded-[10px] border border-line p-0.5">
             {(["build", "preview"] as const).map((v) => (
               <button key={v} onClick={() => setView(v)} className={clsx("rounded-[3px] px-3 py-1.5 text-xs capitalize", view === v ? "bg-hover text-fg" : "text-faint")}>{v}</button>
             ))}
@@ -145,7 +145,7 @@ export function FormEditor({ initial, siteUrl }: { initial: F; siteUrl: string }
                         onDragOver={(e) => e.preventDefault()}
                         onDrop={(e) => { e.stopPropagation(); if (drag) { move(drag, { page: pi, field: fi }); setSel(null); setDrag(null); } }}
                         onClick={() => setSel({ page: pi, field: fi })}
-                        className={clsx("group flex cursor-pointer items-center gap-3 rounded-[7px] border px-3 py-2.5", on ? "border-signal/40 bg-signal-soft/60 shadow-card" : "border-line bg-surface hover:border-line-strong")}
+                        className={clsx("group flex cursor-pointer items-center gap-3 rounded-[10px] border px-3 py-2.5", on ? "border-signal/40 bg-signal-soft/60 shadow-card" : "border-line bg-surface hover:border-line-strong")}
                       >
                         <span className="cursor-grab select-none text-ghost" aria-hidden>⋮⋮</span>
                         <span className="w-28 shrink-0 font-mono text-[0.65rem] uppercase tracking-wider text-faint">{FIELD_TYPES[fl.type].label}</span>
@@ -160,7 +160,7 @@ export function FormEditor({ initial, siteUrl }: { initial: F; siteUrl: string }
                       </li>
                     );
                   })}
-                  {!pg.fields.length && <li className="rounded-[7px] border border-dashed border-line px-3 py-6 text-center text-sm text-ghost">No questions on this page. Add one below.</li>}
+                  {!pg.fields.length && <li className="rounded-[10px] border border-dashed border-line px-3 py-6 text-center text-sm text-ghost">No questions on this page. Add one below.</li>}
                 </ul>
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {(Object.keys(FIELD_TYPES) as FieldType[]).map((t) => (

@@ -1,9 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { GeistSans } from "geist/font/sans";
-import { GeistMono } from "geist/font/mono";
 import { Suspense } from "react";
 import "../globals.css";
 import { SidebarServer } from "@/components/crm/SidebarServer";
+import { TopBarServer } from "@/components/crm/TopBarServer";
 import { LiveSync } from "@/components/crm/LiveSync";
 
 export const metadata: Metadata = {
@@ -11,22 +11,28 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
   icons: { icon: "/icon.png" },
 };
-export const viewport: Viewport = { themeColor: "#f5f6f8", colorScheme: "light" };
+export const viewport: Viewport = { themeColor: "#f6f6f6" };
 
-/**
- * Root layout for the staff CRM (separate from the public site: no header/footer/smooth scroll).
- * Light "daylight" version of the brand: canvas behind, content on a white inset panel.
- */
+// Runs before first paint so a dark-theme user never sees a light flash.
+const THEME_SCRIPT = `try{if(localStorage.getItem("crm-theme")==="dark")document.documentElement.dataset.theme="dark"}catch(e){}`;
+
+/** Root layout for the staff CRM (separate from the public site: no header/footer/smooth scroll). */
 export default function CrmLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`crm ${GeistSans.variable} ${GeistMono.variable} antialiased`}>
+    <html lang="en" suppressHydrationWarning className={`crm ${GeistSans.variable} antialiased`}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className="min-h-dvh bg-canvas text-fg">
         <div className="flex min-h-dvh">
-          <Suspense fallback={<div className="hidden w-[15.5rem] shrink-0 md:block" />}>
+          <Suspense fallback={<div className="hidden w-[5.25rem] shrink-0 md:block" />}>
             <SidebarServer />
           </Suspense>
-          <main className="min-w-0 flex-1 pb-20 md:py-2 md:pb-2 md:pr-2">
-            <div className="min-h-[calc(100dvh-1rem)] bg-surface md:rounded-[12px] md:border md:border-line md:shadow-card">{children}</div>
+          <main className="min-w-0 flex-1 pb-24 md:pb-3">
+            <Suspense fallback={<div className="h-[84px]" />}>
+              <TopBarServer />
+            </Suspense>
+            {children}
           </main>
           <LiveSync dev={process.env.NODE_ENV !== "production"} />
         </div>

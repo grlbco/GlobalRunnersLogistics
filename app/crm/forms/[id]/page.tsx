@@ -29,7 +29,7 @@ async function Body({ params, searchParams }: { params: Promise<{ id: string }>;
   ]);
   if (!form) notFound();
   return (
-    <div className="p-5 md:p-8">
+    <div className="px-5 md:px-6">
       <Link href="/crm/forms" className="inline-flex items-center gap-1 text-[0.78rem] text-muted transition-colors hover:text-fg">← Forms</Link>
       <div className="mt-4 mb-5 flex gap-1 border-b border-line">
         {[["build", "Build"], ["submissions", `Submissions (${count ?? 0})`]].map(([k, l]) => (

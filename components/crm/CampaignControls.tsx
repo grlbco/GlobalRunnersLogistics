@@ -30,7 +30,7 @@ export function CampaignControls({ id, created, status, leadsAdded, available }:
             <p className="text-sm font-medium">Add a wave of leads</p>
             <div className="flex flex-wrap gap-1.5">
               {[1, 2, 3, 4, 5].map((t) => (
-                <button key={t} type="button" onClick={() => setTiers(tiers.includes(t) ? tiers.filter((x) => x !== t) : [...tiers, t])} className={clsx("rounded-full px-2.5 py-1 text-xs", tiers.includes(t) ? "bg-fg text-white" : "bg-hover text-muted")} title={TIERS[t]}>
+                <button key={t} type="button" onClick={() => setTiers(tiers.includes(t) ? tiers.filter((x) => x !== t) : [...tiers, t])} className={clsx("rounded-full px-2.5 py-1 text-xs", tiers.includes(t) ? "bg-fg text-surface" : "bg-hover text-muted")} title={TIERS[t]}>
                   Tier {t} · {(available[t] ?? 0).toLocaleString("en-US")}
                 </button>
               ))}

@@ -62,8 +62,8 @@ async function Body({ searchParams }: { searchParams: Promise<{ range?: string }
   return (
     <>
       {head}
-      <div className="space-y-6 p-5 md:p-8">
-        <Stagger className="grid gap-4 sm:grid-cols-3 xl:grid-cols-6">
+      <div className="space-y-3 px-5 md:px-6">
+        <Stagger className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
           <StaggerItem><Kpi label="Leads" value={f.contacts} hint={`${n(f.contacted)} emailed`} /></StaggerItem>
           <StaggerItem><Kpi label="Replied" value={f.replied} hint={`${pct(f.replied, f.contacted)} of emailed`} /></StaggerItem>
           <StaggerItem><Kpi label="Form sent" value={f.form_sent} hint={`${pct(f.form_sent, f.replied)} of replies`} /></StaggerItem>
@@ -72,7 +72,7 @@ async function Body({ searchParams }: { searchParams: Promise<{ range?: string }
           <StaggerItem><Stat label="Cost per hire" value={f.hired ? usd(total / f.hired) : "—"} hint={f.applied ? `${usd(total / f.applied)} per application` : `${usd(total)} spent`} /></StaggerItem>
         </Stagger>
 
-        <div className="grid gap-6 xl:grid-cols-3">
+        <div className="grid gap-3 xl:grid-cols-3">
           <FadeIn delay={0.1} className="xl:col-span-2">
             <Panel title="Activity" sub={sel[2] ? `Last ${sel[1].toLowerCase()}` : "Last 90 days"}><ActivityChart days={days} /></Panel>
           </FadeIn>
@@ -83,15 +83,15 @@ async function Body({ searchParams }: { searchParams: Promise<{ range?: string }
           </FadeIn>
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-3">
+        <div className="grid gap-3 xl:grid-cols-3">
           <Panel title="Speed to reply" sub="Driver message → our answer">
-            <p className="text-[1.85rem] font-semibold leading-none tracking-[-0.035em]">{r.speed.median_min == null ? "—" : <><CountUp value={r.speed.median_min} /> <span className="text-[0.95rem] font-normal text-faint">min median</span></>}</p>
+            <p className="text-[2rem] font-semibold leading-none tracking-[-0.035em]">{r.speed.median_min == null ? "—" : <><CountUp value={r.speed.median_min} /> <span className="text-[0.95rem] font-normal text-faint">min median</span></>}</p>
             <p className="mt-3 text-[0.8rem] text-muted">90% answered within <span className="font-medium text-fg">{r.speed.p90_min ?? "—"} min</span> · {n(r.speed.samples)} messages</p>
           </Panel>
           <Panel title="Assistant" sub={`${n(runs)} conversations handled`}>
             <Meter parts={[
-              { label: "Answered", value: Number(r.assistant.replied), className: "bg-navy" },
-              { label: "Handed to a person", value: Number(r.assistant.handed_off), className: "bg-signal" },
+              { label: "Answered", value: Number(r.assistant.replied), className: "bg-fg" },
+              { label: "Handed to a person", value: Number(r.assistant.handed_off), className: "bg-line-strong" },
               { label: "Failed", value: Number(r.assistant.failed), className: "bg-ghost" },
             ]} />
             <p className="mt-4 text-[0.8rem] text-muted">Assistant cost <span className="font-medium text-fg tabular-nums">{usd(Number(r.assistant.cost))}</span></p>
@@ -112,12 +112,12 @@ async function Body({ searchParams }: { searchParams: Promise<{ range?: string }
         </Panel>
 
         <Table title="By campaign" rows={r.by_campaign} first="members" extra={(x) => { const o = x.stats?.overall ?? {}; const sent = o.emails_sent_count ?? o.sent ?? 0; const rep = o.reply_count ?? o.replies ?? 0; return sent ? `${n(sent)} sent · ${pct(rep, sent)} reply` : x.status ?? ""; }} empty="No campaigns yet." />
-        <div className="grid gap-6 xl:grid-cols-2">
+        <div className="grid gap-3 xl:grid-cols-2">
           <Table title="By lead tier" rows={r.by_tier} first="total" empty="No leads yet." />
           <Table title="By source" rows={r.by_source} first="total" empty="No leads yet." />
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-2">
+        <div className="grid gap-3 xl:grid-cols-2">
           <Panel title="Forms" sub="Submissions in this range">
             {r.forms.length ? <BarList items={r.forms.map((x) => ({ label: x.name, value: Number(x.submissions) }))} /> : <Empty title="No forms yet" />}
           </Panel>
@@ -133,11 +133,11 @@ async function Body({ searchParams }: { searchParams: Promise<{ range?: string }
 function Table({ title, rows, first, extra, empty }: { title: string; rows: Row[]; first: "total" | "members"; extra?: (r: Row) => string; empty: string }) {
   return (
     <Card className="overflow-x-auto">
-      <div className="border-b border-line px-5 py-3.5"><h2 className="text-[0.875rem] font-semibold tracking-[-0.01em]">{title}</h2></div>
+      <div className="px-5 pb-1 pt-4"><h2 className="text-[0.95rem] font-medium tracking-[-0.01em]">{title}</h2></div>
       {rows.length ? (
         <table className="w-full min-w-[40rem] text-[0.84rem]">
           <thead>
-            <tr className="border-b border-line bg-subtle text-left text-[0.75rem] text-muted">
+            <tr className="text-left text-[0.75rem] text-muted">
               <th className="px-5 py-2 font-medium">Name</th>
               <th className="px-3 py-2 text-right font-medium">Leads</th>
               <th className="px-3 py-2 text-right font-medium">Replied</th>

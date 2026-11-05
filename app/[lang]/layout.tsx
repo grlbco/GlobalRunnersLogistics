@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
 import { Suspense, ViewTransition } from "react";
 import { GeistSans } from "geist/font/sans";
-import { GeistMono } from "geist/font/mono";
 import "../globals.css";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
@@ -49,7 +48,7 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
   const dict = await getDictionary(lang);
 
   return (
-    <html lang={lang} className={`${GeistSans.variable} ${GeistMono.variable} antialiased`}>
+    <html lang={lang} className={`${GeistSans.variable} antialiased`}>
       <body className="min-h-dvh bg-ink text-white">
         <a
           href="#main"
