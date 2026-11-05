@@ -42,7 +42,7 @@ async function Body() {
           <p className="text-lg font-semibold tracking-[-0.02em]">{s.enabled ? "Assistant is ON" : "Assistant is OFF"}</p>
           <p className="mt-1 text-sm text-white/60">
             {s.enabled
-              ? s.draft_mode ? "It writes replies as drafts; you approve each one." : "It replies and follows up automatically (9am–8pm driver time, never Sunday)."
+              ? s.draft_mode ? "It writes replies as drafts; you approve each one." : "It replies 24/7 within minutes. Follow-up texts it starts itself go out 8am–9pm driver time."
               : "Nobody gets automatic replies. Turning it on also answers drivers waiting from the last 48 hours."}
           </p>
         </div>
@@ -63,7 +63,7 @@ async function Body() {
               <label className="space-y-1"><span className="text-xs text-white/50">Max messages / driver / day</span><input name="max_per_day" type="number" defaultValue={s.max_per_day} className={inputCls} disabled={!admin} /></label>
               <label className="space-y-1"><span className="text-xs text-white/50">Max follow-ups</span><input name="max_followups" type="number" defaultValue={s.max_followups} className={inputCls} disabled={!admin} /></label>
             </div>
-            <p className="text-xs text-white/40">Automatic messages only go out 9am–8pm in the driver&apos;s time zone, never on Sunday. STOP and opt-outs are handled in code before the assistant sees anything.</p>
+            <p className="text-xs text-white/40">Replies to drivers go out 24/7. Follow-up texts the assistant or an automation starts wait for 8am–9pm in the driver&apos;s time zone (federal + state quiet-hour laws). Email has no time limit. STOP and opt-outs are handled in code first.</p>
             {admin && <button className={btnCls}>Save</button>}
           </form>
         </Card>

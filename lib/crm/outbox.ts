@@ -10,14 +10,17 @@ import * as instantly from "@/lib/integrations/instantly";
  */
 export const sendingEnabled = () => process.env.SENDING_ENABLED === "true";
 
-type Row = { id: string; contact_id: string; channel: "email" | "sms"; author: "agent" | "human" | "workflow"; author_id: string | null; subject: string | null; body: string; attempts: number };
+type Row = { id: string; contact_id: string; channel: "email" | "sms"; author: "agent" | "human" | "workflow"; author_id: string | null; subject: string | null; body: string; attempts: number; is_reply: boolean };
 
+/**
+ * Quiet hours apply only to texts WE start (follow-ups, automations): 8am–9pm driver time.
+ * Replies to a driver who just messaged us go out 24/7. Email has no quiet hours.
+ */
 function inQuietHours(tz: string | null, at = new Date()) {
   if (!tz) return false;
-  const parts = new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", hour12: false, weekday: "short" }).formatToParts(at);
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", hour12: false }).formatToParts(at);
   const hour = Number(parts.find((p) => p.type === "hour")?.value ?? 12) % 24;
-  const day = parts.find((p) => p.type === "weekday")?.value;
-  return hour < 9 || hour >= 20 || day === "Sun";
+  return hour < 8 || hour >= 21;
 }
 
 export type SendOutcome = { ok: true; messageId: string | null } | { ok: false; reason: string; retry?: boolean };
@@ -28,7 +31,7 @@ async function sendOne(row: Row): Promise<SendOutcome> {
   const { data: c } = await db.from("contacts").select("id, email, phone, cell_phone, timezone, do_not_contact, email_consent, sms_consent").eq("id", row.contact_id).single();
   if (!c) return { ok: false, reason: "Contact not found" };
   if (c.do_not_contact) return { ok: false, reason: "Contact is do-not-contact" };
-  if (row.author !== "human" && inQuietHours(c.timezone)) return { ok: false, reason: "Quiet hours in the driver's time zone", retry: true };
+  if (row.channel === "sms" && row.author !== "human" && !row.is_reply && inQuietHours(c.timezone)) return { ok: false, reason: "Follow-up waits for 8am in the driver's time zone", retry: true };
 
   if (row.channel === "sms") {
     const to = c.cell_phone ?? c.phone;
@@ -57,7 +60,7 @@ async function sendOne(row: Row): Promise<SendOutcome> {
 /** Claims and sends one outbox row. */
 export async function processRow(id: string): Promise<SendOutcome> {
   const db = adminDb();
-  const { data: row } = await db.from("outbox").update({ status: "sending" }).eq("id", id).eq("status", "pending").select("id, contact_id, channel, author, author_id, subject, body, attempts").maybeSingle();
+  const { data: row } = await db.from("outbox").update({ status: "sending" }).eq("id", id).eq("status", "pending").select("id, contact_id, channel, author, author_id, subject, body, attempts, is_reply").maybeSingle();
   if (!row) return { ok: false, reason: "Already sent or cancelled" };
   try {
     const out = await sendOne(row as Row);

@@ -143,6 +143,7 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
       await db.from("outbox").insert({
         contact_id: c.id, channel, author: "agent", subject: decision.subject ?? null, body: decision.reply.trim(),
         status: settings.draft_mode ? "draft" : "pending", send_after: new Date(Date.now() + delay * 1000).toISOString(),
+        is_reply: input.trigger === "text_received" || input.trigger === "email_received",
       });
       if (decision.reply.includes(link.url) && !link.form.sent) {
         await db.from("form_links").update({ sent_at: new Date().toISOString() }).eq("token", link.token);
