@@ -85,6 +85,7 @@ export type PromptCtx = {
   memory: { facts: Record<string, unknown>; summary?: string | null; next_step?: string | null };
   turns: Turn[]; trigger: string; followupAttempt?: number;
   hasPhone?: boolean; followupKind?: string; chaseTotal?: number; alsoText?: boolean;
+  formSubmitted?: { form: string; sendDriverForm?: boolean }; otherForms?: string[];
 };
 
 /** One fresh angle per chase step, so no two follow-ups say the same thing. Direct, a little pushy, never fake urgency. */
@@ -108,7 +109,7 @@ Form link: ${p.formUrl}
 Form status: ${p.form.completed ? "COMPLETED" : p.form.opened ? `opened, stopped at step ${p.form.step}` : p.form.sent ? "link sent, not opened" : "not sent yet"}
 What we know: ${JSON.stringify(p.memory.facts)}
 Summary so far: ${p.memory.summary ?? "(first conversation)"}
-Note from last time: ${p.memory.next_step ?? "(none)"}`;
+Note from last time: ${p.memory.next_step ?? "(none)"}${p.otherForms?.length ? `\nForms they sent us: ${p.otherForms.join(", ")}` : ""}`;
 
   const msgs: ChatMsg[] = [{ role: "system", content: systemPrompt() }, { role: "system", content: card }];
   // collapse consecutive same-side turns so roles alternate
@@ -121,7 +122,9 @@ Note from last time: ${p.memory.next_step ?? "(none)"}`;
   }
   const chaseN = p.followupAttempt ?? 1;
   const task =
-    p.trigger === "followup" && p.followupKind === "chase"
+    p.trigger === "form_submitted"
+      ? `[INSTRUCTION] They just filled out our "${p.formSubmitted?.form ?? "web"}" form (their answers are in What we know). Write the first ${p.channel === "sms" ? "text" : "email"}: thank them in a few words, use one detail from their answers so it's clearly about them, then the next step.${p.formSubmitted?.sendDriverForm && !p.form.completed ? " Next step is the driver application: send the FORM LINK, say it takes about 5 minutes and Ken calls them once it's in." : " Next step: Ken or someone from the team reaches out soon."} Output the JSON.`
+      : p.trigger === "followup" && p.followupKind === "chase"
       ? `[INSTRUCTION] Form follow-up ${chaseN} of ${p.chaseTotal ?? 8} on ${p.channel}. They got the form link but haven't finished it${p.form.opened ? ` (they opened it and stopped at step ${p.form.step}, so it's only a couple more minutes)` : " (not opened yet)"}. Angle for this one: ${CHASE_ANGLES[Math.min(chaseN, CHASE_ANGLES.length) - 1]} Be direct and confident, a bit persistent like a recruiter who wants them, never fake urgency or made-up deadlines, never guilt. Don't reuse wording from earlier messages. Output the JSON.`
       : p.trigger === "followup" && (p.followupKind === "chase_extra")
         ? `[INSTRUCTION] Email version of the text you're sending them right now about finishing the form${p.form.opened ? ` (they stopped at step ${p.form.step})` : ""}. 2-4 short lines, short casual subject, the link, sign "Ken". Output the JSON.`

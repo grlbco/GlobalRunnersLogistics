@@ -88,7 +88,7 @@ export async function formLinkFor(contactId: string) {
   return { url: `${siteUrl()}/apply/driver?t=${row.token}`, token: row.token as string, form: { sent: !!row.sent_at, opened: !!row.opened_at, step: row.step_reached ?? 0, completed: !!row.completed_at } };
 }
 
-type RunInput = { simTurns?: Turn[]; contactId: string; trigger: "text_received" | "email_received" | "followup" | "form_abandoned" | "manual" | "test"; inputMessageId?: string | null; followupAttempt?: number; followupKind?: FollowupKind; followupChannel?: "email" | "sms" | null; runId?: string; dryRunMessage?: { channel: "email" | "sms"; body: string } };
+type RunInput = { simTurns?: Turn[]; contactId: string; trigger: "text_received" | "email_received" | "followup" | "form_abandoned" | "form_submitted" | "manual" | "test"; formSubmitted?: { form: string; sendDriverForm?: boolean }; inputMessageId?: string | null; followupAttempt?: number; followupKind?: FollowupKind; followupChannel?: "email" | "sms" | null; runId?: string; dryRunMessage?: { channel: "email" | "sms"; body: string } };
 export type RunResult = { action: string; reply?: string | null; channel?: "email" | "sms"; decision?: Decision; problems?: string[]; reason?: string; costUsd?: number };
 
 /** One assistant decision for one driver. Never throws: failures hand the driver to a person. */
@@ -145,12 +145,13 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
         return { action: "handed_off", reason: "conversation limit" };
       }
     }
-    if (link.form.completed && input.trigger !== "test" && input.trigger !== "text_received" && input.trigger !== "email_received")
+    if (link.form.completed && input.trigger !== "test" && input.trigger !== "text_received" && input.trigger !== "email_received" && input.trigger !== "form_submitted")
       return (await log({ action: "ignored", decision: { reason: "form already completed" } }), { action: "ignored", reason: "Form already completed" });
 
     // Reply on the channel they used; follow-ups prefer text when allowed.
     const lastInbound = [...turns].reverse().find((t) => t.direction === "inbound");
     let channel: "email" | "sms" = (lastInbound?.channel as "email" | "sms") ?? (c.sms_consent ? "sms" : "email");
+    if (input.trigger === "form_submitted") channel = c.sms_consent ? "sms" : "email";
     if (input.trigger === "followup") channel = input.followupChannel ?? (c.sms_consent && (input.followupAttempt ?? 1) <= MAX_TEXT_FOLLOWUPS ? "sms" : "email");
     if (channel === "email" && !(c.email && (dry || (await hasEmailThread(c.id))))) channel = "sms";
     // First chase touch: the card moves to "Following up".
@@ -168,7 +169,9 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
       return (await log({ action: "ignored", decision: { reason: "no way to reach: no text consent and no email thread" } }), { action: "ignored", reason: "Can't text (no consent) and no email thread yet" });
 
     const name = [c.first_name, c.last_name].filter(Boolean).join(" ") || "the driver";
-    const base = { name, city: c.city, state: c.state, localTime: localTime(c.timezone), stage: c.stage, channel, smsConsent: c.sms_consent, hasPhone: !!(c.cell_phone || c.phone), formUrl: link.url, form: link.form, memory: { facts: (mem?.facts as Record<string, unknown>) ?? {}, summary: mem?.summary, next_step: mem?.next_step }, turns, trigger: promptTrigger, followupAttempt: input.followupAttempt, followupKind: input.followupKind, chaseTotal: CHASE.length, alsoText };
+    const { data: subs } = await db.from("crm_form_submissions").select("created_at, form:crm_forms(name)").eq("contact_id", c.id).order("created_at", { ascending: false }).limit(3);
+    const otherForms = (subs ?? []).map((s) => `${(s.form as unknown as { name: string } | null)?.name ?? "form"} (${s.created_at.slice(0, 10)})`);
+    const base = { name, city: c.city, state: c.state, localTime: localTime(c.timezone), stage: c.stage, channel, smsConsent: c.sms_consent, hasPhone: !!(c.cell_phone || c.phone), formUrl: link.url, form: link.form, memory: { facts: (mem?.facts as Record<string, unknown>) ?? {}, summary: mem?.summary, next_step: mem?.next_step }, turns, trigger: promptTrigger, followupAttempt: input.followupAttempt, followupKind: input.followupKind, chaseTotal: CHASE.length, alsoText, formSubmitted: input.formSubmitted, otherForms };
 
     // Decide: JSON first (2 tries with the checker's feedback), then a plain-text fallback so a driver is never left hanging.
     const messages: ChatMsg[] = buildMessages(base);
@@ -260,13 +263,13 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
       // Human timing: quick in a live back-and-forth, slower after a long silence; extra texts follow like someone typing.
       const lastOut = [...turns].reverse().find((t) => t.direction === "outbound");
       const live = !!lastOut && Date.now() - new Date(lastOut.at).getTime() < 20 * 60_000;
-      const replying = input.trigger === "text_received" || input.trigger === "email_received";
+      const replying = input.trigger === "text_received" || input.trigger === "email_received" || input.trigger === "form_submitted";
       // Human cadence (GoHighLevel uses ~60-90s for SMS): live chat 30-75s, reply after a silence 60-150s, plus "typing" time.
       const base = manual ? 5 : replying ? (live ? 30 + Math.random() * 45 : 60 + Math.random() * 90) + parts[0].length * 0.25 : settings.delay_min_s + Math.random() * Math.max(0, settings.delay_max_s - settings.delay_min_s);
       let at = Date.now() + 1000 * base;
       if (input.followupKind !== "chase_extra")
         await db.from("outbox").update({ status: "cancelled", error: "replaced by a newer reply" }).eq("contact_id", c.id).eq("author", "agent").in("status", ["draft", "pending"]);
-      const isReply = input.trigger === "text_received" || input.trigger === "email_received" || manual;
+      const isReply = input.trigger === "text_received" || input.trigger === "email_received" || input.trigger === "form_submitted" || manual;
       for (let i = 0; i < parts.length; i++) {
         if (i > 0) at += 1000 * (8 + Math.random() * 12 + parts[i].length * 0.15);
         await db.from("outbox").insert({
@@ -376,7 +379,7 @@ async function handoff(c: { id: string; first_name: string | null; last_name: st
 export async function processAgentQueue(limit = 10) {
   const db = adminDb();
   const out: { contactId: string; action: string }[] = [];
-  const { data: queued } = await db.from("agent_runs").select("id, contact_id, trigger, input_message_id").eq("action", "queued").order("created_at").limit(limit);
+  const { data: queued } = await db.from("agent_runs").select("id, contact_id, trigger, input_message_id, decision").eq("action", "queued").order("created_at").limit(limit);
   // Collapse several new messages from one driver into one run (answer the latest).
   const seen = new Set<string>();
   for (const q of queued ?? []) {
@@ -389,7 +392,7 @@ export async function processAgentQueue(limit = 10) {
     }
     seen.add(q.contact_id);
     await db.from("agent_runs").update({ action: "running" }).eq("id", q.id);
-    const r = await runAgent({ contactId: q.contact_id, trigger: q.trigger as RunInput["trigger"], inputMessageId: q.input_message_id, runId: q.id });
+    const r = await runAgent({ contactId: q.contact_id, trigger: q.trigger as RunInput["trigger"], inputMessageId: q.input_message_id, runId: q.id, formSubmitted: q.trigger === "form_submitted" ? (q.decision as { form: string; sendDriverForm?: boolean }) : undefined });
     out.push({ contactId: q.contact_id, action: r.action });
   }
   const { data: due } = await db.from("followups").select("id, contact_id, attempt, kind, channel").eq("status", "pending").lte("due_at", new Date().toISOString()).order("due_at").limit(limit);

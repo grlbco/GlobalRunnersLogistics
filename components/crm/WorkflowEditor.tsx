@@ -70,6 +70,7 @@ export function WorkflowEditor({ initial, canEdit }: { initial: WF; canEdit: boo
               <option value="website_form">from the website form</option>
             </select>
           )}
+          {filterKey === "form" && <input value={wf.trigger_filter.form ?? ""} onChange={(e) => upd({ trigger_filter: { form: e.target.value.toLowerCase() } })} placeholder="form link name (blank = any form)" disabled={!canEdit} className={clsx(inputCls, "max-w-xs")} />}
           {filterKey === "tag" && <input value={wf.trigger_filter.tag ?? ""} onChange={(e) => upd({ trigger_filter: { tag: e.target.value } })} placeholder="tag name" disabled={!canEdit} className={clsx(inputCls, "max-w-xs")} />}
         </div>
       </Card>
