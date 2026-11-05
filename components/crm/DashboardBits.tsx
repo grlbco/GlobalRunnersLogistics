@@ -5,17 +5,11 @@ import { AreaChart, Sparkline } from "./charts";
 import { CHART } from "@/lib/crm/chart-colors";
 import { CountUp } from "./motion";
 import { Card } from "./ui";
-
-export type Daily = { day: string; replies: number; answered: number; forms: number; applied: number };
+import type { Daily } from "@/lib/crm/daily";
 
 const short = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
-/** Sum of the last `n` days vs the `n` days before: the delta shown on KPI cards. */
-export function windowDelta(values: number[], n = 7) {
-  const now = values.slice(-n).reduce((s, v) => s + v, 0);
-  const before = values.slice(-2 * n, -n).reduce((s, v) => s + v, 0);
-  return { now, before, diff: now - before };
-}
+export type { Daily };
 
 export function Kpi({ label, value, hint, spark, color = CHART.navy, delta, decimals = 0 }: {
   label: string; value: number; hint?: string; spark?: number[]; color?: string; delta?: { diff: number; label: string }; decimals?: number;

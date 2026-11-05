@@ -6,7 +6,8 @@ import { ago, fullName } from "@/lib/crm/format";
 import { Avatar, Empty, PageHead, Panel, Skeleton, StageBadge, btnCls, btnGhostCls } from "@/components/crm/ui";
 import { BarList, Funnel } from "@/components/crm/charts";
 import { FadeIn, Stagger, StaggerItem } from "@/components/crm/motion";
-import { ActivityChart, Kpi, windowDelta, type Daily } from "@/components/crm/DashboardBits";
+import { ActivityChart, Kpi } from "@/components/crm/DashboardBits";
+import { windowDelta, type Daily } from "@/lib/crm/daily";
 import { CHART } from "@/lib/crm/chart-colors";
 import { GoLive } from "@/components/crm/GoLive";
 
