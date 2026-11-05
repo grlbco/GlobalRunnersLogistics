@@ -148,7 +148,8 @@ export async function approveDraft(formData: FormData) {
   const { supabase, staff } = await requireStaff();
   const parsed = z.object({ id, contact_id: id, body: z.string().trim().min(1).max(1500) }).safeParse(Object.fromEntries(formData));
   if (!parsed.success) return;
-  await supabase.from("outbox").update({ status: "pending", body: parsed.data.body, send_after: new Date().toISOString(), author_id: staff.id }).eq("id", parsed.data.id).in("status", ["draft", "pending"]);
+  // A person approved it: send now, no quiet-hour hold.
+  await supabase.from("outbox").update({ status: "pending", body: parsed.data.body, send_after: new Date().toISOString(), author_id: staff.id, is_reply: true, error: null }).eq("id", parsed.data.id).in("status", ["draft", "pending"]);
   const { processRow } = await import("@/lib/crm/outbox");
   const out = await processRow(parsed.data.id);
   await supabase.from("activities").insert({ contact_id: parsed.data.contact_id, type: out.ok ? "draft_approved" : "draft_failed", data: out.ok ? {} : { reason: out.reason }, actor: `user:${staff.id}` });

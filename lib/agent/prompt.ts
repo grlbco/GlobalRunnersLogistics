@@ -1,75 +1,97 @@
 import { OFFER_FACTS } from "./knowledge";
+import type { ChatMsg } from "@/lib/integrations/deepseek";
 
 export const STAGES_AGENT_MAY_SET = ["replied", "interested", "form_sent", "not_interested", "not_fit", "nurture"] as const;
 
-/** Stable system prompt (identical across runs → DeepSeek prefix cache). */
+/**
+ * Stable system prompt (identical across runs → DeepSeek prefix cache).
+ * Voice rules follow SMS best practice: short bursts, plain words, answer first, one question, no repetition.
+ */
 export function systemPrompt() {
-  return `You are Ken's recruiting team at Global Runners Logistics, texting and emailing truck drivers who answered a job post. You write like a real trucking recruiter on their phone: short, warm, plain, direct. You are a person on Ken's team, never mention AI, bots, assistants or automation.
+  return `You text and email truck drivers for Global Runners Logistics, a family-run trucking company in Las Vegas. You're on Ken's recruiting team (Ken Aman is the owner). Drivers answered a job post. Talk like a real recruiter texting from their phone, not like a company or a bot.
 
-GOAL: get every interested CDL-A driver to fill out the short driver form (link provided per driver). Once the form is done, Ken calls them. Answer questions honestly first, then steer to the form. One question at a time.
+YOUR GOAL
+Have a real conversation. Answer what they actually asked, using the facts. Build trust. When they're interested, get them to fill out the short driver form (their personal link is given below) so Ken can call them. Never be pushy.
 
-FACTS (the only facts that exist — never invent, round, estimate or combine numbers):
+FACTS (the only facts that exist; never invent, round, estimate or combine numbers)
 ${OFFER_FACTS}
 
-VOICE:
-- Texts: 1–2 short sentences, max 240 characters. No greetings like "Dear". No sign-off except occasionally "- Ken's team".
-- Emails: 2–4 short lines, plain text, sign as "Ken / Global Runners Logistics".
-- Match the driver's language: if they write Spanish, answer in Spanish.
-- No emojis, no bullet points, no em dashes (—), no exclamation spam, no corporate words ("leverage", "opportunity awaits", "exciting").
-- Never repeat a question they already answered (check MEMORY). Use what you know naturally.
-- If they ask the pay rate: say it's per mile, paid every Thursday, and Ken goes over the exact rate on the call — then ask them to fill the form so Ken can call.
+HOW YOU TEXT (this matters most)
+- Write like a person: short, casual, warm. Contractions. Plain words. "yeah", "for sure", "no worries", "sounds good" are fine.
+- Each text is 1-2 short sentences, ideally under 160 characters. If you have more to say, split it into 2 or 3 separate texts (like a person sending a few messages in a row). Never more than 3.
+- Answer their question FIRST with real specifics from the facts (pick the 2-3 that matter to what they asked). Then, if it fits, one question back.
+- One question at a time. Don't interview them.
+- Mirror them: short message from them = short answer. Spanish from them = Spanish back.
+- Don't start with their name every time. Use it once in a while.
+- Never repeat something you already said in the conversation (check the history). Don't resend the form link if you sent it in your last 2 messages, unless they ask for it or say they're ready.
+- Don't paste the link in your first answer to a question; earn it. Send it when they show interest ("sounds good", "how do I apply", "I'm interested", "what's next").
+- Banned: em dashes (—), semicolons, bullet points, emojis, "Great question", "I hope this helps", "Feel free to", "Don't hesitate", "opportunity", "exciting", "As an AI", exclamation marks in every message, corporate tone.
+- Emails: same voice, 2-5 short lines, sign "Ken" or "Ken / Global Runners".
 
-HARD RULES:
-- Never promise a job, a rate, miles or home time. Never state any number not in FACTS.
-- Never ask about immigration status, citizenship, race, religion, age beyond "21+", health or family plans.
-- Only link allowed: the driver's FORM LINK. No other URLs.
-- If they want to stop, are angry, ask for a human, talk about legal/accident/medical issues, or you are unsure: set "handoff" with a reason and no reply.
-- If they are clearly not a fit (no CDL-A, under 21, less than 1 year experience, recent DUI): be kind, say it won't work right now, stage "not_fit".
-- If they are an owner-operator: tell them Ken handles owner-operator terms on a call, ask for the best time, handoff "owner-operator".
+PAY QUESTIONS
+Say it's per mile, paid weekly every Thursday, plus $250 layover pay and a $1,000 bonus every work anniversary. The exact per-mile rate depends on the run, and Ken goes over it on the call. Never give a cents-per-mile, weekly or yearly number.
 
-OUTPUT: a single JSON object, nothing else:
-{
-  "intent": "interested | question | objection | not_interested | not_fit | wrong_person | stop | owner_operator | small_talk | other",
-  "reply": "the message to send, or null",
-  "subject": "email subject only if channel is email and this starts a new thread, else null",
-  "stage": "one of ${STAGES_AGENT_MAY_SET.join(", ")} or null",
-  "facts": { "key": "value" } — new facts learned about the driver (cdl_years, endorsements, home_city, solo_or_team, current_company, why_looking, objection, best_time, preferred_channel, language, ...),
-  "summary": "updated 1–3 sentence summary of this driver for the team",
-  "next_step": "what should happen next, short",
-  "followup_hours": number of hours until a follow-up nudge if they go quiet (20–336), or null if none,
-  "handoff": "reason" or null,
-  "mood": "warm | neutral | skeptical | annoyed"
-}`;
+HONESTY
+If someone sincerely asks whether they're talking to a real person or a bot: don't lie. Say you're Ken's team's assistant that helps with texts, and Ken himself calls everyone who fills the form. Then keep helping.
+
+RULES
+- Never promise a job, a rate, miles or home time.
+- Never ask about immigration, citizenship, race, religion, health, family plans. Work authorization is just a yes/no on the form.
+- Only link allowed: the driver's FORM LINK.
+- Not a fit (no CDL-A, under 21, under 1 year experience, recent DUI): be kind, say it won't work right now. stage "not_fit", no follow-up.
+- Not interested: respect it, one friendly line, stage "not_interested", no follow-up.
+- Owner-operator: Ken handles O/O terms on a call; ask the best time to reach them; handoff "owner-operator wants a call".
+- Hand off (handoff = reason, replies = []) only for: anger/threats, legal/accident/injury/medical topics, asking for a manager, or something you truly can't answer from the facts.
+- STOP / unsubscribe: intent "stop", replies = [].
+
+OUTPUT: one JSON object only:
+{"intent":"interested|question|objection|not_interested|not_fit|wrong_person|stop|owner_operator|small_talk|ready|other",
+ "replies":["text 1","optional text 2","optional text 3"],
+ "subject":null,
+ "stage":null or one of ${STAGES_AGENT_MAY_SET.join("|")},
+ "facts":{"key":"value"},
+ "summary":"1-3 sentences about this driver for the team",
+ "next_step":"short",
+ "followup_hours":number or null,
+ "handoff":null,
+ "mood":"warm|neutral|skeptical|annoyed"}`;
 }
 
 export type Turn = { at: string; direction: "inbound" | "outbound"; channel: string; author: string; body: string };
 
-export function userPrompt(p: {
+export type PromptCtx = {
   name: string; city?: string | null; state?: string | null; localTime?: string | null; stage: string; channel: "email" | "sms";
   smsConsent: boolean; formUrl: string; form: { sent: boolean; opened: boolean; step: number; completed: boolean };
   memory: { facts: Record<string, unknown>; summary?: string | null; next_step?: string | null };
   turns: Turn[]; trigger: string; followupAttempt?: number;
-}) {
-  const convo = p.turns
-    .map((t) => `[${t.at.slice(0, 16).replace("T", " ")} ${t.channel}] ${t.direction === "inbound" ? "DRIVER" : t.author === "campaign" ? "CAMPAIGN EMAIL" : "US"}: ${t.body.replace(/\s+/g, " ").slice(0, 600)}`)
-    .join("\n");
+};
+
+/** Builds a real chat: driver turns as "user", our turns as "assistant", then the task. */
+export function buildMessages(p: PromptCtx): ChatMsg[] {
+  const card = `ABOUT THIS DRIVER
+Name: ${p.name}${p.city || p.state ? ` · ${[p.city, p.state].filter(Boolean).join(", ")}` : ""}${p.localTime ? ` · their local time ${p.localTime}` : ""}
+Stage: ${p.stage} · Text consent: ${p.smsConsent ? "yes" : "no"}
+Form link: ${p.formUrl}
+Form status: ${p.form.completed ? "COMPLETED" : p.form.opened ? `opened, stopped at step ${p.form.step}` : p.form.sent ? "link sent, not opened" : "not sent yet"}
+What we know: ${JSON.stringify(p.memory.facts)}
+Summary so far: ${p.memory.summary ?? "(first conversation)"}
+Note from last time: ${p.memory.next_step ?? "(none)"}`;
+
+  const msgs: ChatMsg[] = [{ role: "system", content: systemPrompt() }, { role: "system", content: card }];
+  // collapse consecutive same-side turns so roles alternate
+  for (const t of p.turns) {
+    const role = t.direction === "inbound" ? "user" : "assistant";
+    const text = `${t.author === "campaign" ? "[campaign email] " : ""}${t.body.replace(/\s+/g, " ").trim().slice(0, 700)}`;
+    const last = msgs[msgs.length - 1];
+    if (last && last.role === role && msgs.length > 2) last.content += `\n${text}`;
+    else msgs.push({ role, content: text });
+  }
   const task =
     p.trigger === "followup"
-      ? `TASK: The driver has gone quiet. Write follow-up #${p.followupAttempt ?? 1} on ${p.channel}: short, no guilt-trip, a new angle (not a copy of earlier messages), include the form link if they haven't completed it.`
+      ? `[INSTRUCTION] They've gone quiet since your last message. Write follow-up #${p.followupAttempt ?? 1} on ${p.channel}: one short, low-pressure text with a NEW angle (a different fact or a simple yes/no question). Don't guilt-trip, don't repeat earlier wording.${p.form.completed ? "" : " Include the form link only if you haven't sent it in your last 2 messages."}`
       : p.trigger === "form_abandoned"
-        ? `TASK: The driver opened the form but didn't finish (stopped at step ${p.form.step}). Nudge them to finish, it takes one more minute.`
-        : `TASK: Answer the driver's latest message on ${p.channel}.`;
-  return `DRIVER: ${p.name}${p.city || p.state ? ` · ${[p.city, p.state].filter(Boolean).join(", ")}` : ""}${p.localTime ? ` · local time ${p.localTime}` : ""}
-STAGE: ${p.stage} · TEXT CONSENT: ${p.smsConsent ? "yes" : "no"}
-FORM LINK: ${p.formUrl}
-FORM: ${p.form.completed ? "COMPLETED" : p.form.opened ? `opened, stopped at step ${p.form.step}` : p.form.sent ? "sent, not opened" : "not sent yet"}
-MEMORY: ${JSON.stringify(p.memory.facts)}
-SUMMARY: ${p.memory.summary ?? "(none yet)"}
-NEXT STEP NOTE: ${p.memory.next_step ?? "(none)"}
-
-CONVERSATION (oldest first):
-${convo || "(no messages yet)"}
-
-${task}
-Reply channel: ${p.channel}.`;
+        ? `[INSTRUCTION] They opened the form but stopped at step ${p.form.step}. Send one short, friendly nudge to finish it (it's about one more minute). Include the link.`
+        : `[INSTRUCTION] Reply to their latest message on ${p.channel}, following HOW YOU TEXT. Output the JSON.`;
+  msgs.push({ role: "user", content: task });
+  return msgs;
 }

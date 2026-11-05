@@ -169,7 +169,10 @@ export async function handleInstantlyStatus(event: { event_type: string; lead_em
 // ---------------- assistant hook (phase 4 fills this in) ----------------
 
 export async function enqueueAgent(contactId: string, messageId: string, trigger: string) {
-  await adminDb().from("agent_runs").insert({ contact_id: contactId, trigger, input_message_id: messageId, action: "queued" });
+  const db = adminDb();
+  // The driver just wrote: anything we had waiting for them is stale now, the next run answers with full context.
+  await db.from("outbox").update({ status: "cancelled", error: "driver replied first" }).eq("contact_id", contactId).eq("author", "agent").in("status", ["draft", "pending"]);
+  await db.from("agent_runs").insert({ contact_id: contactId, trigger, input_message_id: messageId, action: "queued" });
 }
 
 // ---------------- full tick ----------------

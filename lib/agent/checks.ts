@@ -2,7 +2,9 @@ import { allowedNumbers } from "./knowledge";
 
 /** Code-level guardrails on every reply. Any failure → retry once, then hand to a person. */
 const BANNED = [
-  /\b(as an )?(ai|a\.i\.|artificial intelligence|language model|chatbot|bot|automated|assistant)\b/i,
+  /\b(as an ai|as an a\.i\.|artificial intelligence|language model|large language)\b/i, // honesty answers ("Ken's team's assistant") are allowed
+  /\b(great question|i hope this helps|feel free to|don'?t hesitate)\b/i,
+  /[—–;]/, // em/en dashes and semicolons read robotic in texts
   /\bguarantee(d)?\b/i,
   /\b(green card|citizen(ship)?|immigration|visa status|undocumented)\b/i,
   /\b(leverage|synergy|opportunity awaits|exciting opportunity)\b/i,

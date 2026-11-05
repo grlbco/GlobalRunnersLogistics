@@ -6,25 +6,29 @@ import { getAssistantSettings } from "@/lib/crm/settings";
 import { notifyTeam } from "@/lib/crm/notify";
 import { localTime } from "@/lib/crm/timezones";
 import { company } from "@/content/facts";
-import { chatJson, type ChatMsg } from "@/lib/integrations/deepseek";
+import { chatJson, chatText, extractJson, type ChatMsg } from "@/lib/integrations/deepseek";
 import { checkReply } from "./checks";
-import { STAGES_AGENT_MAY_SET, systemPrompt, userPrompt, type Turn } from "./prompt";
+import { STAGES_AGENT_MAY_SET, buildMessages, type Turn } from "./prompt";
 
+const str = z.preprocess((v) => (v === undefined || v === null ? null : String(v)), z.string().nullable());
 const Decision = z.object({
-  intent: z.string().default("other"),
-  reply: z.string().nullable().optional(),
-  subject: z.string().nullable().optional(),
+  intent: z.preprocess((v) => (typeof v === "string" ? v : "other"), z.string()),
+  replies: z.preprocess((v) => (Array.isArray(v) ? v.filter((x) => typeof x === "string" && x.trim()) : typeof v === "string" && v.trim() ? [v] : []), z.array(z.string())).default([]),
+  reply: str.optional(),
+  subject: str.optional(),
   stage: z.enum(STAGES_AGENT_MAY_SET).nullable().optional().catch(null),
-  facts: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional().catch({}),
-  summary: z.string().nullable().optional(),
-  next_step: z.string().nullable().optional(),
-  followup_hours: z.number().min(1).max(720).nullable().optional().catch(null),
-  handoff: z.string().nullable().optional(),
-  mood: z.string().nullable().optional(),
+  facts: z.preprocess((v) => (v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).filter(([, x]) => ["string", "number", "boolean"].includes(typeof x))) : {}), z.record(z.string(), z.union([z.string(), z.number(), z.boolean()]))).default({}),
+  summary: str.optional(),
+  next_step: str.optional(),
+  followup_hours: z.preprocess((v) => (typeof v === "number" ? v : v == null ? null : Number(v) || null), z.number().min(1).max(720).nullable()).optional().catch(null),
+  handoff: str.optional(),
+  mood: str.optional(),
 });
 export type Decision = z.infer<typeof Decision>;
 
 const FOLLOWUP_LADDER_H = [20, 48, 96, 168, 336];
+/** Last-mile cleanup so texts read human: no em/en dashes, no semicolons, no wrapping quotes. */
+const clean = (t: string) => t.trim().replace(/\s*[—–]\s*/g, ", ").replace(/;\s*/g, ". ").replace(/^["“]|["”]$/g, "").replace(/,\s*,/g, ",").trim();
 const siteUrl = () => process.env.NEXT_PUBLIC_SITE_URL || company.url;
 
 export async function formLinkFor(contactId: string) {
@@ -34,7 +38,7 @@ export async function formLinkFor(contactId: string) {
   return { url: `${siteUrl()}/apply/driver?t=${row.token}`, token: row.token as string, form: { sent: !!row.sent_at, opened: !!row.opened_at, step: row.step_reached ?? 0, completed: !!row.completed_at } };
 }
 
-type RunInput = { contactId: string; trigger: "text_received" | "email_received" | "followup" | "form_abandoned" | "manual" | "test"; inputMessageId?: string | null; followupAttempt?: number; runId?: string; dryRunMessage?: { channel: "email" | "sms"; body: string } };
+type RunInput = { simTurns?: Turn[]; contactId: string; trigger: "text_received" | "email_received" | "followup" | "form_abandoned" | "manual" | "test"; inputMessageId?: string | null; followupAttempt?: number; runId?: string; dryRunMessage?: { channel: "email" | "sms"; body: string } };
 export type RunResult = { action: string; reply?: string | null; channel?: "email" | "sms"; decision?: Decision; problems?: string[]; reason?: string; costUsd?: number };
 
 /** One assistant decision for one driver. Never throws: failures hand the driver to a person. */
@@ -66,7 +70,7 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
       db.from("agent_memory").select("facts, summary, next_step").eq("contact_id", c.id).maybeSingle(),
       formLinkFor(c.id),
     ]);
-    const turns: Turn[] = (msgs ?? []).reverse().map((m) => ({ at: m.created_at, direction: m.direction, channel: m.channel, author: m.author, body: m.body }));
+    const turns: Turn[] = input.simTurns ?? (msgs ?? []).reverse().map((m) => ({ at: m.created_at, direction: m.direction, channel: m.channel, author: m.author, body: m.body }));
     if (input.dryRunMessage) turns.push({ at: new Date().toISOString(), direction: "inbound", channel: input.dryRunMessage.channel, author: "lead", body: input.dryRunMessage.body });
     if (link.form.completed && input.trigger !== "test" && input.trigger !== "text_received" && input.trigger !== "email_received")
       return (await log({ action: "ignored", decision: { reason: "form already completed" } }), { action: "ignored", reason: "Form already completed" });
@@ -82,37 +86,51 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
     const name = [c.first_name, c.last_name].filter(Boolean).join(" ") || "the driver";
     const base = { name, city: c.city, state: c.state, localTime: localTime(c.timezone), stage: c.stage, channel, smsConsent: c.sms_consent, formUrl: link.url, form: link.form, memory: { facts: (mem?.facts as Record<string, unknown>) ?? {}, summary: mem?.summary, next_step: mem?.next_step }, turns, trigger: promptTrigger, followupAttempt: input.followupAttempt };
 
-    // Decide (one retry with the checker's feedback)
-    const messages: ChatMsg[] = [{ role: "system", content: systemPrompt() }, { role: "user", content: userPrompt(base) }];
+    // Decide: JSON first (2 tries with the checker's feedback), then a plain-text fallback so a driver is never left hanging.
+    const messages: ChatMsg[] = buildMessages(base);
     let decision: Decision | null = null;
     let problems: string[] = [];
+    let raw = "";
     let costUsd = 0, tokensIn = 0, tokensOut = 0, latency = 0, model = "";
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const r = await chatJson(messages);
+    const track = (r: { costUsd: number; tokensIn: number; tokensOut: number; latencyMs: number; model: string }) => {
       costUsd += r.costUsd; tokensIn += r.tokensIn; tokensOut += r.tokensOut; latency += r.latencyMs; model = r.model;
+    };
+    const partsOf = (d: Decision) => (d.replies.length ? d.replies : d.reply ? [d.reply] : []).map(clean).filter(Boolean).slice(0, channel === "sms" ? 3 : 1);
+    for (let attempt = 0; attempt < 2 && !decision; attempt++) {
+      const r = await chatJson(messages, { temperature: attempt ? 0.5 : 0.8 });
+      track(r);
+      raw = r.content;
       let parsed: Decision;
       try {
-        parsed = Decision.parse(JSON.parse(r.content));
+        parsed = Decision.parse(extractJson(r.content));
       } catch {
-        problems = ["model returned invalid JSON"];
-        messages.push({ role: "assistant", content: r.content }, { role: "user", content: "That was not valid JSON in the required shape. Return only the JSON object." });
+        problems = [`invalid JSON (finish: ${r.finish ?? "?"})`];
+        messages.push({ role: "assistant", content: r.content.slice(0, 2000) }, { role: "user", content: "[INSTRUCTION] That wasn't valid JSON. Return ONLY the JSON object, nothing else." });
         continue;
       }
-      decision = parsed;
-      if (!parsed.reply || parsed.handoff) { problems = []; break; }
-      const check = checkReply(parsed.reply, { channel, formUrl: link.url });
-      problems = check.problems;
-      if (check.ok) break;
-      messages.push({ role: "assistant", content: r.content }, { role: "user", content: `Your reply broke these rules: ${check.problems.join("; ")}. Rewrite it to follow every rule. Return the full JSON again.` });
-      decision = null;
+      const parts = partsOf(parsed);
+      if (!parts.length || parsed.handoff) { decision = parsed; problems = []; break; }
+      const bad = parts.flatMap((t) => checkReply(t, { channel, formUrl: link.url }).problems);
+      if (!bad.length) { decision = { ...parsed, replies: parts }; problems = []; break; }
+      problems = bad;
+      messages.push({ role: "assistant", content: r.content.slice(0, 2000) }, { role: "user", content: `[INSTRUCTION] Your texts broke these rules: ${bad.join("; ")}. Rewrite them so every rule is followed. Return the full JSON again.` });
+    }
+    if (!decision) {
+      // Plain-text fallback: just the reply, no JSON.
+      const r = await chatText([...buildMessages(base).slice(0, -1), { role: "user", content: `[INSTRUCTION] Reply to their latest message on ${channel}. Write ONLY the message text${channel === "sms" ? " (1-2 short sentences, under 200 characters)" : ""}, nothing else. No em dashes.` }], { temperature: 0.6, maxTokens: 400 });
+      track(r);
+      const text = clean(r.content.replace(/^["']|["']$/g, ""));
+      const check = checkReply(text, { channel, formUrl: link.url });
+      if (text && check.ok) decision = { intent: "other", replies: [text], facts: {}, stage: null, followup_hours: null } as Decision;
+      else problems = [...problems, ...check.problems.map((x) => `fallback: ${x}`)];
     }
     const meta = { model, tokens_in: tokensIn, tokens_out: tokensOut, cost_usd: costUsd, latency_ms: latency };
 
-    if (dry) return decision ? { action: decision.handoff ? "handed_off" : decision.reply ? "would_reply" : "no_reply", reply: decision.reply, channel, decision, problems, costUsd } : { action: "failed", problems, costUsd };
+    if (dry) return decision ? { action: decision.handoff ? "handed_off" : decision.replies.length ? "would_reply" : "no_reply", reply: decision.replies.join("\n\n"), channel, decision, problems, costUsd } : { action: "failed", problems, costUsd };
 
     if (!decision) {
-      await handoff(c, `Reply failed checks: ${problems.join("; ")}`);
-      await log({ action: "handed_off", checks: { problems }, ...meta });
+      await handoff(c, `Couldn't write a safe reply: ${problems.join("; ")}`);
+      await log({ action: "handed_off", checks: { problems, raw: raw.slice(0, 1500) }, ...meta });
       return { action: "handed_off", problems, costUsd };
     }
 
@@ -140,17 +158,23 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
     }
 
     let action = "no_reply";
-    if (decision.reply) {
+    const parts = decision.replies;
+    if (parts.length) {
       const manual = input.trigger === "manual";
-      const delay = manual ? 5 : settings.delay_min_s + Math.random() * Math.max(0, settings.delay_max_s - settings.delay_min_s);
-      // newest reply wins: drop anything of ours still waiting for this driver
+      // Human timing: quick in a live back-and-forth, slower after a long silence; extra texts follow like someone typing.
+      const lastOut = [...turns].reverse().find((t) => t.direction === "outbound");
+      const live = !!lastOut && Date.now() - new Date(lastOut.at).getTime() < 20 * 60_000;
+      let at = Date.now() + 1000 * (manual ? 5 : live ? 20 + Math.random() * 40 + parts[0].length * 0.2 : settings.delay_min_s + Math.random() * Math.max(0, settings.delay_max_s - settings.delay_min_s));
       await db.from("outbox").update({ status: "cancelled", error: "replaced by a newer reply" }).eq("contact_id", c.id).eq("author", "agent").in("status", ["draft", "pending"]);
-      await db.from("outbox").insert({
-        contact_id: c.id, channel, author: "agent", subject: decision.subject ?? null, body: decision.reply.trim().replace(/\s*[—–]\s*/g, ", "),
-        status: settings.draft_mode ? "draft" : "pending", send_after: new Date(Date.now() + delay * 1000).toISOString(),
-        is_reply: input.trigger === "text_received" || input.trigger === "email_received" || manual,
-      });
-      if (decision.reply.includes(link.url) && !link.form.sent) {
+      const isReply = input.trigger === "text_received" || input.trigger === "email_received" || manual;
+      for (let i = 0; i < parts.length; i++) {
+        if (i > 0) at += 1000 * (8 + Math.random() * 12 + parts[i].length * 0.15);
+        await db.from("outbox").insert({
+          contact_id: c.id, channel, author: "agent", subject: i === 0 ? decision.subject ?? null : null, body: parts[i],
+          status: settings.draft_mode ? "draft" : "pending", send_after: new Date(at).toISOString(), is_reply: isReply,
+        });
+      }
+      if (parts.some((t) => t.includes(link.url)) && !link.form.sent) {
         await db.from("form_links").update({ sent_at: new Date().toISOString() }).eq("token", link.token);
         await moveStage(c as Contact, "form_sent", "agent");
       }
@@ -160,13 +184,14 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
     // Follow-up ladder: any run resets it.
     await db.from("followups").update({ status: "cancelled" }).eq("contact_id", c.id).eq("status", "pending");
     const attempt = input.trigger === "followup" ? (input.followupAttempt ?? 1) + 1 : 1; // manual/reply resets the ladder
-    if (!link.form.completed && attempt <= settings.max_followups) {
+    const done = ["not_interested", "not_fit", "stop", "wrong_person"].includes(decision.intent) || decision.stage === "not_interested" || decision.stage === "not_fit";
+    if (!done && !link.form.completed && attempt <= settings.max_followups) {
       const hours = decision.followup_hours ?? FOLLOWUP_LADDER_H[Math.min(attempt - 1, FOLLOWUP_LADDER_H.length - 1)];
       await db.from("followups").insert({ contact_id: c.id, due_at: new Date(Date.now() + hours * 3600_000).toISOString(), attempt, reason: `Follow-up #${attempt}`, channel });
     }
 
-    await log({ action, decision, reply: decision.reply ?? null, checks: { problems }, ...meta });
-    return { action, reply: decision.reply, channel, decision, costUsd };
+    await log({ action, decision, reply: parts.join("\n\n") || null, checks: { problems }, ...meta });
+    return { action, reply: parts.join("\n\n"), channel, decision, costUsd };
   } catch (e) {
     const reason = e instanceof Error ? e.message : String(e);
     await log({ action: "failed", decision: { error: reason.slice(0, 500) } }).catch(() => {});
@@ -190,6 +215,9 @@ export async function processAgentQueue(limit = 10) {
   // Collapse several new messages from one driver into one run (answer the latest).
   const seen = new Set<string>();
   for (const q of queued ?? []) {
+    // Wait until the driver has stopped typing (no new text for 25s), then answer everything at once.
+    const { data: lastIn } = await db.from("messages").select("created_at").eq("contact_id", q.contact_id).eq("direction", "inbound").order("created_at", { ascending: false }).limit(1).maybeSingle();
+    if (lastIn && Date.now() - new Date(lastIn.created_at).getTime() < 25_000) continue;
     if (seen.has(q.contact_id)) {
       await db.from("agent_runs").update({ action: "merged" }).eq("id", q.id);
       continue;
