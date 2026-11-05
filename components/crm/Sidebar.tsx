@@ -10,7 +10,7 @@ const NAV = [
   { href: "/crm/inbox", label: "Inbox", icon: "M4 4h16v12H5.2L4 17.2zM4 4l8 6 8-6" },
   { href: "/crm/pipeline", label: "Pipeline", icon: "M4 5h4v14H4zM10 5h4v9h-4zM16 5h4v5h-4z" },
   { href: "/crm/contacts", label: "Contacts", icon: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm-7 9a7 7 0 0 1 14 0" },
-  { href: "/crm/campaigns", label: "Campaigns", icon: "M3 11l18-8-8 18-2-8z", soon: true },
+  { href: "/crm/campaigns", label: "Campaigns", icon: "M3 11l18-8-8 18-2-8z" },
   { href: "/crm/automations", label: "Automations", icon: "M5 4v6h6M19 20v-6h-6M5 10a7 7 0 0 1 12-3M19 14a7 7 0 0 1-12 3" },
   { href: "/crm/assistant", label: "Assistant", icon: "M4 6h16v10H8l-4 4z" },
   { href: "/crm/settings", label: "Settings", icon: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19 12l2-1-2-4-2 1-2-2V4h-4v2L9 8 7 7l-2 4 2 1v0l-2 1 2 4 2-1 2 2v2h4v-2l2-2 2 1 2-4z", soon: true },

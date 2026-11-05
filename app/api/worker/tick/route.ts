@@ -4,6 +4,7 @@ import { processAgentQueue } from "@/lib/agent/engine";
 import { queueAbandonedNudges } from "@/lib/crm/forms";
 import { processWorkflows } from "@/lib/automations/engine";
 import { maybeSendDigest } from "@/lib/automations/digest";
+import { syncCampaignStats } from "@/lib/crm/campaigns";
 
 export const maxDuration = 60;
 
@@ -22,7 +23,8 @@ async function run(req: Request) {
   const agent = await processAgentQueue();
   const sent = await processDue();
   const digest = await maybeSendDigest().catch(() => false);
-  return Response.json({ ok: true, ms: Date.now() - started, sync, nudges, workflows, agent, sent, digest }, { headers: { "Cache-Control": "no-store" } });
+  const campaigns = await syncCampaignStats().catch(() => 0);
+  return Response.json({ ok: true, ms: Date.now() - started, sync, nudges, workflows, agent, sent, digest, campaigns }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export const GET = run;
