@@ -34,7 +34,7 @@ export async function formLinkFor(contactId: string) {
   return { url: `${siteUrl()}/apply/driver?t=${row.token}`, token: row.token as string, form: { sent: !!row.sent_at, opened: !!row.opened_at, step: row.step_reached ?? 0, completed: !!row.completed_at } };
 }
 
-type RunInput = { contactId: string; trigger: "text_received" | "email_received" | "followup" | "form_abandoned" | "test"; inputMessageId?: string | null; followupAttempt?: number; runId?: string; dryRunMessage?: { channel: "email" | "sms"; body: string } };
+type RunInput = { contactId: string; trigger: "text_received" | "email_received" | "followup" | "form_abandoned" | "manual" | "test"; inputMessageId?: string | null; followupAttempt?: number; runId?: string; dryRunMessage?: { channel: "email" | "sms"; body: string } };
 export type RunResult = { action: string; reply?: string | null; channel?: "email" | "sms"; decision?: Decision; problems?: string[]; reason?: string; costUsd?: number };
 
 /** One assistant decision for one driver. Never throws: failures hand the driver to a person. */
@@ -75,10 +75,12 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
     const lastInbound = [...turns].reverse().find((t) => t.direction === "inbound");
     let channel: "email" | "sms" = (lastInbound?.channel as "email" | "sms") ?? (c.sms_consent ? "sms" : "email");
     if (input.trigger === "followup" && c.sms_consent && (input.followupAttempt ?? 1) % 2 === 0) channel = "sms";
+    // "Reply now" from staff: answer the driver if they wrote last, otherwise a fresh nudge.
+    const promptTrigger = input.trigger === "manual" ? (turns.at(-1)?.direction === "inbound" ? "text_received" : "followup") : input.trigger === "test" ? "text_received" : input.trigger;
     if (channel === "sms" && !c.sms_consent) channel = "email";
 
     const name = [c.first_name, c.last_name].filter(Boolean).join(" ") || "the driver";
-    const base = { name, city: c.city, state: c.state, localTime: localTime(c.timezone), stage: c.stage, channel, smsConsent: c.sms_consent, formUrl: link.url, form: link.form, memory: { facts: (mem?.facts as Record<string, unknown>) ?? {}, summary: mem?.summary, next_step: mem?.next_step }, turns, trigger: input.trigger === "test" ? "text_received" : input.trigger, followupAttempt: input.followupAttempt };
+    const base = { name, city: c.city, state: c.state, localTime: localTime(c.timezone), stage: c.stage, channel, smsConsent: c.sms_consent, formUrl: link.url, form: link.form, memory: { facts: (mem?.facts as Record<string, unknown>) ?? {}, summary: mem?.summary, next_step: mem?.next_step }, turns, trigger: promptTrigger, followupAttempt: input.followupAttempt };
 
     // Decide (one retry with the checker's feedback)
     const messages: ChatMsg[] = [{ role: "system", content: systemPrompt() }, { role: "user", content: userPrompt(base) }];
@@ -139,11 +141,14 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
 
     let action = "no_reply";
     if (decision.reply) {
-      const delay = settings.delay_min_s + Math.random() * Math.max(0, settings.delay_max_s - settings.delay_min_s);
+      const manual = input.trigger === "manual";
+      const delay = manual ? 5 : settings.delay_min_s + Math.random() * Math.max(0, settings.delay_max_s - settings.delay_min_s);
+      // newest reply wins: drop anything of ours still waiting for this driver
+      await db.from("outbox").update({ status: "cancelled", error: "replaced by a newer reply" }).eq("contact_id", c.id).eq("author", "agent").in("status", ["draft", "pending"]);
       await db.from("outbox").insert({
-        contact_id: c.id, channel, author: "agent", subject: decision.subject ?? null, body: decision.reply.trim(),
+        contact_id: c.id, channel, author: "agent", subject: decision.subject ?? null, body: decision.reply.trim().replace(/\s*[—–]\s*/g, ", "),
         status: settings.draft_mode ? "draft" : "pending", send_after: new Date(Date.now() + delay * 1000).toISOString(),
-        is_reply: input.trigger === "text_received" || input.trigger === "email_received",
+        is_reply: input.trigger === "text_received" || input.trigger === "email_received" || manual,
       });
       if (decision.reply.includes(link.url) && !link.form.sent) {
         await db.from("form_links").update({ sent_at: new Date().toISOString() }).eq("token", link.token);
@@ -154,7 +159,7 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
 
     // Follow-up ladder: any run resets it.
     await db.from("followups").update({ status: "cancelled" }).eq("contact_id", c.id).eq("status", "pending");
-    const attempt = input.trigger === "followup" ? (input.followupAttempt ?? 1) + 1 : 1;
+    const attempt = input.trigger === "followup" ? (input.followupAttempt ?? 1) + 1 : 1; // manual/reply resets the ladder
     if (!link.form.completed && attempt <= settings.max_followups) {
       const hours = decision.followup_hours ?? FOLLOWUP_LADDER_H[Math.min(attempt - 1, FOLLOWUP_LADDER_H.length - 1)];
       await db.from("followups").insert({ contact_id: c.id, due_at: new Date(Date.now() + hours * 3600_000).toISOString(), attempt, reason: `Follow-up #${attempt}`, channel });

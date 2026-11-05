@@ -232,7 +232,7 @@ export async function askAssistant(formData: FormData) {
   await supabase.from("contacts").update({ agent_mode: "auto" }).eq("id", contactId);
   await supabase.from("agent_runs").insert({
     contact_id: contactId,
-    trigger: last?.direction === "inbound" ? (last.channel === "sms" ? "text_received" : "email_received") : "followup",
+    trigger: "manual",
     input_message_id: last?.id ?? null,
     action: "queued",
   });

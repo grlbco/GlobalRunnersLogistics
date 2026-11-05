@@ -59,7 +59,7 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
           <input type="hidden" name="id" value={c.id} />
           <Label>Stage</Label>
           <div className="flex gap-2">
-            <select name="stage" defaultValue={c.stage} className={inputCls}>
+            <select key={c.stage} name="stage" defaultValue={c.stage} className={inputCls}>
               {STAGES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
             </select>
             <button className={btnGhostCls}>Move</button>
