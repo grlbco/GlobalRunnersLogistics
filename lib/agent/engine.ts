@@ -126,6 +126,16 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
     ]);
     const turns: Turn[] = input.simTurns ?? (msgs ?? []).reverse().map((m) => ({ at: m.created_at, direction: m.direction, channel: m.channel, author: m.author, body: m.body }));
     if (input.dryRunMessage) turns.push({ at: new Date().toISOString(), direction: "inbound", channel: input.dryRunMessage.channel, author: "lead", body: input.dryRunMessage.body });
+    // A form submission is the driver's latest action: put it in the conversation so the reply is about it.
+    if (!input.simTurns) {
+      const { data: sub } = await db.from("crm_form_submissions").select("data, created_at, form:crm_forms(name, schema)").eq("contact_id", input.contactId).order("created_at", { ascending: false }).limit(1).maybeSingle();
+      if (sub && (input.trigger === "form_submitted" || Date.now() - new Date(sub.created_at).getTime() < 3 * 3600_000)) {
+        const f = sub.form as unknown as { name: string; schema: { pages: { fields: { id: string; label: string; type: string }[] }[] } } | null;
+        const qa = (f?.schema.pages ?? []).flatMap((p) => p.fields).filter((x) => x.type !== "statement" && x.type !== "consent").map((x) => { const v = (sub.data as Record<string, unknown>)[x.id]; return v == null || v === "" ? null : `${x.label} ${Array.isArray(v) ? v.join(", ") : String(v)}`; }).filter(Boolean).join("; ");
+        turns.push({ at: sub.created_at, direction: "inbound", channel: "sms", author: "lead", body: `[filled out the "${f?.name ?? "web"}" form: ${qa}]` });
+        turns.sort((x, y) => x.at.localeCompare(y.at));
+      }
+    }
     const startedAt = Date.now();
     const lastInboundTurn = [...turns].reverse().find((t) => t.direction === "inbound");
 
@@ -380,9 +390,18 @@ export async function processAgentQueue(limit = 10) {
   const db = adminDb();
   const out: { contactId: string; action: string }[] = [];
   const { data: queued } = await db.from("agent_runs").select("id, contact_id, trigger, input_message_id, decision").eq("action", "queued").order("created_at").limit(limit);
-  // Collapse several new messages from one driver into one run (answer the latest).
-  const seen = new Set<string>();
+  // Collapse several queued runs for one driver into one: the newest wins (it sees everything), form info is carried along.
+  const latest = new Map<string, NonNullable<typeof queued>[number]>();
+  const formInfo = new Map<string, { form: string; sendDriverForm?: boolean }>();
   for (const q of queued ?? []) {
+    if (q.trigger === "form_submitted") formInfo.set(q.contact_id, q.decision as { form: string; sendDriverForm?: boolean });
+    latest.set(q.contact_id, q);
+  }
+  for (const q of queued ?? []) {
+    if (latest.get(q.contact_id)?.id !== q.id) await db.from("agent_runs").update({ action: "merged" }).eq("id", q.id);
+  }
+  const seen = new Set<string>();
+  for (const q of latest.values()) {
     // Trailing-edge debounce: wait until the driver stops sending for 40s, then answer all their texts at once.
     const { data: lastIn } = await db.from("messages").select("created_at").eq("contact_id", q.contact_id).eq("direction", "inbound").order("created_at", { ascending: false }).limit(1).maybeSingle();
     if (lastIn && Date.now() - new Date(lastIn.created_at).getTime() < 40_000) continue;
@@ -392,7 +411,9 @@ export async function processAgentQueue(limit = 10) {
     }
     seen.add(q.contact_id);
     await db.from("agent_runs").update({ action: "running" }).eq("id", q.id);
-    const r = await runAgent({ contactId: q.contact_id, trigger: q.trigger as RunInput["trigger"], inputMessageId: q.input_message_id, runId: q.id, formSubmitted: q.trigger === "form_submitted" ? (q.decision as { form: string; sendDriverForm?: boolean }) : undefined });
+    const fi = formInfo.get(q.contact_id);
+    const trig = (fi && q.trigger !== "text_received" && q.trigger !== "email_received" ? "form_submitted" : q.trigger) as RunInput["trigger"];
+    const r = await runAgent({ contactId: q.contact_id, trigger: trig, inputMessageId: q.input_message_id, runId: q.id, formSubmitted: fi });
     out.push({ contactId: q.contact_id, action: r.action });
   }
   const { data: due } = await db.from("followups").select("id, contact_id, attempt, kind, channel").eq("status", "pending").lte("due_at", new Date().toISOString()).order("due_at").limit(limit);
