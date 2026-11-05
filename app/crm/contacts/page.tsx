@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { requireStaff } from "@/lib/crm/auth";
 import { STAGES, TIERS } from "@/lib/crm/stages";
 import { ago, fullName, n, phoneDisplay } from "@/lib/crm/format";
-import { PageHead, Skeleton, StageBadge, inputCls, btnCls } from "@/components/crm/ui";
+import { Avatar, btnCls, btnGhostCls, Empty, inputCls, PageHead, selectCls, Skeleton, StageBadge } from "@/components/crm/ui";
 
 export const metadata = { title: "Contacts" };
 const PAGE = 50;
@@ -48,12 +48,15 @@ async function Table({ searchParams }: { searchParams: SP }) {
   return (
     <div className="p-5 md:p-8">
       <form className="grid gap-3 md:grid-cols-[1fr_11rem_11rem_6rem_auto]" action="/crm/contacts">
-        <input name="q" defaultValue={sp.q} placeholder="Search name, company, email, USDOT, phone, city" className={inputCls} />
-        <select name="stage" defaultValue={sp.stage ?? ""} className={inputCls}>
+        <label className="relative">
+          <svg viewBox="0 0 24 24" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg>
+          <input name="q" defaultValue={sp.q} placeholder="Search name, company, email, USDOT, phone, city" className={`${inputCls} pl-9`} />
+        </label>
+        <select name="stage" defaultValue={sp.stage ?? ""} className={selectCls}>
           <option value="">All stages</option>
           {STAGES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
         </select>
-        <select name="tier" defaultValue={sp.tier ?? ""} className={inputCls}>
+        <select name="tier" defaultValue={sp.tier ?? ""} className={selectCls}>
           <option value="">All tiers</option>
           {Object.entries(TIERS).map(([t, l]) => <option key={t} value={t}>{t} · {l}</option>)}
         </select>
@@ -61,48 +64,53 @@ async function Table({ searchParams }: { searchParams: SP }) {
         <button className={btnCls}>Filter</button>
       </form>
 
-      <p className="mt-4 text-xs text-white/45">
-        {error ? <span className="text-red-300">{error.message}</span> : <>~{n(count)} contacts{q || sp.stage || sp.tier || sp.state ? " match" : ""} · page {page} of {n(pages)}</>}
+      <p className="mt-4 text-xs text-faint">
+        {error ? <span className="text-red-600">{error.message}</span> : <>~{n(count)} contacts{q || sp.stage || sp.tier || sp.state ? " match" : ""} · page {page} of {n(pages)}</>}
       </p>
 
-      <div className="mt-3 overflow-x-auto rounded-[6px] border border-white/[0.08]">
-        <table className="w-full min-w-[860px] text-left text-sm">
-          <thead className="bg-white/[0.03] font-mono text-[0.65rem] uppercase tracking-[0.12em] text-white/45">
+      <div className="mt-3 overflow-x-auto rounded-[10px] border border-line shadow-card">
+        <table className="w-full min-w-[860px] text-left text-[0.84rem]">
+          <thead className="border-b border-line bg-subtle text-[0.75rem] text-muted">
             <tr>
-              <th className="px-4 py-3 font-normal">Name</th>
-              <th className="px-4 py-3 font-normal">Company</th>
-              <th className="px-4 py-3 font-normal">Phone</th>
-              <th className="px-4 py-3 font-normal">Location</th>
-              <th className="px-4 py-3 font-normal">Tier</th>
-              <th className="px-4 py-3 font-normal">Stage</th>
-              <th className="px-4 py-3 text-right font-normal">Last reply</th>
+              <th className="px-4 py-3 font-medium">Name</th>
+              <th className="px-4 py-3 font-medium">Company</th>
+              <th className="px-4 py-3 font-medium">Phone</th>
+              <th className="px-4 py-3 font-medium">Location</th>
+              <th className="px-4 py-3 font-medium">Tier</th>
+              <th className="px-4 py-3 font-medium">Stage</th>
+              <th className="px-4 py-3 text-right font-medium">Last reply</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/[0.05]">
+          <tbody className="divide-y divide-line">
             {data?.map((c) => (
-              <tr key={c.id} className="transition-colors hover:bg-white/[0.03]">
+              <tr key={c.id} className="transition-colors hover:bg-subtle">
                 <td className="px-4 py-2.5">
-                  <Link href={`/crm/contacts/${c.id}`} className="font-medium hover:underline">{fullName(c)}</Link>
-                  <div className="truncate text-xs text-white/40">{c.email}</div>
+                  <Link href={`/crm/contacts/${c.id}`} className="flex items-center gap-3">
+                    <Avatar name={fullName(c)} className="h-7 w-7 text-[0.65rem]" />
+                    <span className="min-w-0">
+                      <span className="block font-medium text-fg hover:underline">{fullName(c)}</span>
+                      <span className="block truncate text-[0.75rem] text-faint">{c.email}</span>
+                    </span>
+                  </Link>
                 </td>
-                <td className="max-w-[16rem] truncate px-4 py-2.5 text-white/70">{c.company_name}</td>
-                <td className="px-4 py-2.5 tabular-nums text-white/70">{phoneDisplay(c.phone)}</td>
-                <td className="px-4 py-2.5 text-white/70">{[c.city, c.state].filter(Boolean).join(", ")}</td>
-                <td className="px-4 py-2.5 font-mono text-white/60">{c.tier ?? "—"}</td>
+                <td className="max-w-[16rem] truncate px-4 py-2.5 text-muted">{c.company_name}</td>
+                <td className="px-4 py-2.5 tabular-nums text-muted">{phoneDisplay(c.phone)}</td>
+                <td className="px-4 py-2.5 text-muted">{[c.city, c.state].filter(Boolean).join(", ")}</td>
+                <td className="px-4 py-2.5">{c.tier ? <span className="rounded-[5px] border border-line px-1.5 py-px font-mono text-[0.7rem] text-muted">T{c.tier}</span> : <span className="text-ghost">—</span>}</td>
                 <td className="px-4 py-2.5"><StageBadge stage={c.stage} /></td>
-                <td className="px-4 py-2.5 text-right text-white/45">{ago(c.last_inbound_at)}</td>
+                <td className="px-4 py-2.5 text-right text-faint">{ago(c.last_inbound_at)}</td>
               </tr>
             ))}
             {!data?.length && (
-              <tr><td colSpan={7} className="px-4 py-16 text-center text-white/45">No contacts found.</td></tr>
+              <tr><td colSpan={7} className="p-4"><Empty title="No contacts found">Try a different search or clear the filters.</Empty></td></tr>
             )}
           </tbody>
         </table>
       </div>
 
       <div className="mt-4 flex justify-between text-sm">
-        {page > 1 ? <Link href={qs({ page: String(page - 1) })} className="text-white/60 hover:text-white">← Previous</Link> : <span />}
-        {page < pages && <Link href={qs({ page: String(page + 1) })} className="text-white/60 hover:text-white">Next →</Link>}
+        {page > 1 ? <Link href={qs({ page: String(page - 1) })} className={btnGhostCls}>← Previous</Link> : <span />}
+        {page < pages && <Link href={qs({ page: String(page + 1) })} className={btnGhostCls}>Next →</Link>}
       </div>
     </div>
   );

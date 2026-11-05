@@ -48,13 +48,13 @@ async function Body({ params }: { params: Promise<{ id: string }> }) {
   return (
     <div className="space-y-6 p-5 md:p-8">
       <div>
-        <Link href="/crm/campaigns" className="text-xs text-white/45 hover:text-white">← Campaigns</Link>
+        <Link href="/crm/campaigns" className="inline-flex items-center gap-1 text-[0.78rem] text-muted transition-colors hover:text-fg">← Campaigns</Link>
         <div className="mt-2 flex flex-wrap items-center gap-3">
-          <h1 className="text-[1.6rem] font-semibold tracking-[-0.03em]">{c.name}</h1>
-          <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-xs capitalize text-white/70">{c.status}</span>
-          {c.stats_synced_at && <span className="text-xs text-white/40">stats {ago(c.stats_synced_at)} ago</span>}
+          <h1 className="text-[1.375rem] font-semibold tracking-[-0.025em]">{c.name}</h1>
+          <span className="rounded-full bg-hover px-2 py-0.5 text-xs capitalize text-muted">{c.status}</span>
+          {c.stats_synced_at && <span className="text-xs text-faint">stats {ago(c.stats_synced_at)} ago</span>}
         </div>
-        {c.error && <p className="mt-2 text-sm text-red-300">{c.error}</p>}
+        {c.error && <p className="mt-2 text-sm text-red-600">{c.error}</p>}
       </div>
 
       {c.instantly_id && (
@@ -71,8 +71,8 @@ async function Body({ params }: { params: Promise<{ id: string }> }) {
         <Card className="p-5">
           <Label>A/B/C results</Label>
           <table className="mt-3 w-full text-left text-sm">
-            <thead className="font-mono text-[0.62rem] uppercase tracking-[0.12em] text-white/40"><tr><th className="py-2 font-normal">Email</th><th className="font-normal">Version</th><th className="font-normal">Sent</th><th className="font-normal">Open rate</th><th className="font-normal">Reply rate</th></tr></thead>
-            <tbody className="divide-y divide-white/[0.06]">
+            <thead className="text-[0.75rem] text-muted"><tr><th className="py-2 font-medium">Email</th><th className="font-medium">Version</th><th className="font-medium">Sent</th><th className="font-medium">Open rate</th><th className="font-medium">Reply rate</th></tr></thead>
+            <tbody className="divide-y divide-line">
               {(() => {
                 const rows = (stats.steps ?? []).map((r) => ({ step: Number(r.step ?? 0), variant: Number(r.variant ?? 0), sent: r.sent ?? 0, open: r.unique_opened ?? r.opened ?? 0, reply: r.unique_replies ?? r.replies ?? 0 }));
                 const best = new Map<number, number>();
@@ -80,7 +80,7 @@ async function Body({ params }: { params: Promise<{ id: string }> }) {
                 return rows.sort((a, b) => a.step - b.step || a.variant - b.variant).map((r, i) => {
                   const lead = r.sent >= 100 && best.get(r.step) === r.reply / r.sent && rows.filter((x) => x.step === r.step).length > 1;
                   return (
-                    <tr key={i} className={clsx(lead && "text-emerald-300")}>
+                    <tr key={i} className={clsx(lead && "text-emerald-700")}>
                       <td className="py-2">{r.step + 1}</td>
                       <td>{"ABCDE"[r.variant] ?? r.variant}{lead ? " · leading" : ""}</td>
                       <td className="tabular-nums">{n(r.sent)}</td>
@@ -92,7 +92,7 @@ async function Body({ params }: { params: Promise<{ id: string }> }) {
               })()}
             </tbody>
           </table>
-          <p className="mt-3 text-xs text-white/40">A version is marked leading once it has 100+ sends. Pause the loser in Instantly and add a new challenger.</p>
+          <p className="mt-3 text-xs text-faint">A version is marked leading once it has 100+ sends. Pause the loser in Instantly and add a new challenger.</p>
         </Card>
       )}
 

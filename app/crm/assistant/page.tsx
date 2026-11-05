@@ -4,7 +4,8 @@ import { getAssistantSettings } from "@/lib/crm/settings";
 import { OFFER_FACTS } from "@/lib/agent/knowledge";
 import { saveAssistantSettings, setAssistantEnabled } from "@/app/crm/actions";
 import { clsx } from "clsx";
-import { Card, Label, PageHead, Skeleton, btnCls, inputCls } from "@/components/crm/ui";
+import { LiveDot } from "@/components/crm/motion";
+import { btnAccentCls, btnCls, btnGhostCls, Card, inputCls, Label, PageHead, Skeleton } from "@/components/crm/ui";
 import { AssistantTest } from "@/components/crm/AssistantTest";
 import { ago, n } from "@/lib/crm/format";
 
@@ -39,17 +40,17 @@ async function Body() {
 
   return (
     <div className="grid gap-6 p-5 md:p-8 xl:grid-cols-[24rem_1fr]">
-      <form action={setAssistantEnabled} className={clsx("flex flex-wrap items-center justify-between gap-4 rounded-[8px] border p-5 xl:col-span-2", s.enabled ? "border-emerald-400/30 bg-emerald-400/[0.06]" : "border-signal/40 bg-signal/[0.07]")}>
+      <form action={setAssistantEnabled} className={clsx("flex flex-wrap items-center justify-between gap-4 rounded-[12px] border p-5 shadow-card xl:col-span-2", s.enabled ? "border-emerald-200 bg-emerald-50/70" : "border-amber-200 bg-amber-50/70")}>
         <input type="hidden" name="on" value={s.enabled ? "0" : "1"} />
         <div>
-          <p className="text-lg font-semibold tracking-[-0.02em]">{s.enabled ? "Assistant is ON" : "Assistant is OFF"}</p>
-          <p className="mt-1 text-sm text-white/60">
+          <p className="flex items-center gap-2.5 text-[1.05rem] font-semibold tracking-[-0.02em]"><LiveDot on={s.enabled} />{s.enabled ? "Assistant is on" : "Assistant is off"}</p>
+          <p className="mt-1 text-sm text-muted">
             {s.enabled
               ? s.draft_mode ? "It writes replies as drafts; you approve each one." : "It replies 24/7 within minutes. Follow-up texts it starts itself go out 8am–9pm driver time."
               : "Nobody gets automatic replies. Turning it on also answers drivers waiting from the last 48 hours."}
           </p>
         </div>
-        {admin && <button className={clsx("h-12 rounded-[4px] px-6 text-sm font-semibold", s.enabled ? "border border-white/25 text-white hover:border-white" : "bg-signal text-white hover:bg-signal-ink")}>{s.enabled ? "Turn off" : "Turn on"}</button>}
+        {admin && <button className={s.enabled ? btnGhostCls : btnAccentCls}>{s.enabled ? "Turn off" : "Turn on"}</button>}
       </form>
       <div className="space-y-6">
         <Card className="p-5">
@@ -57,25 +58,25 @@ async function Body() {
           <form action={saveAssistantSettings} className="mt-4 space-y-4 text-sm">
             <input type="hidden" name="enabled" value={s.enabled ? "on" : ""} />
             <label className="flex items-center justify-between gap-3">
-              <span>Draft mode<span className="block text-xs text-white/45">You approve every message before it sends{s.draft_mode && s.auto_after ? ` · ${Math.min(approved, s.auto_after)} of ${s.auto_after} approved${edits ? ` (${edits} edited)` : ""}, then it switches to automatic by itself if under 20% needed edits` : ""}</span></span>
+              <span>Draft mode<span className="block text-xs text-faint">You approve every message before it sends{s.draft_mode && s.auto_after ? ` · ${Math.min(approved, s.auto_after)} of ${s.auto_after} approved${edits ? ` (${edits} edited)` : ""}, then it switches to automatic by itself if under 20% needed edits` : ""}</span></span>
               <input type="checkbox" name="draft_mode" defaultChecked={s.draft_mode} disabled={!admin} className="h-5 w-5 accent-[#e8401c]" />
             </label>
             <div className="grid grid-cols-2 gap-3">
-              <label className="space-y-1"><span className="text-xs text-white/50">Reply delay from (min)</span><input name="delay_min_m" type="number" defaultValue={Math.round(s.delay_min_s / 60)} className={inputCls} disabled={!admin} /></label>
-              <label className="space-y-1"><span className="text-xs text-white/50">to (min)</span><input name="delay_max_m" type="number" defaultValue={Math.round(s.delay_max_s / 60)} className={inputCls} disabled={!admin} /></label>
-              <label className="space-y-1"><span className="text-xs text-white/50">Max messages / driver / day</span><input name="max_per_day" type="number" defaultValue={s.max_per_day} className={inputCls} disabled={!admin} /></label>
-              <label className="space-y-1"><span className="text-xs text-white/50">Max follow-ups</span><input name="max_followups" type="number" defaultValue={s.max_followups} className={inputCls} disabled={!admin} /></label>
+              <label className="space-y-1"><span className="text-xs text-faint">Reply delay from (min)</span><input name="delay_min_m" type="number" defaultValue={Math.round(s.delay_min_s / 60)} className={inputCls} disabled={!admin} /></label>
+              <label className="space-y-1"><span className="text-xs text-faint">to (min)</span><input name="delay_max_m" type="number" defaultValue={Math.round(s.delay_max_s / 60)} className={inputCls} disabled={!admin} /></label>
+              <label className="space-y-1"><span className="text-xs text-faint">Max messages / driver / day</span><input name="max_per_day" type="number" defaultValue={s.max_per_day} className={inputCls} disabled={!admin} /></label>
+              <label className="space-y-1"><span className="text-xs text-faint">Max follow-ups</span><input name="max_followups" type="number" defaultValue={s.max_followups} className={inputCls} disabled={!admin} /></label>
             </div>
-            <p className="text-xs text-white/40">Replies to drivers go out 24/7. Follow-up texts the assistant or an automation starts wait for 8am–9pm in the driver&apos;s time zone (federal + state quiet-hour laws). Email has no time limit. STOP and opt-outs are handled in code first.</p>
+            <p className="text-xs text-faint">Replies to drivers go out 24/7. Follow-up texts the assistant or an automation starts wait for 8am–9pm in the driver&apos;s time zone (federal + state quiet-hour laws). Email has no time limit. STOP and opt-outs are handled in code first.</p>
             {admin && <button className={btnCls}>Save</button>}
           </form>
         </Card>
         <Card className="p-5">
           <Label>Today</Label>
           <div className="mt-3 grid grid-cols-3 gap-3 text-center">
-            <div><p className="text-2xl font-semibold tabular-nums">{n(replied)}</p><p className="text-xs text-white/45">replies</p></div>
-            <div><p className="text-2xl font-semibold tabular-nums">{n(handed)}</p><p className="text-xs text-white/45">to a person</p></div>
-            <div><p className="text-2xl font-semibold tabular-nums">${spent.toFixed(2)}</p><p className="text-xs text-white/45">DeepSeek</p></div>
+            <div><p className="text-2xl font-semibold tabular-nums">{n(replied)}</p><p className="text-xs text-faint">replies</p></div>
+            <div><p className="text-2xl font-semibold tabular-nums">{n(handed)}</p><p className="text-xs text-faint">to a person</p></div>
+            <div><p className="text-2xl font-semibold tabular-nums">${spent.toFixed(2)}</p><p className="text-xs text-faint">spent</p></div>
           </div>
         </Card>
       </div>
@@ -83,28 +84,28 @@ async function Body() {
       <div className="space-y-6">
         <Card className="p-5">
           <Label>Test it</Label>
-          <p className="mt-1 text-xs text-white/45">Write as a driver. Uses your test contact&apos;s history and memory. Nothing is saved or sent.</p>
+          <p className="mt-1 text-xs text-faint">Write as a driver. Uses your test contact&apos;s history and memory. Nothing is saved or sent.</p>
           <div className="mt-4"><AssistantTest /></div>
         </Card>
         <Card className="p-5">
           <Label>Recent decisions</Label>
           {runs?.length ? (
-            <ul className="mt-3 divide-y divide-white/[0.06] text-sm">
+            <ul className="mt-3 divide-y divide-line text-sm">
               {runs.map((r, i) => {
                 const c = r.contact as unknown as { id: string; first_name: string | null; last_name: string | null } | null;
                 return (
                   <li key={i} className="py-2.5">
-                    <div className="flex justify-between gap-3 text-xs"><a href={c ? `/crm/contacts/${c.id}` : "#"} className="text-white/70 hover:text-white">{c ? [c.first_name, c.last_name].filter(Boolean).join(" ") : "—"} · {r.trigger.replace(/_/g, " ")} → {r.action}{(r.decision as { reason?: string } | null)?.reason ? ` (${(r.decision as { reason?: string }).reason})` : ""}</a><span className="text-white/40">{ago(r.created_at)}</span></div>
-                    {r.reply && <p className="mt-1 line-clamp-2 text-white/60">{r.reply}</p>}
+                    <div className="flex justify-between gap-3 text-xs"><a href={c ? `/crm/contacts/${c.id}` : "#"} className="text-muted hover:text-fg">{c ? [c.first_name, c.last_name].filter(Boolean).join(" ") : "—"} · {r.trigger.replace(/_/g, " ")} → {r.action}{(r.decision as { reason?: string } | null)?.reason ? ` (${(r.decision as { reason?: string }).reason})` : ""}</a><span className="text-faint">{ago(r.created_at)}</span></div>
+                    {r.reply && <p className="mt-1 line-clamp-2 text-muted">{r.reply}</p>}
                   </li>
                 );
               })}
             </ul>
-          ) : <p className="mt-3 text-sm text-white/45">No decisions yet.</p>}
+          ) : <p className="mt-3 text-sm text-faint">No decisions yet.</p>}
         </Card>
         <Card className="p-5">
           <Label>What it knows (the only facts it may use)</Label>
-          <pre className="mt-3 whitespace-pre-wrap text-xs leading-relaxed text-white/60">{OFFER_FACTS}</pre>
+          <pre className="mt-3 whitespace-pre-wrap text-xs leading-relaxed text-muted">{OFFER_FACTS}</pre>
         </Card>
       </div>
     </div>

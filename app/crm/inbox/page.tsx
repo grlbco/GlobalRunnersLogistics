@@ -5,7 +5,7 @@ import { requireStaff } from "@/lib/crm/auth";
 import { isSendingOn } from "@/lib/crm/sending";
 import { ago, fullName, phoneDisplay } from "@/lib/crm/format";
 import { localTime } from "@/lib/crm/timezones";
-import { Skeleton, StageBadge } from "@/components/crm/ui";
+import { Avatar, Badge, Empty, Skeleton, StageBadge } from "@/components/crm/ui";
 import { Composer } from "@/components/crm/Composer";
 import { Drafts } from "@/components/crm/Drafts";
 import { Timeline, loadTimeline } from "@/components/crm/Timeline";
@@ -69,49 +69,55 @@ async function Inbox({ searchParams }: { searchParams: SP }) {
   };
 
   return (
-    <div className="grid h-dvh grid-rows-[auto_1fr] md:grid-cols-[22rem_1fr] md:grid-rows-1">
+    <div className="grid h-[calc(100dvh-5rem)] grid-rows-[auto_1fr] md:h-[calc(100dvh-1rem-2px)] md:grid-cols-[22rem_1fr] md:grid-rows-1">
       {/* List */}
-      <section className={clsx("flex min-h-0 flex-col border-r border-white/[0.07]", sp.c && "hidden md:flex")}>
-        <header className="border-b border-white/[0.07] px-4 pb-3 pt-5">
-          <h1 className="text-[1.35rem] font-semibold tracking-[-0.03em]">Inbox</h1>
-          <nav className="mt-3 flex flex-wrap gap-1.5">
+      <section className={clsx("flex min-h-0 flex-col border-r border-line", sp.c && "hidden md:flex")}>
+        <header className="border-b border-line px-4 pb-3 pt-5">
+          <div className="flex items-baseline justify-between">
+            <h1 className="text-[1.375rem] font-semibold tracking-[-0.025em]">Inbox</h1>
+            {unreadSet.size > 0 && <span className="text-[0.75rem] font-medium text-signal-ink">{unreadSet.size} unread</span>}
+          </div>
+          <nav className="mt-3 flex flex-wrap gap-0.5 rounded-[8px] border border-line bg-subtle p-0.5">
             {FILTERS.map((x) => (
-              <Link key={x.key} href={href({ f: x.key })} className={clsx("rounded-full px-2.5 py-1 text-xs", f === x.key ? "bg-white text-ink" : "bg-white/[0.05] text-white/60 hover:text-white")}>
-                {x.label}{x.key === "unread" && unreadSet.size ? ` · ${unreadSet.size}` : ""}
+              <Link key={x.key} href={href({ f: x.key })} className={clsx("flex-1 rounded-[6px] px-2 py-1 text-center text-[0.75rem] font-medium transition-all", f === x.key ? "bg-surface text-fg shadow-card" : "text-muted hover:text-fg")}>
+                {x.label}
               </Link>
             ))}
           </nav>
         </header>
-        <ul className="min-h-0 flex-1 divide-y divide-white/[0.05] overflow-y-auto">
+        <ul className="min-h-0 flex-1 space-y-px overflow-y-auto p-2">
           {threads.map((m) => {
             const c = m.contact as unknown as Contact;
             const unread = unreadSet.has(c.id);
             return (
               <li key={m.id}>
-                <Link href={href({ c: c.id })} className={clsx("block px-4 py-3 transition-colors", c.id === selectedId ? "bg-white/[0.06]" : "hover:bg-white/[0.03]")}>
-                  <div className="flex items-center justify-between gap-2">
-                    <p className={clsx("truncate text-sm", unread ? "font-semibold text-white" : "text-white/85")}>
-                      {unread && <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-signal align-middle" />}
-                      {fullName(c)}
-                    </p>
-                    <span className="shrink-0 text-[0.7rem] text-white/40">{ago(m.created_at)}</span>
-                  </div>
-                  <p className="mt-0.5 line-clamp-2 text-[0.8rem] text-white/50">
-                    <span className="mr-1.5 font-mono text-[0.6rem] uppercase text-white/35">{m.channel === "sms" ? "text" : "email"}</span>
-                    {m.direction === "outbound" && "You: "}{m.body}
-                  </p>
+                <Link href={href({ c: c.id })} className={clsx("flex gap-3 rounded-[9px] px-3 py-2.5 transition-colors", c.id === selectedId ? "bg-hover" : "hover:bg-subtle")}>
+                  <span className="relative">
+                    <Avatar name={fullName(c)} />
+                    {unread && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface bg-signal" />}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center justify-between gap-2">
+                      <span className={clsx("truncate text-[0.84rem]", unread ? "font-semibold text-fg" : "font-medium text-fg-2")}>{fullName(c)}</span>
+                      <span className="shrink-0 text-[0.7rem] text-faint">{ago(m.created_at)}</span>
+                    </span>
+                    <span className="mt-0.5 line-clamp-2 text-[0.78rem] leading-snug text-muted">
+                      <span className="mr-1.5 rounded-[4px] bg-hover px-1 py-px font-mono text-[0.58rem] uppercase text-faint">{m.channel === "sms" ? "text" : "email"}</span>
+                      {m.direction === "outbound" && <span className="text-faint">You: </span>}{m.body}
+                    </span>
+                  </span>
                 </Link>
               </li>
             );
           })}
-          {!threads.length && <li className="px-4 py-16 text-center text-sm text-white/45">Nothing here.</li>}
+          {!threads.length && <li className="p-2"><Empty title="Nothing here">Replies from drivers land here, email and text together.</Empty></li>}
         </ul>
       </section>
 
       {/* Thread */}
       <section className={clsx("min-h-0 flex-col", sp.c ? "flex" : "hidden md:flex")}>
         {selected ? <Thread contact={selected} unread={unreadSet.has(selected.id)} back={href({ c: "" }).replace(/[?&]c=$/, "")} /> : (
-          <div className="grid flex-1 place-items-center text-sm text-white/45">Select a conversation</div>
+          <div className="grid flex-1 place-items-center bg-subtle/60 text-sm text-faint">Select a conversation</div>
         )}
       </section>
     </div>
@@ -125,19 +131,22 @@ async function Thread({ contact: c, unread, back }: { contact: Contact; unread: 
   return (
     <>
       <MarkRead contactId={c.id} unread={unread} />
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.07] px-5 py-4">
-        <div className="min-w-0">
-          <Link href={back || "/crm/inbox"} className="mb-1 block text-xs text-white/45 md:hidden">← Inbox</Link>
-          <Link href={`/crm/contacts/${c.id}`} className="text-base font-semibold hover:underline">{fullName(c)}</Link>
-          <p className="truncate text-xs text-white/45">{[c.company_name, phoneDisplay(c.cell_phone ?? c.phone), localTime(c.timezone) && `${localTime(c.timezone)} local`].filter(Boolean).join(" · ")}</p>
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <Link href={back || "/crm/inbox"} className="text-sm text-faint md:hidden">←</Link>
+          <Avatar name={fullName(c)} className="h-9 w-9" />
+          <div className="min-w-0">
+            <Link href={`/crm/contacts/${c.id}`} className="text-[0.95rem] font-semibold tracking-[-0.01em] hover:underline">{fullName(c)}</Link>
+            <p className="truncate text-[0.75rem] text-faint">{[c.company_name, phoneDisplay(c.cell_phone ?? c.phone), localTime(c.timezone) && `${localTime(c.timezone)} local`].filter(Boolean).join(" · ")}</p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <StageBadge stage={c.stage} />
-          <span className="text-xs text-white/40">{c.agent_mode === "auto" ? "Auto" : "Manual"}</span>
+          <Badge tone={c.agent_mode === "auto" ? "info" : "warn"} dot>{c.agent_mode === "auto" ? "Assistant on" : "Manual"}</Badge>
         </div>
       </header>
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6"><Timeline items={items} oldestFirst /></div>
-      <div className="space-y-3 border-t border-white/[0.07] p-4">
+      <div className="min-h-0 flex-1 overflow-y-auto bg-subtle/50 px-5 py-6"><Timeline items={items} oldestFirst /></div>
+      <div className="space-y-3 border-t border-line bg-surface p-4">
         <Drafts supabase={supabase} contactId={c.id} />
         <Composer
           contactId={c.id}

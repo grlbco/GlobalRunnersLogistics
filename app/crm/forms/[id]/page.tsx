@@ -30,10 +30,10 @@ async function Body({ params, searchParams }: { params: Promise<{ id: string }>;
   if (!form) notFound();
   return (
     <div className="p-5 md:p-8">
-      <Link href="/crm/forms" className="text-xs text-white/45 hover:text-white">← Forms</Link>
-      <div className="mt-4 mb-5 flex gap-1 border-b border-white/[0.07]">
+      <Link href="/crm/forms" className="inline-flex items-center gap-1 text-[0.78rem] text-muted transition-colors hover:text-fg">← Forms</Link>
+      <div className="mt-4 mb-5 flex gap-1 border-b border-line">
         {[["build", "Build"], ["submissions", `Submissions (${count ?? 0})`]].map(([k, l]) => (
-          <Link key={k} href={`/crm/forms/${id}?tab=${k}`} className={clsx("-mb-px border-b-2 px-4 py-2.5 text-sm", tab === k ? "border-signal text-white" : "border-transparent text-white/50 hover:text-white")}>{l}</Link>
+          <Link key={k} href={`/crm/forms/${id}?tab=${k}`} className={clsx("-mb-px border-b-2 px-4 py-2.5 text-sm", tab === k ? "border-signal text-fg" : "border-transparent text-faint hover:text-fg")}>{l}</Link>
         ))}
       </div>
       {tab === "submissions" ? (
@@ -44,7 +44,7 @@ async function Body({ params, searchParams }: { params: Promise<{ id: string }>;
           {staff.can("forms.manage") && (
             <form action={deleteForm} className="mt-8">
               <input type="hidden" name="id" value={form.id} />
-              <button className="text-xs text-red-300/80 hover:text-red-300">Delete this form and its submissions</button>
+              <button className="text-xs text-red-600 hover:text-red-600">Delete this form and its submissions</button>
             </form>
           )}
         </>
@@ -63,35 +63,35 @@ async function Submissions({ id, schema }: { id: string; schema: FormSchema }) {
     .limit(200);
   const cols = allFields(schema).filter((f) => f.type !== "statement");
   const show = (v: Answers[string]) => (v === true ? "Yes" : v === false ? "No" : Array.isArray(v) ? v.join(", ") : v == null || v === "" ? "—" : String(v));
-  if (!subs?.length) return <p className="text-sm text-white/45">No submissions yet. Publish the form and share the link.</p>;
+  if (!subs?.length) return <p className="text-sm text-faint">No submissions yet. Publish the form and share the link.</p>;
   return (
     <div className="space-y-3">
       <div className="flex justify-end"><a href={`/crm/forms/${id}/export`} className={btnGhostCls}>Export CSV</a></div>
       <Card className="overflow-x-auto">
         <table className="w-full min-w-[48rem] text-sm">
           <thead>
-            <tr className="border-b border-white/[0.07] text-left text-xs text-white/45">
-              <th className="px-4 py-3 font-normal">When</th>
-              <th className="px-4 py-3 font-normal">Driver</th>
-              {cols.slice(0, 6).map((c) => <th key={c.id} className="max-w-48 truncate px-4 py-3 font-normal">{c.type === "consent" ? "Text consent" : c.label}</th>)}
+            <tr className="border-b border-line text-left text-xs text-faint">
+              <th className="px-4 py-3 font-medium">When</th>
+              <th className="px-4 py-3 font-medium">Driver</th>
+              {cols.slice(0, 6).map((c) => <th key={c.id} className="max-w-48 truncate px-4 py-3 font-medium">{c.type === "consent" ? "Text consent" : c.label}</th>)}
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/[0.05]">
+          <tbody className="divide-y divide-line">
             {subs.map((s) => {
               const c = s.contact as unknown as { id: string; first_name: string | null; last_name: string | null; company_name: string | null; stage: string } | null;
               const d = s.data as Answers;
               return (
                 <tr key={s.id} className="align-top">
-                  <td className="whitespace-nowrap px-4 py-3 text-white/50">{ago(s.created_at)}</td>
-                  <td className="px-4 py-3">{c ? <span className="flex flex-col gap-1"><Link href={`/crm/contacts/${c.id}`} className="hover:underline">{fullName(c)}</Link><StageBadge stage={c.stage} /></span> : <span className="text-white/40">anonymous</span>}</td>
-                  {cols.slice(0, 6).map((f) => <td key={f.id} className="max-w-56 px-4 py-3 text-white/75">{show(d[f.id])}</td>)}
+                  <td className="whitespace-nowrap px-4 py-3 text-faint">{ago(s.created_at)}</td>
+                  <td className="px-4 py-3">{c ? <span className="flex flex-col gap-1"><Link href={`/crm/contacts/${c.id}`} className="hover:underline">{fullName(c)}</Link><StageBadge stage={c.stage} /></span> : <span className="text-faint">anonymous</span>}</td>
+                  {cols.slice(0, 6).map((f) => <td key={f.id} className="max-w-56 px-4 py-3 text-fg-2">{show(d[f.id])}</td>)}
                 </tr>
               );
             })}
           </tbody>
         </table>
       </Card>
-      {cols.length > 6 && <p className="text-xs text-white/40">Showing 6 of {cols.length} questions. Export CSV for everything, or open the driver to see the full answers in their notes.</p>}
+      {cols.length > 6 && <p className="text-xs text-faint">Showing 6 of {cols.length} questions. Export CSV for everything, or open the driver to see the full answers in their notes.</p>}
     </div>
   );
 }

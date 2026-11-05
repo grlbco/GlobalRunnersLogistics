@@ -43,7 +43,7 @@ export function WorkflowEditor({ initial, canEdit }: { initial: WF; canEdit: boo
       <Card className="space-y-4 p-5">
         <div className="flex flex-wrap items-center gap-3">
           <input value={wf.name} onChange={(e) => upd({ name: e.target.value })} disabled={!canEdit} className={clsx(inputCls, "max-w-md text-base font-medium")} />
-          <label className="flex items-center gap-2 text-sm text-white/70">
+          <label className="flex items-center gap-2 text-sm text-muted">
             <input type="checkbox" checked={wf.active} onChange={(e) => upd({ active: e.target.checked })} disabled={!canEdit} className="h-4 w-4 accent-[#e8401c]" /> Active
           </label>
         </div>
@@ -80,12 +80,12 @@ export function WorkflowEditor({ initial, canEdit }: { initial: WF; canEdit: boo
           <li key={i}>
             <Card className="p-4">
               <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-medium"><span className="mr-2 font-mono text-xs text-white/40">{i + 1}</span>{STEP_LABELS[s.type]}</p>
+                <p className="text-sm font-medium"><span className="mr-2 font-mono text-xs text-faint">{i + 1}</span>{STEP_LABELS[s.type]}</p>
                 {canEdit && (
-                  <div className="flex gap-1 text-white/50">
-                    <button type="button" onClick={() => move(i, -1)} className="px-2 hover:text-white" aria-label="Move up">↑</button>
-                    <button type="button" onClick={() => move(i, 1)} className="px-2 hover:text-white" aria-label="Move down">↓</button>
-                    <button type="button" onClick={() => upd({ steps: wf.steps.filter((_, j) => j !== i) })} className="px-2 hover:text-red-300" aria-label="Remove">✕</button>
+                  <div className="flex gap-1 text-faint">
+                    <button type="button" onClick={() => move(i, -1)} className="px-2 hover:text-fg" aria-label="Move up">↑</button>
+                    <button type="button" onClick={() => move(i, 1)} className="px-2 hover:text-fg" aria-label="Move down">↓</button>
+                    <button type="button" onClick={() => upd({ steps: wf.steps.filter((_, j) => j !== i) })} className="px-2 hover:text-red-600" aria-label="Remove">✕</button>
                   </div>
                 )}
               </div>
@@ -104,10 +104,10 @@ export function WorkflowEditor({ initial, canEdit }: { initial: WF; canEdit: boo
           <button type="button" className={btnCls} disabled={busy} onClick={() => start(async () => { const r = await saveWorkflow(wf); setMsg({ ok: r.ok, text: r.ok ? "Saved" : r.error ?? "Error" }); })}>
             {busy ? "Saving…" : "Save automation"}
           </button>
-          {msg && <span className={clsx("text-sm", msg.ok ? "text-emerald-300" : "text-red-300")}>{msg.text}</span>}
+          {msg && <span className={clsx("text-sm", msg.ok ? "text-emerald-700" : "text-red-600")}>{msg.text}</span>}
         </div>
       )}
-      <p className="text-xs text-white/40">Variables: {TEMPLATE_VARS.join(" ")} · Texts only go to drivers with text consent; opt-outs and quiet hours always apply.</p>
+      <p className="text-xs text-faint">Variables: {TEMPLATE_VARS.join(" ")} · Texts only go to drivers with text consent; opt-outs and quiet hours always apply.</p>
     </div>
   );
 }
@@ -150,7 +150,7 @@ function StepFields({ step, onChange, disabled }: { step: Step; onChange: (s: St
               <option value="is_false">no</option>
             </select>
           )}
-          <span className="self-center text-xs text-white/40">otherwise stop</span>
+          <span className="self-center text-xs text-faint">otherwise stop</span>
         </div>
       );
     case "send_text":
@@ -185,6 +185,6 @@ function StepFields({ step, onChange, disabled }: { step: Step; onChange: (s: St
         </div>
       );
     default:
-      return <p className="text-xs text-white/45">No settings.</p>;
+      return <p className="text-xs text-faint">No settings.</p>;
   }
 }

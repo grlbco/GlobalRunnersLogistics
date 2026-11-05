@@ -39,13 +39,13 @@ async function Body() {
 
       <Card className="p-5">
         <Label>Ken&apos;s call hours</Label>
-        <p className="mt-2 text-sm text-white/55">&quot;Call me now&quot; inside these hours tells the driver Ken calls in a few minutes. Outside, it says first thing in the morning. Right now: <span className={clsx(inCallHours(hours) ? "text-emerald-300" : "text-white/70")}>{inCallHours(hours) ? "Ken is available" : "after hours"}</span>.</p>
+        <p className="mt-2 text-sm text-muted">&quot;Call me now&quot; inside these hours tells the driver Ken calls in a few minutes. Outside, it says first thing in the morning. Right now: <span className={clsx(inCallHours(hours) ? "text-emerald-700" : "text-muted")}>{inCallHours(hours) ? "Ken is available" : "after hours"}</span>.</p>
         <div className="mt-4"><CallHoursForm initial={hours} canEdit={isAdmin} /></div>
       </Card>
 
       <Card className="p-5">
         <Label>Team and your account</Label>
-        <p className="mt-2 text-sm text-white/55">Signed in as {staff.email} ({staff.roleName}).</p>
+        <p className="mt-2 text-sm text-muted">Signed in as {staff.email} ({staff.roleName}).</p>
         <div className="mt-4 flex flex-wrap gap-2">
           <Link href="/crm/account" className={btnGhostCls}>My account and password</Link>
           {staff.can("team.manage") && <Link href="/crm/team" className={btnGhostCls}>Team and permissions</Link>}
@@ -65,13 +65,13 @@ async function Body() {
 async function Connections() {
   const checks = await healthChecks();
   return (
-    <ul className="mt-4 divide-y divide-white/[0.06]">
+    <ul className="mt-4 divide-y divide-line">
       {checks.map((c) => (
         <li key={c.name} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-3 text-sm">
-          <span className={clsx("h-2.5 w-2.5 shrink-0 rounded-full", c.ok === null ? "bg-white/30" : c.ok ? "bg-emerald-400" : "bg-red-400")} />
+          <span className={clsx("h-2.5 w-2.5 shrink-0 rounded-full", c.ok === null ? "bg-line-strong" : c.ok ? "bg-emerald-400" : "bg-red-400")} />
           <span className="w-56 font-medium">{c.name}</span>
-          <span className="flex-1 text-white/60">{c.detail}</span>
-          {c.fix && <span className="text-xs text-amber-200/80">{c.fix}</span>}
+          <span className="flex-1 text-muted">{c.detail}</span>
+          {c.fix && <span className="text-xs text-amber-700">{c.fix}</span>}
         </li>
       ))}
     </ul>

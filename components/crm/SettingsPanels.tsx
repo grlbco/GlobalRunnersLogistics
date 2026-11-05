@@ -7,7 +7,7 @@ import { btnGhostCls, inputCls } from "./ui";
 
 function Msg({ r }: { r: { ok: boolean; error?: string; message?: string } | null }) {
   if (!r) return null;
-  return <p className={clsx("text-sm", r.ok ? "text-emerald-300" : "text-red-300")}>{r.ok ? r.message : r.error}</p>;
+  return <p className={clsx("text-sm", r.ok ? "text-emerald-700" : "text-red-600")}>{r.ok ? r.message : r.error}</p>;
 }
 
 export function SendingSwitch({ on, envOn, canEdit }: { on: boolean; envOn: boolean; canEdit: boolean }) {
@@ -28,13 +28,13 @@ export function SendingSwitch({ on, envOn, canEdit }: { on: boolean; envOn: bool
           });
         }}
         aria-label={state ? "Stop all sending" : "Turn sending on"}
-        className={clsx("relative h-12 w-24 shrink-0 rounded-full transition-colors disabled:opacity-50", state ? "bg-emerald-500" : "bg-red-500/80")}
+        className={clsx("relative h-12 w-24 shrink-0 rounded-full transition-colors disabled:opacity-50", state ? "bg-emerald-500" : "bg-red-50")}
       >
         <span className={clsx("absolute top-1 h-10 w-10 rounded-full bg-white shadow transition-all", state ? "left-[52px]" : "left-1")} />
       </button>
       <div className="min-w-0 flex-1">
         <p className="text-xl font-semibold">{live ? "Sending is ON" : "All sending is OFF"}</p>
-        <p className="mt-1 text-sm text-white/55">
+        <p className="mt-1 text-sm text-muted">
           {live
             ? "Texts, emails, follow-ups and the assistant's replies go out normally."
             : !envOn
@@ -65,7 +65,7 @@ export function CallHoursForm({ initial, canEdit }: { initial: { start: string; 
       </div>
       <div className="flex flex-wrap gap-1.5">
         {DAYS.map((d, i) => (
-          <button key={d} disabled={!canEdit} onClick={() => setH({ ...h, days: h.days.includes(i) ? h.days.filter((x) => x !== i) : [...h.days, i].sort() })} className={clsx("h-9 w-12 rounded-[4px] border text-xs", h.days.includes(i) ? "border-signal bg-signal/15 text-white" : "border-white/12 text-white/45")}>{d}</button>
+          <button key={d} disabled={!canEdit} onClick={() => setH({ ...h, days: h.days.includes(i) ? h.days.filter((x) => x !== i) : [...h.days, i].sort() })} className={clsx("h-9 w-12 rounded-[7px] border text-xs", h.days.includes(i) ? "border-signal bg-signal-soft text-signal-ink" : "border-line text-faint")}>{d}</button>
         ))}
       </div>
       {canEdit && <button disabled={pending} onClick={() => start(async () => setR(await saveCallHours(h)))} className={btnGhostCls}>Save hours</button>}

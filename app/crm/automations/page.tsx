@@ -40,32 +40,32 @@ async function List() {
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <Link href={`/crm/automations/${f.id}`} className="font-medium hover:underline">{f.name}</Link>
-                <p className="mt-1 text-sm text-white/50">{f.description}</p>
+                <p className="mt-1 text-sm text-faint">{f.description}</p>
               </div>
               <form action={toggleWorkflow}>
                 <input type="hidden" name="id" value={f.id} />
-                <button aria-label={f.active ? "Turn off" : "Turn on"} className={clsx("relative h-6 w-11 shrink-0 rounded-full transition-colors", f.active ? "bg-signal" : "bg-white/15")}>
+                <button aria-label={f.active ? "Turn off" : "Turn on"} className={clsx("relative h-6 w-11 shrink-0 rounded-full transition-colors", f.active ? "bg-signal" : "bg-line-strong")}>
                   <span className={clsx("absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all", f.active ? "left-[22px]" : "left-0.5")} />
                 </button>
               </form>
             </div>
-            <p className="mt-4 font-mono text-[0.68rem] uppercase tracking-[0.12em] text-white/40">
+            <p className="mt-4 text-[0.75rem] text-muted">
               When: {TRIGGERS[f.trigger_type as TriggerType]?.label ?? f.trigger_type}
               {filter.to ? ` → ${stageLabel(filter.to)}` : ""}{filter.source ? ` (${filter.source.replace(/_/g, " ")})` : ""}{filter.tag ? ` #${filter.tag}` : ""}
               {" · "}{(f.steps as unknown[]).length} steps
             </p>
-            <div className="mt-3 flex gap-4 text-xs text-white/50">
+            <div className="mt-3 flex gap-4 text-xs text-faint">
               <span>{stat(f.id, "waiting")} waiting</span>
               <span>{stat(f.id, "done")} done</span>
               <span>{stat(f.id, "stopped")} stopped</span>
-              {stat(f.id, "failed") > 0 && <span className="text-red-300">{stat(f.id, "failed")} failed</span>}
+              {stat(f.id, "failed") > 0 && <span className="text-red-600">{stat(f.id, "failed")} failed</span>}
             </div>
           </Card>
         );
       })}
       <Card className="p-5 lg:col-span-2">
         <p className="font-medium">Daily digest</p>
-        <p className="mt-1 text-sm text-white/50">Every morning at 8:00 Pacific, an email to the alert address with replies, completed forms, new applications and open tasks.</p>
+        <p className="mt-1 text-sm text-faint">Every morning at 8:00 Pacific, an email to the alert address with replies, completed forms, new applications and open tasks.</p>
       </Card>
     </div>
   );

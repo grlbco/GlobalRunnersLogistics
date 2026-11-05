@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import { clsx } from "clsx";
 import { sendManual, type SendState } from "@/app/crm/actions";
-import { btnCls, inputCls } from "./ui";
+import { btnCls } from "./ui";
 
 type Channel = "email" | "sms";
 
@@ -14,20 +14,20 @@ export function Composer({ contactId, email, sms, sendingOn }: { contactId: stri
   const blocked = !sendingOn ? "Sending is off (Settings → All sending)." : !cur.ok ? cur.why : null;
 
   return (
-    <form action={action} className="rounded-[8px] border border-white/10 bg-white/[0.02]">
+    <form action={action} className="overflow-hidden rounded-[10px] border border-line bg-surface shadow-card focus-within:border-line-strong focus-within:shadow-pop">
       <input type="hidden" name="id" value={contactId} />
       <input type="hidden" name="channel" value={channel} />
-      <div className="flex border-b border-white/[0.07] text-sm">
+      <div className="flex gap-1 border-b border-line px-2 pt-2 text-[0.8rem] font-medium">
         {(["email", "sms"] as Channel[]).map((c) => (
-          <button key={c} type="button" onClick={() => setChannel(c)} className={clsx("px-4 py-2.5", channel === c ? "border-b-2 border-signal text-white" : "text-white/50 hover:text-white")}>
+          <button key={c} type="button" onClick={() => setChannel(c)} className={clsx("-mb-px border-b-2 px-3 pb-2", channel === c ? "border-signal text-fg" : "border-transparent text-faint hover:text-fg")}>
             {c === "email" ? "Email" : "Text"}
           </button>
         ))}
       </div>
       <div className="space-y-2 p-3">
-        <textarea name="body" rows={3} maxLength={channel === "sms" ? 320 : 1500} placeholder={channel === "sms" ? "Short text, like you'd send from your phone…" : "Reply in the email thread…"} className={clsx(inputCls, "h-auto py-2")} disabled={!!blocked} />
+        <textarea name="body" rows={3} maxLength={channel === "sms" ? 320 : 1500} placeholder={channel === "sms" ? "Short text, like you'd send from your phone…" : "Reply in the email thread…"} className="block w-full resize-none bg-transparent px-1 py-1 text-[0.875rem] leading-relaxed text-fg placeholder:text-faint focus:outline-none disabled:text-faint" disabled={!!blocked} />
         <div className="flex items-center justify-between gap-3">
-          <p className={clsx("text-xs", state ? (state.ok ? "text-emerald-300" : "text-red-300") : "text-white/40")}>{state?.message ?? blocked ?? (channel === "sms" ? "Sent from (725) 666-1558" : "Sent from the inbox in this thread")}</p>
+          <p className={clsx("text-xs", state ? (state.ok ? "text-emerald-700" : "text-red-600") : "text-faint")}>{state?.message ?? blocked ?? (channel === "sms" ? "Sent from (725) 666-1558" : "Sent from the inbox in this thread")}</p>
           <button className={btnCls} disabled={busy || !!blocked}>{busy ? "Sending…" : "Send"}</button>
         </div>
       </div>

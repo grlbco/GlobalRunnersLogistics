@@ -28,8 +28,8 @@ async function Body() {
       <Card className="p-5">
         <Label>Signed in</Label>
         <p className="mt-3 text-lg font-medium">{staff.name}</p>
-        <p className="text-sm text-white/55">{staff.email}</p>
-        <p className="mt-3 inline-flex rounded-full border border-white/15 px-2.5 py-0.5 text-xs text-white/75">{staff.roleName}</p>
+        <p className="text-sm text-muted">{staff.email}</p>
+        <p className="mt-3 inline-flex rounded-full border border-line px-2.5 py-0.5 text-xs text-fg-2">{staff.roleName}</p>
         <form action={crmSignOut} className="mt-5">
           <button className={btnGhostCls}>Sign out</button>
         </form>
@@ -45,7 +45,7 @@ async function Body() {
         <Label>Sections</Label>
         <ul className="mt-3 grid grid-cols-2 gap-2">
           {sections.map((s) => (
-            <li key={s.href}><Link href={s.href} className="block rounded-[4px] border border-white/10 px-3 py-2.5 text-sm text-white/80">{s.label}</Link></li>
+            <li key={s.href}><Link href={s.href} className="block rounded-[7px] border border-line px-3 py-2.5 text-sm text-fg-2">{s.label}</Link></li>
           ))}
         </ul>
       </Card>
@@ -55,19 +55,19 @@ async function Body() {
         <div className="mt-4 grid gap-x-8 gap-y-5 md:grid-cols-2 xl:grid-cols-3">
           {groups.map((g) => (
             <div key={g}>
-              <p className="text-sm font-medium text-white/80">{g}</p>
+              <p className="text-sm font-medium text-fg-2">{g}</p>
               <ul className="mt-2 space-y-1.5">
                 {PERMISSIONS.filter((p) => p.group === g).map((p) => (
                   <li key={p.key} className="flex gap-2 text-sm">
-                    <span className={staff.can(p.key) ? "text-emerald-300" : "text-white/25"}>{staff.can(p.key) ? "✓" : "–"}</span>
-                    <span className={staff.can(p.key) ? "text-white/75" : "text-white/35"}>{p.label}</span>
+                    <span className={staff.can(p.key) ? "text-emerald-700" : "text-ghost"}>{staff.can(p.key) ? "✓" : "–"}</span>
+                    <span className={staff.can(p.key) ? "text-fg-2" : "text-ghost"}>{p.label}</span>
                   </li>
                 ))}
               </ul>
             </div>
           ))}
         </div>
-        <p className="mt-5 text-xs text-white/40">Need more? Ask someone who manages the team.</p>
+        <p className="mt-5 text-xs text-faint">Need more? Ask someone who manages the team.</p>
       </Card>
     </div>
   );

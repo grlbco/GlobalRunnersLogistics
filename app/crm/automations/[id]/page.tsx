@@ -27,32 +27,32 @@ async function Body({ params }: { params: Promise<{ id: string }> }) {
   return (
     <div className="grid gap-6 p-5 md:p-8 xl:grid-cols-[1fr_22rem]">
       <div>
-        <Link href="/crm/automations" className="text-xs text-white/45 hover:text-white">← Automations</Link>
+        <Link href="/crm/automations" className="inline-flex items-center gap-1 text-[0.78rem] text-muted transition-colors hover:text-fg">← Automations</Link>
         <div className="mt-4">
           <WorkflowEditor initial={{ id: wf.id, name: wf.name, description: wf.description, trigger_type: wf.trigger_type, trigger_filter: wf.trigger_filter, steps: wf.steps, active: wf.active }} canEdit={staff.can("automations.manage")} />
         </div>
         {!wf.builtin && staff.can("automations.manage") && (
           <form action={deleteWorkflow} className="mt-6">
             <input type="hidden" name="id" value={wf.id} />
-            <button className="text-xs text-red-300/80 hover:text-red-300">Delete this automation</button>
+            <button className="text-xs text-red-600 hover:text-red-600">Delete this automation</button>
           </form>
         )}
       </div>
       <Card className="h-fit p-5">
         <Label>Recent runs</Label>
         {runs?.length ? (
-          <ul className="mt-3 divide-y divide-white/[0.06] text-sm">
+          <ul className="mt-3 divide-y divide-line text-sm">
             {runs.map((r) => {
               const c = r.contact as unknown as { id: string; first_name: string | null; last_name: string | null; company_name: string | null } | null;
               return (
                 <li key={r.id} className="flex items-center justify-between gap-3 py-2.5">
                   {c ? <Link href={`/crm/contacts/${c.id}`} className="truncate hover:underline">{fullName(c)}</Link> : <span>—</span>}
-                  <span className="shrink-0 text-xs text-white/45">{r.status === "waiting" ? `step ${r.step_index + 1}, wakes ${ago(r.wake_at).replace("now", "soon")}` : r.status} · {ago(r.created_at)}</span>
+                  <span className="shrink-0 text-xs text-faint">{r.status === "waiting" ? `step ${r.step_index + 1}, wakes ${ago(r.wake_at).replace("now", "soon")}` : r.status} · {ago(r.created_at)}</span>
                 </li>
               );
             })}
           </ul>
-        ) : <p className="mt-3 text-sm text-white/45">No runs yet.</p>}
+        ) : <p className="mt-3 text-sm text-faint">No runs yet.</p>}
       </Card>
     </div>
   );

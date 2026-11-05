@@ -11,7 +11,7 @@ export function GoLiveTick({ item, done }: { item: string; done: boolean }) {
       aria-label={done ? "Mark not done" : "Mark done"}
       disabled={pending}
       onClick={() => start(async () => void (await toggleGoLive(item, !done)))}
-      className={clsx("mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-[3px] text-[10px]", done ? "bg-emerald-500 text-white" : "border border-white/40 hover:border-white")}
+      className={clsx("mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-[3px] text-[10px]", done ? "bg-emerald-500 text-white" : "border border-line-strong hover:border-fg")}
     >
       {done ? "✓" : ""}
     </button>

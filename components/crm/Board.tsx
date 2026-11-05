@@ -2,11 +2,18 @@
 
 import Link from "next/link";
 import { useOptimistic, useState, useTransition } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { clsx } from "clsx";
 import { moveContact } from "@/app/crm/actions";
+import { stageTone, toneDot } from "@/lib/crm/stages";
+import { Avatar } from "./ui";
+import { EASE } from "./motion";
 
-type Card = { id: string; name: string; company: string | null; place: string; when: string };
+type Card = { id: string; name: string; company: string | null; place: string; when: string; email: string | null; phone: string | null; tier: number | null };
 type Col = { stage: string; label: string; count: number; items: Card[] };
+
+const MailIcon = () => <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M4 6h16v12H4zM4 7l8 6 8-6" /></svg>;
+const PhoneIcon = () => <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M6.5 4h3l1.5 4-2 1.2a10 10 0 0 0 5.8 5.8L16 13l4 1.5v3A2 2 0 0 1 18 19.5 15.5 15.5 0 0 1 4.5 6 2 2 0 0 1 6.5 4z" /></svg>;
 
 /** Kanban with native drag and drop; moves are optimistic and saved as stage changes. */
 export function Board({ columns }: { columns: Col[] }) {
@@ -21,16 +28,14 @@ export function Board({ columns }: { columns: Col[] }) {
   });
   const [, start] = useTransition();
   const [over, setOver] = useState<string | null>(null);
+  const [dragging, setDragging] = useState<string | null>(null);
 
   return (
-    <div className="flex gap-4 overflow-x-auto p-5 md:p-8">
+    <div className="flex gap-3 overflow-x-auto p-5 md:px-8 md:py-6">
       {cols.map((col) => (
         <section
           key={col.stage}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setOver(col.stage);
-          }}
+          onDragOver={(e) => { e.preventDefault(); setOver(col.stage); }}
           onDragLeave={() => setOver((o) => (o === col.stage ? null : o))}
           onDrop={(e) => {
             e.preventDefault();
@@ -43,32 +48,62 @@ export function Board({ columns }: { columns: Col[] }) {
               await moveContact(id, col.stage);
             });
           }}
-          className={clsx("flex w-72 shrink-0 flex-col rounded-[6px] border bg-white/[0.015] transition-colors", over === col.stage ? "border-signal/60 bg-signal/[0.04]" : "border-white/[0.07]")}
+          className={clsx(
+            "flex w-[17.5rem] shrink-0 flex-col rounded-[12px] border transition-all duration-200",
+            over === col.stage ? "border-signal/40 bg-signal-soft/60 ring-4 ring-signal/10" : "border-line bg-subtle",
+          )}
         >
-          <header className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
-            <h2 className="text-sm font-medium">{col.label}</h2>
-            <span className="font-mono text-xs text-white/45">{col.count.toLocaleString("en-US")}</span>
+          <header className="flex items-center justify-between px-3.5 pb-2 pt-3">
+            <h2 className="flex items-center gap-2 text-[0.8rem] font-semibold tracking-[-0.01em]">
+              <span className={clsx("h-2 w-2 rounded-full", toneDot[stageTone(col.stage)])} />
+              {col.label}
+            </h2>
+            <span className="rounded-full bg-surface px-2 py-0.5 text-[0.7rem] font-medium tabular-nums text-muted shadow-card">{col.count.toLocaleString("en-US")}</span>
           </header>
-          <ul className="flex max-h-[72vh] min-h-24 flex-col gap-2 overflow-y-auto p-2">
-            {col.items.map((c) => (
-              <li
-                key={c.id}
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData("text/plain", c.id);
-                  e.dataTransfer.setData("application/x-stage", col.stage);
-                  e.dataTransfer.effectAllowed = "move";
-                }}
-                className="cursor-grab active:cursor-grabbing"
-              >
-                <Link href={`/crm/contacts/${c.id}`} draggable={false} className="block rounded-[4px] border border-white/[0.07] bg-ink p-3 transition-colors hover:border-white/25">
-                  <p className="truncate text-sm font-medium">{c.name}</p>
-                  <p className="truncate text-xs text-white/45">{c.company}</p>
-                  <div className="mt-2 flex justify-between text-[0.7rem] text-white/40"><span>{c.place}</span><span>{c.when}</span></div>
-                </Link>
-              </li>
-            ))}
-            {col.items.length === 0 && <li className="px-2 py-6 text-center text-xs text-white/30">Drop here</li>}
+          <ul className="flex max-h-[calc(100dvh-14rem)] min-h-28 flex-col gap-2 overflow-y-auto p-2 pt-1">
+            <AnimatePresence initial={false}>
+              {col.items.map((c) => (
+                <motion.li
+                  key={c.id}
+                  layout
+                  initial={{ opacity: 0, scale: 0.97 }}
+                  animate={{ opacity: dragging === c.id ? 0.4 : 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.97 }}
+                  transition={{ duration: 0.25, ease: EASE }}
+                >
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("text/plain", c.id);
+                      e.dataTransfer.setData("application/x-stage", col.stage);
+                      e.dataTransfer.effectAllowed = "move";
+                      setDragging(c.id);
+                    }}
+                    onDragEnd={() => setDragging(null)}
+                    className="cursor-grab active:cursor-grabbing"
+                  >
+                  <Link href={`/crm/contacts/${c.id}`} draggable={false} className="group block rounded-[9px] border border-line bg-surface p-3 shadow-card transition-all duration-200 hover:-translate-y-px hover:border-line-strong hover:shadow-pop">
+                    <div className="flex items-start gap-2.5">
+                      <Avatar name={c.name} className="h-7 w-7 text-[0.65rem]" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[0.84rem] font-medium leading-tight">{c.name}</p>
+                        <p className="mt-0.5 truncate text-[0.72rem] text-faint">{c.when}{c.place && ` · ${c.place}`}</p>
+                      </div>
+                      {c.tier && <span className="rounded-[5px] border border-line px-1.5 py-px font-mono text-[0.62rem] text-faint">T{c.tier}</span>}
+                    </div>
+                    {(c.email || c.phone || c.company) && (
+                      <div className="mt-2.5 space-y-1 border-t border-line pt-2.5 text-[0.75rem] text-muted">
+                        {c.company && <p className="truncate font-medium text-fg-2">{c.company}</p>}
+                        {c.email && <p className="flex items-center gap-1.5 truncate"><MailIcon /><span className="truncate">{c.email}</span></p>}
+                        {c.phone && <p className="flex items-center gap-1.5"><PhoneIcon />{c.phone}</p>}
+                      </div>
+                    )}
+                  </Link>
+                  </div>
+                </motion.li>
+              ))}
+            </AnimatePresence>
+            {col.items.length === 0 && <li className="rounded-[9px] border border-dashed border-line-strong px-2 py-8 text-center text-[0.75rem] text-faint">Drop a card here</li>}
           </ul>
         </section>
       ))}

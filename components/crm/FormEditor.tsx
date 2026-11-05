@@ -71,23 +71,23 @@ export function FormEditor({ initial, siteUrl }: { initial: F; siteUrl: string }
       {/* top bar */}
       <Card className="flex flex-wrap items-center gap-3 p-4">
         <input value={f.name} onChange={(e) => upd({ name: e.target.value })} className={clsx(inputCls, "max-w-xs font-medium")} aria-label="Form name" />
-        <div className="flex items-center gap-1 font-mono text-xs text-white/45">
+        <div className="flex items-center gap-1 font-mono text-xs text-faint">
           /f/
           <input value={f.slug} onChange={(e) => upd({ slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })} className={clsx(inputCls, "h-8 w-44 font-mono text-xs")} aria-label="Link name" />
         </div>
-        <span className={clsx("rounded-full px-2 py-0.5 text-[0.72rem]", f.status === "published" ? "bg-emerald-400/15 text-emerald-300" : "bg-white/[0.06] text-white/55")}>{f.status}</span>
+        <span className={clsx("rounded-full px-2 py-0.5 text-[0.72rem]", f.status === "published" ? "bg-emerald-50 text-emerald-700" : "bg-hover text-muted")}>{f.status}</span>
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          {msg && <span className={clsx("text-xs", msg.ok ? "text-emerald-300" : "text-red-300")}>{msg.text}</span>}
-          {dirty && !msg && <span className="text-xs text-white/40">Unsaved changes</span>}
-          <div className="flex rounded-[4px] border border-white/12 p-0.5" aria-label="Language">
+          {msg && <span className={clsx("text-xs", msg.ok ? "text-emerald-700" : "text-red-600")}>{msg.text}</span>}
+          {dirty && !msg && <span className="text-xs text-faint">Unsaved changes</span>}
+          <div className="flex rounded-[7px] border border-line p-0.5" aria-label="Language">
             {(["en", "es"] as const).map((l) => (
-              <button key={l} onClick={() => setLang(l)} className={clsx("rounded-[3px] px-2.5 py-1.5 text-xs uppercase", lang === l ? "bg-white/10 text-white" : "text-white/50")}>{l}</button>
+              <button key={l} onClick={() => setLang(l)} className={clsx("rounded-[3px] px-2.5 py-1.5 text-xs uppercase", lang === l ? "bg-hover text-fg" : "text-faint")}>{l}</button>
             ))}
           </div>
-          <button onClick={translate} disabled={pending} className="text-xs text-white/55 hover:text-white">Translate to Spanish</button>
-          <div className="flex rounded-[4px] border border-white/12 p-0.5">
+          <button onClick={translate} disabled={pending} className="text-xs text-muted hover:text-fg">Translate to Spanish</button>
+          <div className="flex rounded-[7px] border border-line p-0.5">
             {(["build", "preview"] as const).map((v) => (
-              <button key={v} onClick={() => setView(v)} className={clsx("rounded-[3px] px-3 py-1.5 text-xs capitalize", view === v ? "bg-white/10 text-white" : "text-white/50")}>{v}</button>
+              <button key={v} onClick={() => setView(v)} className={clsx("rounded-[3px] px-3 py-1.5 text-xs capitalize", view === v ? "bg-hover text-fg" : "text-faint")}>{v}</button>
             ))}
           </div>
           <button onClick={() => save()} disabled={pending} className={btnGhostCls}>Save</button>
@@ -102,18 +102,21 @@ export function FormEditor({ initial, siteUrl }: { initial: F; siteUrl: string }
       {f.status === "published" && (
         <Card className="flex flex-wrap items-center gap-3 p-4 text-sm">
           <Label>Live link</Label>
-          <a href={link} target="_blank" rel="noreferrer" className="font-mono text-xs text-white/80 underline underline-offset-4">{link}</a>
-          <button onClick={() => navigator.clipboard.writeText(link)} className="text-xs text-white/50 hover:text-white">Copy</button>
-          <span className="text-xs text-white/40">Add ?t=&lt;driver token&gt; to prefill a known driver.</span>
+          <a href={link} target="_blank" rel="noreferrer" className="font-mono text-xs text-fg-2 underline underline-offset-4">{link}</a>
+          <button onClick={() => navigator.clipboard.writeText(link)} className="text-xs text-faint hover:text-fg">Copy</button>
+          <span className="text-xs text-faint">Add ?t=&lt;driver token&gt; to prefill a known driver.</span>
         </Card>
       )}
 
       {view === "preview" ? (
-        <Card className="mx-auto max-w-2xl bg-[#0b1424] p-6 md:p-10">
-          {(setVal("title") || f.schema.settings.title) && <p className="text-2xl font-semibold tracking-[-0.02em]">{setVal("title") || f.schema.settings.title}</p>}
+        <div className="mx-auto max-w-2xl">
+          <p className="mb-2 text-center text-[0.75rem] text-faint">Preview · exactly how drivers see it on the website</p>
+        <div className="rounded-[14px] border border-line bg-ink p-6 text-white shadow-pop md:p-10">
+          {(setVal("title") || f.schema.settings.title) && <p className="text-2xl font-semibold tracking-[-0.02em] text-white">{setVal("title") || f.schema.settings.title}</p>}
           {(setVal("description") || f.schema.settings.description) && <p className="mt-2 text-white/60">{setVal("description") || f.schema.settings.description}</p>}
           <div className="mt-8"><PublicForm key={`${lang}-${JSON.stringify(f.schema).length}`} slug={f.slug} schema={f.schema} preview locale={lang} /></div>
-        </Card>
+        </div>
+        </div>
       ) : (
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
           {/* questions */}
@@ -124,7 +127,7 @@ export function FormEditor({ initial, siteUrl }: { initial: F; siteUrl: string }
                   <Label>Page {pi + 1}</Label>
                   <input value={pg.title ?? ""} onChange={(e) => updSchema((s) => ((s.pages[pi].title = e.target.value), s))} placeholder="Page title (optional)" className={clsx(inputCls, "h-8 max-w-xs text-xs")} />
                   {f.schema.pages.length > 1 && (
-                    <button onClick={() => { updSchema((s) => (s.pages.splice(pi, 1), s)); setSel(null); }} className="ml-auto text-xs text-white/40 hover:text-red-300">Remove page</button>
+                    <button onClick={() => { updSchema((s) => (s.pages.splice(pi, 1), s)); setSel(null); }} className="ml-auto text-xs text-faint hover:text-red-600">Remove page</button>
                   )}
                 </div>
                 <ul
@@ -142,22 +145,22 @@ export function FormEditor({ initial, siteUrl }: { initial: F; siteUrl: string }
                         onDragOver={(e) => e.preventDefault()}
                         onDrop={(e) => { e.stopPropagation(); if (drag) { move(drag, { page: pi, field: fi }); setSel(null); setDrag(null); } }}
                         onClick={() => setSel({ page: pi, field: fi })}
-                        className={clsx("group flex cursor-pointer items-center gap-3 rounded-[4px] border px-3 py-2.5", on ? "border-signal/60 bg-signal/[0.06]" : "border-white/[0.08] hover:border-white/20")}
+                        className={clsx("group flex cursor-pointer items-center gap-3 rounded-[7px] border px-3 py-2.5", on ? "border-signal/40 bg-signal-soft/60 shadow-card" : "border-line bg-surface hover:border-line-strong")}
                       >
-                        <span className="cursor-grab select-none text-white/25" aria-hidden>⋮⋮</span>
-                        <span className="w-28 shrink-0 font-mono text-[0.65rem] uppercase tracking-wider text-white/40">{FIELD_TYPES[fl.type].label}</span>
-                        <span className={clsx("min-w-0 flex-1 truncate text-sm", es && !fl.es?.label && fl.type !== "consent" && "italic text-white/40")}>{es ? fl.es?.label || (fl.type === "consent" ? "Consentimiento (texto oficial en español)" : `${fl.label} (no Spanish yet)`) : fl.label}{fl.required && <span className="text-signal"> *</span>}</span>
-                        {fl.map && <span className="hidden rounded bg-dusk/15 px-1.5 py-0.5 text-[0.65rem] text-dusk sm:inline">→ {CRM_MAP[fl.map]}</span>}
+                        <span className="cursor-grab select-none text-ghost" aria-hidden>⋮⋮</span>
+                        <span className="w-28 shrink-0 font-mono text-[0.65rem] uppercase tracking-wider text-faint">{FIELD_TYPES[fl.type].label}</span>
+                        <span className={clsx("min-w-0 flex-1 truncate text-sm", es && !fl.es?.label && fl.type !== "consent" && "italic text-faint")}>{es ? fl.es?.label || (fl.type === "consent" ? "Consentimiento (texto oficial en español)" : `${fl.label} (no Spanish yet)`) : fl.label}{fl.required && <span className="text-signal"> *</span>}</span>
+                        {fl.map && <span className="hidden rounded bg-[#fdf3e7] px-1.5 py-0.5 text-[0.65rem] text-[#8a4f0e] sm:inline">→ {CRM_MAP[fl.map]}</span>}
                         <span className="flex gap-1 opacity-0 group-hover:opacity-100">
-                          <button aria-label="Move up" disabled={fi === 0} onClick={(e) => { e.stopPropagation(); move({ page: pi, field: fi }, { page: pi, field: fi - 1 }); setSel(null); }} className="px-1 text-white/50 hover:text-white disabled:opacity-20">↑</button>
-                          <button aria-label="Move down" disabled={fi === pg.fields.length - 1} onClick={(e) => { e.stopPropagation(); move({ page: pi, field: fi }, { page: pi, field: fi + 1 }); setSel(null); }} className="px-1 text-white/50 hover:text-white disabled:opacity-20">↓</button>
-                          <button aria-label="Duplicate" onClick={(e) => { e.stopPropagation(); updSchema((s) => (s.pages[pi].fields.splice(fi + 1, 0, { ...structuredClone(fl), id: newId(), map: undefined }), s)); }} className="px-1 text-white/50 hover:text-white">⧉</button>
-                          <button aria-label="Delete" onClick={(e) => { e.stopPropagation(); updSchema((s) => (s.pages[pi].fields.splice(fi, 1), s)); setSel(null); }} className="px-1 text-white/50 hover:text-red-300">✕</button>
+                          <button aria-label="Move up" disabled={fi === 0} onClick={(e) => { e.stopPropagation(); move({ page: pi, field: fi }, { page: pi, field: fi - 1 }); setSel(null); }} className="px-1 text-faint hover:text-fg disabled:opacity-20">↑</button>
+                          <button aria-label="Move down" disabled={fi === pg.fields.length - 1} onClick={(e) => { e.stopPropagation(); move({ page: pi, field: fi }, { page: pi, field: fi + 1 }); setSel(null); }} className="px-1 text-faint hover:text-fg disabled:opacity-20">↓</button>
+                          <button aria-label="Duplicate" onClick={(e) => { e.stopPropagation(); updSchema((s) => (s.pages[pi].fields.splice(fi + 1, 0, { ...structuredClone(fl), id: newId(), map: undefined }), s)); }} className="px-1 text-faint hover:text-fg">⧉</button>
+                          <button aria-label="Delete" onClick={(e) => { e.stopPropagation(); updSchema((s) => (s.pages[pi].fields.splice(fi, 1), s)); setSel(null); }} className="px-1 text-faint hover:text-red-600">✕</button>
                         </span>
                       </li>
                     );
                   })}
-                  {!pg.fields.length && <li className="rounded-[4px] border border-dashed border-white/10 px-3 py-6 text-center text-sm text-white/35">No questions on this page. Add one below.</li>}
+                  {!pg.fields.length && <li className="rounded-[7px] border border-dashed border-line px-3 py-6 text-center text-sm text-ghost">No questions on this page. Add one below.</li>}
                 </ul>
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {(Object.keys(FIELD_TYPES) as FieldType[]).map((t) => (
@@ -169,7 +172,7 @@ export function FormEditor({ initial, siteUrl }: { initial: F; siteUrl: string }
                         updSchema((s) => (s.pages[pi].fields.push(nf), s));
                         setSel({ page: pi, field: pg.fields.length });
                       }}
-                      className="rounded-full border border-white/10 px-2.5 py-1 text-xs text-white/60 hover:border-white/30 hover:text-white"
+                      className="rounded-full border border-line px-2.5 py-1 text-xs text-muted hover:border-line-strong hover:text-fg"
                     >
                       + {FIELD_TYPES[t].label}
                     </button>
@@ -184,41 +187,41 @@ export function FormEditor({ initial, siteUrl }: { initial: F; siteUrl: string }
           <div className="min-w-0 space-y-5">
             {field ? (
               <Card className="space-y-4 p-4">
-                <div className="flex items-center justify-between"><Label>Question</Label><button onClick={() => setSel(null)} className="text-xs text-white/45 hover:text-white">Form settings</button></div>
+                <div className="flex items-center justify-between"><Label>Question</Label><button onClick={() => setSel(null)} className="text-xs text-faint hover:text-fg">Form settings</button></div>
                 {es && field.type === "consent" ? (
-                  <p className="text-xs text-white/50">Spanish visitors see the official Spanish consent text from the driver application.</p>
+                  <p className="text-xs text-faint">Spanish visitors see the official Spanish consent text from the driver application.</p>
                 ) : es ? (
                   <>
-                    <p className="text-xs text-white/40">English: {field.label}</p>
-                    <label className="block text-xs text-white/50">{field.type === "statement" ? "Texto" : "Pregunta"} (ES)
+                    <p className="text-xs text-faint">English: {field.label}</p>
+                    <label className="block text-xs text-faint">{field.type === "statement" ? "Texto" : "Pregunta"} (ES)
                       <textarea value={field.es?.label ?? ""} onChange={(e) => updEs({ label: e.target.value || undefined })} rows={2} className={clsx(inputCls, "mt-1 h-auto py-2")} />
                     </label>
-                    <label className="block text-xs text-white/50">Ayuda (ES)
+                    <label className="block text-xs text-faint">Ayuda (ES)
                       <input value={field.es?.description ?? ""} onChange={(e) => updEs({ description: e.target.value || undefined })} className={clsx(inputCls, "mt-1")} />
                     </label>
                     {"options" in FIELD_TYPES[field.type] && (
-                      <label className="block text-xs text-white/50">Opciones (ES), same order as English: {(field.options ?? []).join(" / ")}
+                      <label className="block text-xs text-faint">Opciones (ES), same order as English: {(field.options ?? []).join(" / ")}
                         <textarea value={(field.es?.options ?? []).join("\n")} onChange={(e) => updEs({ options: e.target.value.split("\n") })} rows={5} className={clsx(inputCls, "mt-1 h-auto py-2")} />
                       </label>
                     )}
                   </>
                 ) : (
                 <>
-                <label className="block text-xs text-white/50">{field.type === "statement" ? "Text" : "Question"}
+                <label className="block text-xs text-faint">{field.type === "statement" ? "Text" : "Question"}
                   <textarea value={field.label} onChange={(e) => updField({ label: e.target.value })} rows={field.type === "consent" ? 5 : 2} className={clsx(inputCls, "mt-1 h-auto py-2")} />
                 </label>
                 {field.type !== "consent" && (
-                  <label className="block text-xs text-white/50">Help text
+                  <label className="block text-xs text-faint">Help text
                     <input value={field.description ?? ""} onChange={(e) => updField({ description: e.target.value || undefined })} className={clsx(inputCls, "mt-1")} />
                   </label>
                 )}
                 {["text", "textarea", "email", "phone", "number"].includes(field.type) && (
-                  <label className="block text-xs text-white/50">Placeholder
+                  <label className="block text-xs text-faint">Placeholder
                     <input value={field.placeholder ?? ""} onChange={(e) => updField({ placeholder: e.target.value || undefined })} className={clsx(inputCls, "mt-1")} />
                   </label>
                 )}
                 {"options" in FIELD_TYPES[field.type] && (
-                  <label className="block text-xs text-white/50">Options (one per line)
+                  <label className="block text-xs text-faint">Options (one per line)
                     <textarea value={(field.options ?? []).join("\n")} onChange={(e) => updField({ options: e.target.value.split("\n").map((x) => x.trimStart()).filter((x, i, arr) => x || i === arr.length - 1) })} rows={5} className={clsx(inputCls, "mt-1 h-auto py-2")} />
                   </label>
                 )}
@@ -226,57 +229,57 @@ export function FormEditor({ initial, siteUrl }: { initial: F; siteUrl: string }
                 )}
                 {field.type === "number" && (
                   <div className="grid grid-cols-2 gap-3">
-                    <label className="block text-xs text-white/50">Min<input type="number" value={field.validation?.min ?? ""} onChange={(e) => updField({ validation: { ...field.validation, min: e.target.value === "" ? undefined : Number(e.target.value) } })} className={clsx(inputCls, "mt-1")} /></label>
-                    <label className="block text-xs text-white/50">Max<input type="number" value={field.validation?.max ?? ""} onChange={(e) => updField({ validation: { ...field.validation, max: e.target.value === "" ? undefined : Number(e.target.value) } })} className={clsx(inputCls, "mt-1")} /></label>
+                    <label className="block text-xs text-faint">Min<input type="number" value={field.validation?.min ?? ""} onChange={(e) => updField({ validation: { ...field.validation, min: e.target.value === "" ? undefined : Number(e.target.value) } })} className={clsx(inputCls, "mt-1")} /></label>
+                    <label className="block text-xs text-faint">Max<input type="number" value={field.validation?.max ?? ""} onChange={(e) => updField({ validation: { ...field.validation, max: e.target.value === "" ? undefined : Number(e.target.value) } })} className={clsx(inputCls, "mt-1")} /></label>
                   </div>
                 )}
                 {["text", "email", "phone"].includes(field.type) && (
-                  <label className="block text-xs text-white/50">Save answer to the driver&apos;s profile
+                  <label className="block text-xs text-faint">Save answer to the driver&apos;s profile
                     <select value={field.map ?? ""} onChange={(e) => updField({ map: (e.target.value || undefined) as CrmMap | undefined })} className={clsx(inputCls, "mt-1")}>
                       {(Object.keys(CRM_MAP) as CrmMap[]).filter((k) => !k || field.type === "text" || (field.type === "email" ? k === "email" : k === "cell_phone")).map((k) => <option key={k} value={k}>{CRM_MAP[k]}</option>)}
                     </select>
-                    <span className="mt-1 block text-white/35">Other answers are saved on the submission, in a note and in the assistant&apos;s memory.</span>
+                    <span className="mt-1 block text-ghost">Other answers are saved on the submission, in a note and in the assistant&apos;s memory.</span>
                   </label>
                 )}
                 {field.type !== "statement" && (
                   <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={field.required} onChange={(e) => updField({ required: e.target.checked })} className="accent-[#ff5a2c]" /> Required</label>
                 )}
-                {field.type === "consent" && <p className="text-xs text-white/40">Ticking this gives text consent (TCPA). Keep it unticked by default and optional, so it&apos;s never a condition of applying.</p>}
+                {field.type === "consent" && <p className="text-xs text-faint">Ticking this gives text consent (TCPA). Keep it unticked by default and optional, so it&apos;s never a condition of applying.</p>}
               </Card>
             ) : (
               <Card className="space-y-4 p-4">
                 <Label>Form page</Label>
-                {es && <p className="text-xs text-white/40">Editing the Spanish version (/es/f/{f.slug}).</p>}
-                <label className="block text-xs text-white/50">Title{es && " (ES)"}<input value={setVal("title")} placeholder={es ? f.schema.settings.title : undefined} onChange={(e) => updSet("title", e.target.value)} className={clsx(inputCls, "mt-1")} /></label>
-                <label className="block text-xs text-white/50">Description{es && " (ES)"}<textarea value={setVal("description")} placeholder={es ? f.schema.settings.description : undefined} onChange={(e) => updSet("description", e.target.value)} rows={2} className={clsx(inputCls, "mt-1 h-auto py-2")} /></label>
+                {es && <p className="text-xs text-faint">Editing the Spanish version (/es/f/{f.slug}).</p>}
+                <label className="block text-xs text-faint">Title{es && " (ES)"}<input value={setVal("title")} placeholder={es ? f.schema.settings.title : undefined} onChange={(e) => updSet("title", e.target.value)} className={clsx(inputCls, "mt-1")} /></label>
+                <label className="block text-xs text-faint">Description{es && " (ES)"}<textarea value={setVal("description")} placeholder={es ? f.schema.settings.description : undefined} onChange={(e) => updSet("description", e.target.value)} rows={2} className={clsx(inputCls, "mt-1 h-auto py-2")} /></label>
                 <div className="grid grid-cols-2 gap-3">
-                  <label className="block text-xs text-white/50">Button{es && " (ES)"}<input value={setVal("submitText")} placeholder={es ? f.schema.settings.submitText : undefined} onChange={(e) => updSet("submitText", e.target.value)} className={clsx(inputCls, "mt-1")} /></label>
+                  <label className="block text-xs text-faint">Button{es && " (ES)"}<input value={setVal("submitText")} placeholder={es ? f.schema.settings.submitText : undefined} onChange={(e) => updSet("submitText", e.target.value)} className={clsx(inputCls, "mt-1")} /></label>
                   <label className="flex items-end gap-2 pb-2 text-sm"><input type="checkbox" checked={f.schema.settings.showProgress !== false} onChange={(e) => updSchema((s) => ((s.settings.showProgress = e.target.checked), s))} className="accent-[#ff5a2c]" /> Progress bar</label>
                 </div>
-                <label className="block text-xs text-white/50">Thank-you message{es && " (ES)"}<textarea value={setVal("successMessage")} placeholder={es ? f.schema.settings.successMessage : undefined} onChange={(e) => updSet("successMessage", e.target.value)} rows={2} className={clsx(inputCls, "mt-1 h-auto py-2")} /></label>
-                <label className="block text-xs text-white/50">Or send them to a page (URL)<input value={f.schema.settings.redirectUrl ?? ""} onChange={(e) => updSchema((s) => ((s.settings.redirectUrl = e.target.value), s))} placeholder="https://" className={clsx(inputCls, "mt-1")} /></label>
+                <label className="block text-xs text-faint">Thank-you message{es && " (ES)"}<textarea value={setVal("successMessage")} placeholder={es ? f.schema.settings.successMessage : undefined} onChange={(e) => updSet("successMessage", e.target.value)} rows={2} className={clsx(inputCls, "mt-1 h-auto py-2")} /></label>
+                <label className="block text-xs text-faint">Or send them to a page (URL)<input value={f.schema.settings.redirectUrl ?? ""} onChange={(e) => updSchema((s) => ((s.settings.redirectUrl = e.target.value), s))} placeholder="https://" className={clsx(inputCls, "mt-1")} /></label>
               </Card>
             )}
 
             <Card className="space-y-4 p-4">
               <Label>When someone submits</Label>
-              <label className="block text-xs text-white/50">Move the card to
+              <label className="block text-xs text-faint">Move the card to
                 <select value={f.on_submit.stage ?? ""} onChange={(e) => upd({ on_submit: { ...f.on_submit, stage: e.target.value || undefined } })} className={clsx(inputCls, "mt-1")}>
                   <option value="">Don&apos;t move</option>
                   {ASSIGNABLE.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
                 </select>
-                <span className="mt-1 block text-white/35">Cards only move forward, never back.</span>
+                <span className="mt-1 block text-ghost">Cards only move forward, never back.</span>
               </label>
-              <label className="block text-xs text-white/50">Add tags (comma separated)
+              <label className="block text-xs text-faint">Add tags (comma separated)
                 <input value={(f.on_submit.tags ?? []).join(", ")} onChange={(e) => upd({ on_submit: { ...f.on_submit, tags: e.target.value.split(",").map((t) => t.trim().toLowerCase()).filter(Boolean) } })} className={clsx(inputCls, "mt-1")} />
               </label>
-              <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={f.on_submit.assistant === "reply"} onChange={(e) => upd({ on_submit: { ...f.on_submit, assistant: e.target.checked ? "reply" : "none" } })} className="mt-1 accent-[#ff5a2c]" /> <span>The assistant writes back within minutes<span className="block text-xs text-white/40">By text if they gave consent, otherwise by email (only if there&apos;s an email thread).</span></span></label>
+              <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={f.on_submit.assistant === "reply"} onChange={(e) => upd({ on_submit: { ...f.on_submit, assistant: e.target.checked ? "reply" : "none" } })} className="mt-1 accent-[#ff5a2c]" /> <span>The assistant writes back within minutes<span className="block text-xs text-faint">By text if they gave consent, otherwise by email (only if there&apos;s an email thread).</span></span></label>
               {f.on_submit.assistant === "reply" && (
                 <label className="ml-6 flex items-start gap-2 text-sm"><input type="checkbox" checked={!!f.on_submit.sendDriverForm} onChange={(e) => upd({ on_submit: { ...f.on_submit, sendDriverForm: e.target.checked } })} className="mt-1 accent-[#ff5a2c]" /> <span>…and sends the driver application, then follows up until it&apos;s done</span></label>
               )}
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!f.on_submit.telegram} onChange={(e) => upd({ on_submit: { ...f.on_submit, telegram: e.target.checked } })} className="accent-[#ff5a2c]" /> Alert Ken&apos;s Telegram group</label>
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!f.on_submit.task} onChange={(e) => upd({ on_submit: { ...f.on_submit, task: e.target.checked } })} className="accent-[#ff5a2c]" /> Create a task for the team</label>
-              <p className="text-xs text-white/40">Automations can also start on &quot;A form is submitted&quot; (filter by link name: {f.slug}).</p>
+              <p className="text-xs text-faint">Automations can also start on &quot;A form is submitted&quot; (filter by link name: {f.slug}).</p>
             </Card>
           </div>
         </div>

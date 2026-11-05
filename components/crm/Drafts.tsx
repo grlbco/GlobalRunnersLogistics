@@ -14,14 +14,14 @@ export async function Drafts({ supabase, contactId }: { supabase: SupabaseClient
   return (
     <div className="space-y-3">
       {data.map((d) => (
-        <form key={d.id} action={approveDraft} className="rounded-[8px] border border-dusk/30 bg-dusk/[0.05] p-3">
+        <form key={d.id} action={approveDraft} className="rounded-[10px] border border-amber-200 bg-amber-50/70 p-3">
           <input type="hidden" name="id" value={d.id} />
           <input type="hidden" name="contact_id" value={contactId} />
           <div className="mb-2 flex items-center justify-between text-xs">
-            <span className="text-dusk">
+            <span className="font-medium text-amber-800">
               Assistant {d.channel === "sms" ? "text" : "email"} · {d.status === "draft" ? "waiting for your OK" : `sends ${new Date(d.send_after).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`}
             </span>
-            {d.error && <span className="text-white/45">{d.error}</span>}
+            {d.error && <span className="text-faint">{d.error}</span>}
           </div>
           <textarea name="body" defaultValue={d.body} rows={d.channel === "sms" ? 2 : 4} className={`${inputCls} h-auto py-2`} />
           <div className="mt-2 flex justify-end gap-2">

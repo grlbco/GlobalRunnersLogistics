@@ -7,7 +7,7 @@ const NON_DEFAULT_LOCALES = ["es"];
 const AUTH_PATHS = /^\/(?:es\/)?(dashboard|login|register|reset-password|update-password|auth)(\/|$)/;
 const PROTECTED = /^\/(?:es\/)?dashboard(\/|$)/;
 // CRM pages that work signed out: staff sign-in, forgot password, the reset-link landing.
-const CRM_PUBLIC = /^\/crm\/(login|forgot|auth\/callback)(\/|$)/;
+const CRM_PUBLIC = process.env.NODE_ENV === "production" ? /^\/crm\/(login|forgot|auth\/callback)(\/|$)/ : /^\/crm\/(login|forgot|auth\/callback|design)(\/|$)/;
 
 /**
  * 1. English lives at "/" (no prefix), Spanish at "/es". Everything sits under app/[lang] internally,

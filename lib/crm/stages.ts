@@ -33,11 +33,19 @@ export const BOARD: Stage[] = ["replied", "interested", "form_sent", "chasing", 
 export const FUNNEL: Stage[] = ["contacted", "replied", "interested", "form_sent", "applied", "hired"];
 
 export const toneClass: Record<Tone, string> = {
-  cold: "bg-white/[0.06] text-white/60",
-  warm: "bg-dusk/15 text-dusk",
-  hot: "bg-signal/15 text-[#ff7a57]",
-  won: "bg-emerald-400/15 text-emerald-300",
-  lost: "bg-white/[0.04] text-white/35",
+  cold: "bg-hover text-muted",
+  warm: "bg-[#fdf3e7] text-[#8a4f0e]",
+  hot: "bg-signal-soft text-signal-ink",
+  won: "bg-emerald-50 text-emerald-700",
+  lost: "bg-hover text-faint",
+};
+
+export const toneDot: Record<Tone, string> = {
+  cold: "bg-ghost",
+  warm: "bg-dusk",
+  hot: "bg-signal",
+  won: "bg-emerald-500",
+  lost: "bg-ghost",
 };
 
 export const TIERS: Record<number, string> = {

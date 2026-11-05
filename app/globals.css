@@ -11,6 +11,21 @@
   --color-signal-ink: #b32e10;
   --color-dusk: #f2a65a;
 
+  /* Command (CRM) light theme: same brand, daylight version. Text is brand ink, one accent (signal). */
+  --color-canvas: #f5f6f8;
+  --color-surface: #ffffff;
+  --color-subtle: #fafbfc;
+  --color-hover: #f1f3f6;
+  --color-line: #e6e8ec;
+  --color-line-strong: #d3d8df;
+  --color-fg: #0a1220;
+  --color-fg-2: #2f3a4d;
+  --color-muted: #5f6b7d;
+  --color-faint: #8f99a8;
+  --color-ghost: #bcc3ce;
+  --color-signal-soft: #fdeee9;
+  --color-navy-soft: #e9edf4;
+
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
 
@@ -165,4 +180,51 @@ html.lenis body {
 @keyframes cue {
   0% { transform: translateY(-100%); }
   100% { transform: translateY(200%); }
+}
+
+/* ---------- Command (CRM) light theme ---------- */
+html.crm {
+  background: var(--color-canvas);
+  color: var(--color-fg);
+  color-scheme: light;
+}
+html.crm body {
+  background: var(--color-canvas);
+  color: var(--color-fg);
+  font-feature-settings: "ss01", "cv11", "tnum" 0;
+}
+html.crm ::selection {
+  background: color-mix(in oklab, var(--color-signal) 22%, white);
+  color: var(--color-fg);
+}
+html.crm :is(input, textarea, select):focus-visible {
+  outline: none;
+}
+html.crm :focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--color-signal) 70%, white);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+/* thin, quiet scrollbars inside the app */
+html.crm * {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+}
+@utility shadow-card {
+  box-shadow: 0 1px 2px rgb(10 18 32 / 0.04), 0 0 0 1px rgb(10 18 32 / 0.02);
+}
+@utility shadow-pop {
+  box-shadow: 0 1px 2px rgb(10 18 32 / 0.05), 0 8px 24px -6px rgb(10 18 32 / 0.12), 0 0 0 1px rgb(10 18 32 / 0.04);
+}
+@utility bg-dots {
+  background-image: radial-gradient(circle at 1px 1px, rgb(10 18 32 / 0.07) 1px, transparent 0);
+  background-size: 16px 16px;
+}
+@keyframes shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(232 64 28 / 0.35); }
+  50% { box-shadow: 0 0 0 5px rgb(232 64 28 / 0); }
 }
