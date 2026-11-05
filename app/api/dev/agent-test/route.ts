@@ -64,7 +64,7 @@ export async function GET(req: Request) {
       if (r.problems?.length) problems.push(...r.problems);
       const parts = (r.decision?.replies ?? []) as string[];
       const label = `${step.kind} #${step.n} (${r.channel ?? step.ch})`;
-      if (!parts.length) transcript.push(`${label}: (${r.action})`);
+      if (!parts.length) transcript.push(`${label}: (${r.action}) ${JSON.stringify(r.decision ?? r.reason ?? null).slice(0, 400)}`);
       for (const t of parts) {
         transcript.push(`${label}${r.decision?.subject ? ` [${r.decision.subject}]` : ""}: ${t}`);
         turns.push({ at: new Date().toISOString(), direction: "outbound", channel: r.channel ?? step.ch, author: "agent", body: t });
