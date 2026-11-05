@@ -94,9 +94,9 @@ export function FormEditor({ initial, siteUrl }: { initial: F; siteUrl: string }
           <div className="mt-8"><PublicForm key={JSON.stringify(f.schema).length} slug={f.slug} schema={f.schema} preview /></div>
         </Card>
       ) : (
-        <div className="grid gap-5 xl:grid-cols-[1fr_24rem]">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
           {/* questions */}
-          <div className="space-y-5">
+          <div className="min-w-0 space-y-5">
             {f.schema.pages.map((pg, pi) => (
               <Card key={pg.id} className="p-4">
                 <div className="flex items-center gap-3">
@@ -160,7 +160,7 @@ export function FormEditor({ initial, siteUrl }: { initial: F; siteUrl: string }
           </div>
 
           {/* right panel */}
-          <div className="space-y-5">
+          <div className="min-w-0 space-y-5">
             {field ? (
               <Card className="space-y-4 p-4">
                 <div className="flex items-center justify-between"><Label>Question</Label><button onClick={() => setSel(null)} className="text-xs text-white/45 hover:text-white">Form settings</button></div>

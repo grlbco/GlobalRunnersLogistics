@@ -6,7 +6,7 @@ import { allFields, type Answers, type FormSchema } from "@/lib/formbuilder/sche
 import { PublicForm } from "@/components/forms/PublicForm";
 import { company } from "@/content/facts";
 
-export const metadata = { title: "Global Runners Logistics", robots: { index: false, follow: false } };
+export const metadata = { title: "Driver form", robots: { index: false, follow: false } };
 
 /** Public form from the Forms module: /f/<slug>, optional ?t=<personal token> to prefill and link to the driver. */
 export default function FormPage({ params, searchParams }: { params: Promise<{ lang: string; slug: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {

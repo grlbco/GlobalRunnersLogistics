@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
-import { ViewTransition } from "react";
+import { Suspense, ViewTransition } from "react";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import "../globals.css";
@@ -57,14 +57,21 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
         >
           Skip to content
         </a>
-        <SmoothScroll />
-        <AttributionCapture />
-        <Header locale={lang} nav={dict.nav} />
+        {/* pathname-based client bits: in Suspense so dynamic pages (like /f/<slug>) can stream */}
+        <Suspense fallback={null}>
+          <SmoothScroll />
+          <AttributionCapture />
+        </Suspense>
+        <Suspense fallback={null}>
+          <Header locale={lang} nav={dict.nav} />
+        </Suspense>
         <ViewTransition default="page">
           <main id="main">{children}</main>
         </ViewTransition>
         <Footer locale={lang} dict={dict} />
-        <MobileCallBar locale={lang} nav={dict.nav} />
+        <Suspense fallback={null}>
+          <MobileCallBar locale={lang} nav={dict.nav} />
+        </Suspense>
       </body>
     </html>
   );
