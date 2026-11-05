@@ -3,7 +3,9 @@
 import { createHash } from "node:crypto";
 import { headers } from "next/headers";
 import { handleSubmission, type SubmitResult } from "@/lib/formbuilder/submit";
-import type { Answers } from "@/lib/formbuilder/schema";
+import { allFields, type Answers } from "@/lib/formbuilder/schema";
+import { getPublicForm } from "@/lib/formbuilder/public";
+import { prefillForToken } from "@/lib/crm/forms";
 
 const hits = new Map<string, number[]>();
 function limited(key: string, max = 6, windowMs = 10 * 60_000) {
@@ -12,6 +14,22 @@ function limited(key: string, max = 6, windowMs = 10 * 60_000) {
   list.push(now);
   hits.set(key, list);
   return list.length > max;
+}
+
+/** Personal link (?t=): the driver's known details for the form's mapped questions. */
+export async function getFormPrefill(slug: string, token: string): Promise<Answers> {
+  if (!/^[a-z0-9-]{2,61}$/.test(slug) || !/^[0-9a-f]{24}$/.test(token)) return {};
+  const [form, p] = await Promise.all([getPublicForm(slug), prefillForToken(token).catch(() => null)]);
+  if (!form || !p) return {};
+  const out: Answers = {};
+  for (const f of allFields(form.schema)) {
+    if (f.map === "first_name" && p.first_name) out[f.id] = p.first_name;
+    if (f.map === "last_name" && p.last_name) out[f.id] = p.last_name;
+    if (f.map === "full_name" && p.first_name) out[f.id] = [p.first_name, p.last_name].filter(Boolean).join(" ");
+    if (f.map === "cell_phone" && p.phone) out[f.id] = p.phone;
+    if (f.map === "email" && p.email) out[f.id] = p.email;
+  }
+  return out;
 }
 
 /** Public submit for /f/[slug]. Validation happens again on the server; the honeypot drops bots silently. */

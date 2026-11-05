@@ -2,14 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { clsx } from "clsx";
-import { submitPublicForm } from "@/app/actions/publicForms";
+import { getFormPrefill, submitPublicForm } from "@/app/actions/publicForms";
 import { validate, type Answers, type FormField, type FormSchema } from "@/lib/formbuilder/schema";
 
 /**
  * Renders a Forms-module schema. Mobile first: big tap targets, one page at a time, progress bar.
  * `preview` disables submitting (used by the builder).
  */
-export function PublicForm({ slug, schema, token, prefill, preview = false }: { slug: string; schema: FormSchema; token?: string | null; prefill?: Answers; preview?: boolean }) {
+export function PublicForm({ slug, schema, prefill, preview = false }: { slug: string; schema: FormSchema; prefill?: Answers; preview?: boolean }) {
   const pages = schema.pages.filter((p) => p.fields.length);
   const [page, setPage] = useState(0);
   const [a, setA] = useState<Answers>(prefill ?? {});
@@ -19,9 +19,17 @@ export function PublicForm({ slug, schema, token, prefill, preview = false }: { 
   const [fail, setFail] = useState<string | null>(null);
   const hp = useRef<HTMLInputElement>(null);
   const started = useRef(0);
+  const token = useRef<string | null>(null);
   useEffect(() => {
     started.current = now();
-  }, []);
+    if (preview) return;
+    // personal link: fill in what we already know, after first paint (never blocks the page)
+    const t = new URLSearchParams(window.location.search).get("t");
+    if (t && /^[0-9a-f]{24}$/.test(t)) {
+      token.current = t;
+      getFormPrefill(slug, t).then((p) => setA((x) => ({ ...p, ...Object.fromEntries(Object.entries(x).filter(([, v]) => v !== "" && v != null)) })), () => {});
+    }
+  }, [slug, preview]);
 
   if (!pages.length) return <p className="text-white/50">This form has no questions yet.</p>;
   const cur = pages[Math.min(page, pages.length - 1)];
@@ -47,7 +55,7 @@ export function PublicForm({ slug, schema, token, prefill, preview = false }: { 
     setBusy(true);
     setFail(null);
     const utm = Object.fromEntries(new URLSearchParams(window.location.search).entries());
-    const r = await submitPublicForm({ slug, answers: a, token, hp: hp.current?.value, utm, ms: elapsed(started.current) });
+    const r = await submitPublicForm({ slug, answers: a, token: token.current, hp: hp.current?.value, utm, ms: elapsed(started.current) });
     setBusy(false);
     if (r.ok) {
       if (r.redirect) window.location.assign(r.redirect);
@@ -181,6 +189,9 @@ function Field({ f, v, error, onChange }: { f: FormField; v: Answers[string]; er
             placeholder={f.placeholder}
             type={f.type === "email" ? "email" : f.type === "phone" ? "tel" : f.type === "date" ? "date" : f.type === "number" ? "number" : "text"}
             inputMode={f.type === "phone" ? "tel" : f.type === "number" ? "numeric" : f.type === "email" ? "email" : undefined}
+            enterKeyHint="next"
+            autoCapitalize={f.type === "email" ? "none" : f.map === "first_name" || f.map === "last_name" || f.map === "full_name" ? "words" : undefined}
+            spellCheck={f.type === "email" || f.type === "phone" ? false : undefined}
             autoComplete={f.map === "first_name" ? "given-name" : f.map === "last_name" ? "family-name" : f.map === "full_name" ? "name" : f.type === "email" ? "email" : f.type === "phone" ? "tel" : undefined}
             className={inputCls}
           />

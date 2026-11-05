@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireStaff } from "@/lib/crm/auth";
@@ -41,8 +41,12 @@ export async function saveForm(input: unknown): Promise<{ ok: boolean; error?: s
   if (new Set(ids).size !== ids.length) return { ok: false, error: "Two questions have the same id" };
   if (f.status === "published" && !f.schema.pages.some((pg) => pg.fields.some((x) => x.type === "phone" || x.type === "email")))
     return { ok: false, error: "Add a phone or email question before publishing, so answers can reach a driver's profile." };
+  const { data: before } = await supabase.from("crm_forms").select("slug").eq("id", f.id).maybeSingle();
   const { error } = await supabase.from("crm_forms").update({ name: f.name, slug: f.slug, status: f.status, schema: f.schema, on_submit: f.on_submit, updated_at: new Date().toISOString() }).eq("id", f.id);
   if (error) return { ok: false, error: error.code === "23505" ? "That link name is taken" : error.message };
+  // the public page is cached: expire it so the change shows on the next open
+  updateTag(`form:${f.slug}`);
+  if (before?.slug && before.slug !== f.slug) updateTag(`form:${before.slug}`);
   revalidatePath("/crm/forms");
   revalidatePath(`/crm/forms/${f.id}`);
   return { ok: true };
@@ -51,7 +55,8 @@ export async function saveForm(input: unknown): Promise<{ ok: boolean; error?: s
 export async function deleteForm(formData: FormData) {
   const { supabase, staff } = await requireStaff();
   if (staff.role !== "admin") return;
-  await supabase.from("crm_forms").delete().eq("id", String(formData.get("id")));
+  const { data: gone } = await supabase.from("crm_forms").delete().eq("id", String(formData.get("id"))).select("slug").maybeSingle();
+  if (gone?.slug) updateTag(`form:${gone.slug}`);
   revalidatePath("/crm/forms");
   redirect("/crm/forms");
 }
