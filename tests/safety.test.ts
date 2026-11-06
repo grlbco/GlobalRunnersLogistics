@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { gate, inQuietHours, type GateInput } from "@/lib/crm/sendGate";
 import { failureKind, needsRescue } from "@/lib/agent/recovery";
-import { isOptOut, isWrongNumber } from "@/lib/crm/ingest";
-import { actorType, decideMove, quoteFound } from "@/lib/crm/pipeline";
+import { isOptOut, isWrongNumber, redact } from "@/lib/crm/ingest";
+import { HUMAN_WORDS } from "@/lib/agent/engine";
+import { actorType, decideMove, isClosed, outcomeOf, quoteFound, webhookSilent } from "@/lib/crm/pipeline";
+import { EVAL_CASES, judge } from "@/lib/agent/evalCases";
 import { checkReply } from "@/lib/agent/checks";
 import { DISCLOSURE_EMAIL, DISCLOSURE_TEXT, fixedAnswer, withDisclosure } from "@/lib/agent/fixed";
 import { consentFromEmail, consentFromText } from "@/lib/crm/consent";
+import { canAutoSend, duplicateReason, groupFromKey, groupKey, reviewProgress, riskGroup } from "@/lib/agent/graduation";
 
 // Wednesday Nov 4 2026, noon in Las Vegas
 const NOON = new Date("2026-11-04T20:00:00Z");
@@ -136,4 +139,95 @@ describe("replying to a driver who texted us", () => {
 
 describe("promises the AI can't make", () => {
   it.each(["you're hired", "you qualify for this", "you are approved", "I promise you'll get miles"])("blocks %j", (t) => expect(checkReply(t, { channel: "sms", formUrl: "https://x.test/f" }).ok).toBe(false));
+});
+
+describe("earning auto-send", () => {
+  const clean = (group: string, n: number) => Array.from({ length: n }, () => ({ group }));
+  it("sorts messages by kind", () => {
+    expect(riskGroup({ trigger: "text_received", intent: "question", fixed: true })).toBe("fixed");
+    expect(riskGroup({ trigger: "followup", intent: "other", fixed: false })).toBe("followups");
+    expect(riskGroup({ trigger: "text_received", intent: "question", fixed: false })).toBe("questions");
+    expect(riskGroup({ trigger: "text_received", intent: "interested", fixed: false })).toBe("general");
+  });
+  it("reads the group back from the key", () => { expect(groupFromKey(groupKey("followups", "abc"))).toBe("followups"); expect(groupFromKey("wf:1:send_text:3")).toBeNull(); expect(groupFromKey(null)).toBeNull(); });
+  it("never auto-sends on unapproved facts, even with draft mode off", () => expect(canAutoSend({ group: "questions", draftMode: false, factsApproved: false, autoGroups: ["questions"] })).toBe(false));
+  it("drafts a group that hasn't been switched on", () => expect(canAutoSend({ group: "questions", draftMode: true, factsApproved: true, autoGroups: ["fixed"] })).toBe(false));
+  it("sends a group that has", () => expect(canAutoSend({ group: "fixed", draftMode: true, factsApproved: true, autoGroups: ["fixed"] })).toBe(true));
+  it("draft mode off sends everything once facts are approved", () => expect(canAutoSend({ group: "general", draftMode: false, factsApproved: true, autoGroups: [] })).toBe(true));
+  it("99 clean reviews isn't enough", () => expect(reviewProgress("questions", clean("questions", 99)).ready).toBe(false));
+  it("100 clean reviews is", () => expect(reviewProgress("questions", clean("questions", 100)).ready).toBe(true));
+  it("too many changes holds it back", () => expect(reviewProgress("questions", [...clean("questions", 100), ...Array.from({ length: 20 }, () => ({ group: "questions", edited: true }))]).ready).toBe(false));
+  it("discards count against it", () => expect(reviewProgress("general", [{ group: "general", discarded: true }]).changed).toBe(1));
+  it("other groups' reviews don't count", () => expect(reviewProgress("general", clean("questions", 200)).reviewed).toBe(0));
+  it("fixed answers need no track record", () => expect(reviewProgress("fixed", []).ready).toBe(true));
+});
+
+describe("likely duplicates", () => {
+  const p = { id: "a", first_name: "Luis", last_name: "Ortega", phone: "+17025550100", cell_phone: null, company_name: null, state: "NV" };
+  it("matches a phone across fields", () => expect(duplicateReason(p, { ...p, id: "b", phone: null, cell_phone: "+17025550100", first_name: "X" })).toBe("Same phone number"));
+  it("matches name and state", () => expect(duplicateReason(p, { ...p, id: "b", phone: "+17025550111", first_name: "luis" })).toBe("Same name and state"));
+  it("name alone isn't enough", () => expect(duplicateReason(p, { ...p, id: "b", phone: null, state: "AZ" })).toBeNull());
+  it("a record isn't its own duplicate", () => expect(duplicateReason(p, p)).toBeNull());
+});
+
+describe("the assistant's test set", () => {
+  const ok = { reply: "It's per mile, paid every Thursday.", handoff: false, stops: false };
+  const byName = (n: string) => EVAL_CASES.find((c) => c.name === n)!;
+  it("has at least 30 cases with unique names", () => { expect(EVAL_CASES.length).toBeGreaterThanOrEqual(30); expect(new Set(EVAL_CASES.map((c) => c.name)).size).toBe(EVAL_CASES.length); });
+  it.each(["normal", "pay", "injection", "handoff", "stop", "off-limits", "honesty"])("covers %s", (g) => expect(EVAL_CASES.some((c) => c.group === g)).toBe(true));
+  it("passes a good pay answer", () => expect(judge(byName("pay, fixed answer"), ok)).toEqual([]));
+  it("catches a stated rate", () => expect(judge(byName("pay, fixed answer"), { ...ok, reply: "per mile, 80 cents per mile" }).length).toBeGreaterThan(0));
+  it("catches a missed hand-off", () => expect(judge(byName("legal threat"), ok).length).toBeGreaterThan(0));
+  it("catches a missed stop", () => expect(judge(byName("not interested"), ok).length).toBeGreaterThan(0));
+  it("catches a promise", () => expect(judge(byName("fake staff approval"), { ...ok, reply: "you're hired" }).length).toBeGreaterThan(0));
+  it("catches claiming to be human", () => expect(judge(byName("is this a scam"), { ...ok, reply: "I'm a real person" }).length).toBeGreaterThan(0));
+  it("counts a failure as a failure", () => expect(judge(byName("asks about pets"), { ...ok, failed: true }).length).toBe(1));
+  it("the set's own fixed answers pass", () => {
+    for (const c of EVAL_CASES) { const f = fixedAnswer(c.driver.at(-1)!); if (f) expect(judge(c, { reply: f.replies.join("\n"), handoff: false, stops: false })).toEqual([]); }
+  });
+});
+
+describe("closed drivers and real events", () => {
+  it("a finished form reopens a not-interested driver", () => expect(decideMove({ actor: "system", locked: false, current: "not_interested", to: "applied" })).toEqual({ apply: true, to: "applied" }));
+  it("a finished form reopens a not-a-fit driver for review", () => expect(decideMove({ actor: "system", locked: false, current: "not_fit", to: "applied" })).toEqual({ apply: true, to: "applied" }));
+  it("a form doesn't undo an opt-out", () => expect(decideMove({ actor: "system", locked: false, current: "unsubscribed", to: "applied" }).apply).toBe(false));
+  it("a form doesn't undo a hire", () => expect(decideMove({ actor: "system", locked: false, current: "hired", to: "applied" }).apply).toBe(false));
+  it.each(["not_fit", "not_interested", "unsubscribed", "bounced", "hired"] as const)("%s is closed", (s) => expect(isClosed(s)).toBe(true));
+  it.each(["replied", "interested", "nurture", "applied"] as const)("%s isn't", (s) => expect(isClosed(s)).toBe(false));
+});
+
+describe("noticing when Instantly goes quiet", () => {
+  const now = new Date("2026-11-10T12:00:00Z");
+  it("alerts after 3 days of silence with a live campaign", () => expect(webhookSilent({ lastEventAt: "2026-11-07T11:00:00Z", activeCampaigns: 1, lastAlertAt: null, now })).toBe(true));
+  it("alerts when a live campaign has never sent an event", () => expect(webhookSilent({ lastEventAt: null, activeCampaigns: 1, lastAlertAt: null, now })).toBe(true));
+  it("stays quiet with no live campaign", () => expect(webhookSilent({ lastEventAt: null, activeCampaigns: 0, lastAlertAt: null, now })).toBe(false));
+  it("stays quiet when events are flowing", () => expect(webhookSilent({ lastEventAt: "2026-11-09T12:00:00Z", activeCampaigns: 1, lastAlertAt: null, now })).toBe(false));
+  it("alerts once a day at most", () => expect(webhookSilent({ lastEventAt: null, activeCampaigns: 1, lastAlertAt: "2026-11-10T01:00:00Z", now })).toBe(false));
+});
+
+describe("how each conversation ended", () => {
+  const base = { stage: "interested" as const, doNotContact: false, agentMode: "auto", formCompleted: false, lastInboundAt: "2026-11-09T12:00:00Z", lastOutboundAt: "2026-11-09T12:05:00Z", now: new Date("2026-11-10T12:00:00Z") };
+  it("in progress", () => expect(outcomeOf(base)).toBe("In progress"));
+  it("form completed", () => expect(outcomeOf({ ...base, formCompleted: true })).toBe("Form completed"));
+  it("opted out wins", () => expect(outcomeOf({ ...base, formCompleted: true, doNotContact: true })).toBe("Opted out"));
+  it("handed off", () => expect(outcomeOf({ ...base, agentMode: "manual" })).toBe("Handed off"));
+  it("not qualified", () => expect(outcomeOf({ ...base, stage: "not_fit" })).toBe("Not qualified"));
+  it("not interested", () => expect(outcomeOf({ ...base, stage: "not_interested" })).toBe("Not interested"));
+  it("a quiet driver never counts as success", () => expect(outcomeOf({ ...base, lastOutboundAt: "2026-10-20T00:00:00Z", lastInboundAt: "2026-10-19T00:00:00Z" })).toBe("Went quiet"));
+  it("nurture is quiet", () => expect(outcomeOf({ ...base, stage: "nurture" })).toBe("Went quiet"));
+  it("hired", () => expect(outcomeOf({ ...base, stage: "hired", formCompleted: true })).toBe("Hired"));
+});
+
+describe("code catches these before the AI", () => {
+  it.each(["are you turning me down because I'm over 60?", "that's discrimination", "I have diabetes, does that matter", "I need an accommodation", "I got hurt on my last job", "you guys still owe me for two weeks", "my medical card expired"])("%j goes to a person", (t) => expect(HUMAN_WORDS.test(t)).toBe(true));
+  it.each(["I have no accidents", "how do I apply", "what's the pay", "are you human?", "because I want to work"])("%j doesn't", (t) => expect(HUMAN_WORDS.test(t)).toBe(false));
+  it("removes a Social Security number", () => expect(redact("my ssn is 123-45-6789 ok")).toBe("my ssn is [SSN removed] ok"));
+  it("leaves a phone number alone", () => expect(redact("call 702-555-0199")).toBe("call 702-555-0199"));
+});
+
+describe("topics only Ken can confirm", () => {
+  it.each(["is the $2000 weekly minimum guaranteed?", "do I need a hazmat endorsement", "what are the trucks governed at", "whats the speed limiter set to"])("%j gets the Ken answer", (t) => expect(fixedAnswer(t)?.intent).toBe("unconfirmed"));
+  it.each(["I'm on a green card, is that ok?", "do you sponsor a work visa", "I'm not a citizen but I have 10 years experience driving OTR across the whole country, and I am ready to start next week if you have room"])("%j is never judged", (t) => expect(fixedAnswer(t)?.intent).toBe("status"));
+  it("the set answers pass the reply checks", () => { for (const q of ["do I need hazmat", "green card ok?"]) for (const t of fixedAnswer(q)!.replies) expect(checkReply(t, { channel: "sms", formUrl: "https://x.test/f" }).problems).toEqual([]); });
+  it.each(["we don't do a weekly minimum", "nah there's no minimum", "you don't need hazmat", "no hazmat needed"])("blocks the denial %j", (t) => expect(checkReply(t, { channel: "sms", formUrl: "https://x.test/f" }).ok).toBe(false));
 });

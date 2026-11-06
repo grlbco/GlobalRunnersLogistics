@@ -1,6 +1,7 @@
 import { clsx } from "clsx";
 import { adminDb } from "@/lib/crm/admin";
-import { getAssistantSettings } from "@/lib/crm/settings";
+import { getAssistantSettings, getFactsApproval } from "@/lib/crm/settings";
+import { factsVersion } from "@/lib/agent/versions";
 import { isSendingOn } from "@/lib/crm/sending";
 import { Card } from "./ui";
 import { GrowBar } from "./motion";
@@ -14,7 +15,7 @@ type Item = { key: string; label: string; done: boolean; hint: string; manual?: 
 /** Launch readiness. Auto-checks what it can; the rest is ticked by an admin. Hides itself once everything is done. */
 export async function GoLive({ isAdmin }: { isAdmin: boolean }) {
   const db = adminDb();
-  const [{ data: gl }, { data: worker }, { count: campaigns }, assistant, sending, inboxes] = await Promise.all([
+  const [{ data: gl }, { data: worker }, { count: campaigns }, assistant, sending, inboxes, approval] = await Promise.all([
     db.from("app_settings").select("value").eq("key", "golive").maybeSingle(),
     db.from("app_settings").select("value").eq("key", "worker").maybeSingle(),
     db.from("campaigns").select("*", { count: "exact", head: true }),
@@ -29,6 +30,7 @@ export async function GoLive({ isAdmin }: { isAdmin: boolean }) {
         return 0;
       }
     })(),
+    getFactsApproval(),
   ]);
   const v = (gl?.value ?? {}) as { manual?: Record<string, boolean>; password_changed?: Record<string, string> };
   const m = v.manual ?? {};
@@ -43,7 +45,7 @@ export async function GoLive({ isAdmin }: { isAdmin: boolean }) {
     { key: "inboxes", label: "Warmed Instantly inboxes (3+)", done: inboxes >= 3, hint: `${inboxes} real inbox${inboxes === 1 ? "" : "es"} connected (the free AirMail one doesn't count)` },
     { key: "password", label: "Admin password changed from 1234", done: Object.keys(v.password_changed ?? {}).length > 0, hint: "CRM → My account → Change password" },
     { key: "leaked_pw", label: "Supabase leaked-password protection on", done: !!m.leaked_pw, hint: "Supabase → Auth → Passwords", manual: true },
-    { key: "ken_facts", label: "Ken confirmed pay rate, home time, hazmat, MC/DOT", done: !!m.ken_facts, hint: "Update the facts the assistant uses", manual: true },
+    { key: "ken_facts", label: "Ken approved the assistant's facts sheet", done: approval?.version === factsVersion(), hint: "CRM → Assistant → Facts sheet" },
     { key: "sending", label: "Sending switched on", done: sending, hint: "CRM → Settings → All sending" },
     { key: "assistant", label: "Assistant on, draft mode for the first 50", done: assistant.enabled, hint: assistant.draft_mode ? "Draft mode is on (good for the pilot)" : "Turn draft mode on for the pilot" },
     { key: "campaign", label: "Pilot campaign created (10 leads)", done: (campaigns ?? 0) > 0, hint: "CRM → Campaigns → New, add a 10-lead wave" },

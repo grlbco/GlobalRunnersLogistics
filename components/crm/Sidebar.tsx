@@ -28,8 +28,10 @@ const ACCOUNT: Item = { href: "/crm/account", label: "Account", icon: "M12 12a4 
 const SIGN_OUT = "M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10";
 
 const SPRING = { type: "spring", stiffness: 560, damping: 38 } as const;
-const TILE = "group relative flex h-11 w-11 items-center justify-center rounded-[13px] transition-colors duration-150";
-const RAIL_GROUP = "flex flex-col gap-1 rounded-[17px] border-[3px] border-line bg-subtle p-[3px]";
+const TILE = "relative flex h-11 w-full items-center overflow-hidden rounded-[13px] text-left transition-colors duration-150";
+const RAIL_GROUP = "flex w-full flex-col gap-1 rounded-[17px] border-[3px] border-line bg-subtle p-[3px]";
+// Labels stay hidden until the rail opens. Opens for a mouse hover or keyboard focus, not for a click, so it closes when the cursor leaves.
+const LABEL = "relative truncate pr-3 text-[0.875rem] font-medium opacity-0 transition-opacity duration-150 group-hover/rail:opacity-100 group-has-[:focus-visible]/rail:opacity-100";
 
 function Icon({ d, className }: { d: string; className?: string }) {
   return (
@@ -39,20 +41,12 @@ function Icon({ d, className }: { d: string; className?: string }) {
   );
 }
 
-function Tip({ children }: { children: string }) {
-  return (
-    <span className="pointer-events-none absolute left-full z-50 ml-3 -translate-x-1 whitespace-nowrap rounded-[9px] bg-fg px-2.5 py-1.5 text-[0.78rem] font-medium text-surface opacity-0 transition-[opacity,transform] duration-150 group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:opacity-100">
-      {children}
-    </span>
-  );
-}
-
 function RailLink({ item, on }: { item: Item; on: boolean }) {
   return (
     <Link href={item.href} aria-label={item.label} aria-current={on ? "page" : undefined} className={clsx(TILE, on ? "text-surface" : "bg-surface text-fg-2 hover:text-fg")}>
       {on && <motion.span layoutId="rail-active" className="absolute inset-0 rounded-[13px] bg-fg" transition={SPRING} />}
-      <Icon d={item.icon} className="relative" />
-      <Tip>{item.label}</Tip>
+      <span className="relative flex h-11 w-11 shrink-0 items-center justify-center"><Icon d={item.icon} /></span>
+      <span className={LABEL}>{item.label}</span>
     </Link>
   );
 }
@@ -66,22 +60,31 @@ export function Sidebar({ allowed }: { allowed: string[]; me?: { name: string; r
 
   return (
     <>
-      <aside className="sticky top-0 z-30 hidden h-dvh w-[5.25rem] shrink-0 flex-col items-center justify-between py-4 md:flex">
-        <BrandTile href="/crm" />
-        <LayoutGroup id="crm-rail">
-          <nav aria-label="Main" className={RAIL_GROUP}>
-            {main.map((item) => <RailLink key={item.href} item={item} on={active(item.href)} />)}
-          </nav>
-          <div className={RAIL_GROUP}>
-            {secondary.map((item) => <RailLink key={item.href} item={item} on={active(item.href)} />)}
-            <form action={crmSignOut}>
-              <button aria-label="Sign out" className={clsx(TILE, "bg-surface text-fg-2 hover:text-fg")}>
-                <Icon d={SIGN_OUT} />
-                <Tip>Sign out</Tip>
-              </button>
-            </form>
+      {/* The aside holds the rail's collapsed width, so opening slides over the page instead of pushing it. */}
+      <aside className="sticky top-0 z-30 hidden h-dvh w-[5.25rem] shrink-0 md:block">
+        <div className="group/rail absolute inset-y-0 left-0 flex w-[5.25rem] flex-col justify-between overflow-hidden rounded-r-[20px] px-[14px] py-4 transition-[width,background-color,box-shadow] duration-200 ease-house hover:w-[14.5rem] hover:bg-canvas hover:shadow-pop has-[:focus-visible]:w-[14.5rem] has-[:focus-visible]:bg-canvas has-[:focus-visible]:shadow-pop">
+          <div className="flex items-center gap-3 pl-[6px]">
+            <span className="shrink-0"><BrandTile href="/crm" /></span>
+            <span className={clsx(LABEL, "!pr-0 leading-tight")}>
+              <span className="block truncate text-fg">Command</span>
+              <span className="block truncate text-[0.75rem] font-normal text-muted">Global Runners</span>
+            </span>
           </div>
-        </LayoutGroup>
+          <LayoutGroup id="crm-rail">
+            <nav aria-label="Main" className={RAIL_GROUP}>
+              {main.map((item) => <RailLink key={item.href} item={item} on={active(item.href)} />)}
+            </nav>
+            <div className={RAIL_GROUP}>
+              {secondary.map((item) => <RailLink key={item.href} item={item} on={active(item.href)} />)}
+              <form action={crmSignOut}>
+                <button aria-label="Sign out" className={clsx(TILE, "bg-surface text-fg-2 hover:text-fg")}>
+                  <span className="relative flex h-11 w-11 shrink-0 items-center justify-center"><Icon d={SIGN_OUT} /></span>
+                  <span className={LABEL}>Sign out</span>
+                </button>
+              </form>
+            </div>
+          </LayoutGroup>
+        </div>
       </aside>
 
       {/* Phones: four sections + Account (the rest are listed on the Account page) */}

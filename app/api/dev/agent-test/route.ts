@@ -50,12 +50,10 @@ export async function GET(req: Request) {
     const form = (await formLinkFor(test.id)).url;
     const turns: Turn[] = [
       { at: new Date(Date.now() - 3 * 3600_000).toISOString(), direction: "inbound", channel: "sms", author: "lead", body: "ok send me the application, I have 4 years otr" },
-      { at: new Date(Date.now() - 3 * 3600_000).toISOString(), direction: "outbound", channel: "sms", author: "agent", body: `4 years is solid. Here's the form, takes about 5 min: ${form}` },
+      { at: new Date(Date.now() - 3 * 3600_000).toISOString(), direction: "outbound", channel: "sms", author: "agent", body: `4 years is solid. Here's the form, takes a few minutes: ${form}` },
     ];
-    const plan: { kind: "chase" | "chase_extra" | "nurture"; n: number; ch: "sms" | "email" }[] = [
-      { kind: "chase", n: 1, ch: "sms" }, { kind: "chase_extra", n: 1, ch: "email" }, { kind: "chase", n: 2, ch: "sms" }, { kind: "chase", n: 3, ch: "email" },
-      { kind: "chase", n: 4, ch: "sms" }, { kind: "chase", n: 5, ch: "email" }, { kind: "chase", n: 6, ch: "sms" }, { kind: "chase", n: 7, ch: "email" },
-      { kind: "chase", n: 8, ch: "sms" }, { kind: "nurture", n: 1, ch: "email" },
+    const plan: { kind: "chase" | "nurture"; n: number; ch: "sms" | "email" }[] = [
+      { kind: "chase", n: 1, ch: "sms" }, { kind: "chase", n: 2, ch: "sms" }, { kind: "chase", n: 3, ch: "email" }, { kind: "chase", n: 4, ch: "email" }, { kind: "nurture", n: 1, ch: "email" },
     ];
     const transcript: string[] = [];
     const problems: string[] = [];

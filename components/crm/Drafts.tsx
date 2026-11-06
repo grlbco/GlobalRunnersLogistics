@@ -24,6 +24,7 @@ export async function Drafts({ supabase, contactId }: { supabase: SupabaseClient
             {d.error && <span className="text-faint">{d.error}</span>}
           </div>
           <textarea name="body" defaultValue={d.body} rows={d.channel === "sms" ? 2 : 4} className={`${inputCls} h-auto py-2`} />
+          <input name="reason" maxLength={200} placeholder="If you change or discard this, why? (helps tune it)" aria-label="Why you changed or discarded this" className={`${inputCls} mt-2`} />
           <div className="mt-2 flex justify-end gap-2">
             <button formAction={discardDraft} className={btnGhostCls}>Discard</button>
             <button className={btnCls}>{d.status === "draft" ? "Approve & send" : "Send now"}</button>

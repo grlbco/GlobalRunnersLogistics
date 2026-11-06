@@ -5,6 +5,7 @@ import { notifyTeam } from "@/lib/crm/notify";
 import { getAssistantSettings } from "@/lib/crm/settings";
 import { esc, sendTelegram } from "@/lib/integrations/telegram";
 import { company } from "@/content/facts";
+import { webhookSilent } from "@/lib/crm/pipeline";
 import { HOLDING_TEXT, REPLY_WINDOW_MS_FOR_HOLD, needsRescue } from "./recovery";
 
 const siteUrl = () => process.env.NEXT_PUBLIC_SITE_URL || company.url;
@@ -37,6 +38,25 @@ export async function escalateToPerson(contactId: string, reason: string) {
     ]);
   } catch (e) {
     console.error("escalateToPerson failed", contactId, e);
+  }
+}
+
+/** A switched-off webhook would quietly stop "interested" reaching the assistant, so silence itself raises an alert. */
+async function alertIfInstantlySilent(now: Date) {
+  const db = adminDb();
+  try {
+    const [{ count: active }, { data: last }, { data: alerts }] = await Promise.all([
+      db.from("campaigns").select("*", { count: "exact", head: true }).eq("status", "active"),
+      db.from("events").select("created_at").eq("source", "instantly").order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      db.from("app_settings").select("value").eq("key", "alerts").maybeSingle(),
+    ]);
+    const value = (alerts?.value as Record<string, string> | undefined) ?? {};
+    if (!webhookSilent({ lastEventAt: last?.created_at ?? null, activeCampaigns: active ?? 0, lastAlertAt: value.instantly_silent ?? null, now })) return;
+    await db.from("app_settings").upsert({ key: "alerts", value: { ...value, instantly_silent: now.toISOString() }, updated_at: now.toISOString() });
+    const text = "A campaign is live but no Instantly events have arrived in 3 days. Its webhook may be switched off, so interested leads wouldn't reach the assistant. Check CRM → Settings → Connections.";
+    await Promise.allSettled([notifyTeam("Instantly has gone quiet", text), sendTelegram(`⚠️ <b>Instantly has gone quiet</b>\n${esc(text)}`)]);
+  } catch (e) {
+    console.error("instantly silence check failed", e);
   }
 }
 
@@ -82,5 +102,6 @@ export async function sweepStuck() {
       rescued++;
     }
   }
+  await alertIfInstantlySilent(now);
   return { rescued, staleRuns: runs?.length ?? 0, interruptedSends: sends?.length ?? 0 };
 }

@@ -10,6 +10,7 @@ const BANNED = [
   /\bnot just\b[^.!?]{1,40}\bbut\b/i,
   /\b(absolutely|certainly|rest assured|seamless|journey|reach out|i understand your concern|thrilled)\b/i,
   /\bguarantee(d)?\b/i,
+  /\b(no|not|don'?t|doesn'?t|isn'?t|never)\b[^.!?\n]{0,30}\b(minimum|hazmat|tanker|endorsement)\b/i, // unconfirmed: never denied
   /\b(you'?re|you are) (hired|approved|qualified|in)\b|\byou qualify\b|\bi promise\b|\bwe promise\b/i, // hiring is Ken's call
   /(^|\n)\s*-*\s*Ken(\s*(\/|from|at)[^\n]*)?\s*$/i, // signed as Ken: the assistant isn't Ken
   /\b(i'?ll|i will|let me) (give you a (call|ring)|call you|ring you)\b/i, // only Ken calls

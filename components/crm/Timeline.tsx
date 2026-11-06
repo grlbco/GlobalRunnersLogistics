@@ -4,14 +4,14 @@ import { stageLabel } from "@/lib/crm/stages";
 import { REPLY_WINDOW_MS } from "@/lib/crm/sendGate";
 
 export type Item =
-  | { kind: "message"; at: string; channel: string; direction: string; author: string; subject: string | null; body: string; status: string }
+  | { kind: "message"; at: string; channel: string; direction: string; author: string; subject: string | null; body: string; status: string; meta?: { approved_by_person?: boolean; edited_by_person?: boolean } | null }
   | { kind: "activity"; at: string; type: string; data: Record<string, unknown>; actor: string }
   | { kind: "note"; at: string; body: string; author_kind: string };
 
 /** Every email, text, call, note and activity for one contact, newest first. */
 export async function loadTimeline(supabase: SupabaseClient, id: string): Promise<Item[]> {
   const [msgs, acts, notes] = await Promise.all([
-    supabase.from("messages").select("channel, direction, author, subject, body, status, created_at").eq("contact_id", id).order("created_at", { ascending: false }).limit(200),
+    supabase.from("messages").select("channel, direction, author, subject, body, status, created_at, meta").eq("contact_id", id).order("created_at", { ascending: false }).limit(200),
     supabase.from("activities").select("type, data, actor, created_at").eq("contact_id", id).order("created_at", { ascending: false }).limit(200),
     supabase.from("notes").select("body, author_kind, created_at").eq("contact_id", id).order("created_at", { ascending: false }).limit(100),
   ]);
@@ -38,7 +38,7 @@ export function TimelineItem({ it }: { it: Item }) {
   const time = <time className="text-[0.7rem] text-faint">{new Date(it.at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</time>;
   if (it.kind === "message") {
     const inbound = it.direction === "inbound";
-    const who = inbound ? "Driver" : it.author === "agent" ? "Assistant" : it.author === "campaign" ? "Campaign" : it.author === "human" ? "You" : "System";
+    const who = inbound ? "Driver" : it.author === "agent" ? (it.meta?.edited_by_person ? "Assistant, edited by a person" : it.meta?.approved_by_person ? "Assistant, approved by a person" : "Assistant") : it.author === "campaign" ? "Campaign" : it.author === "human" ? "You" : "System";
     const assistant = !inbound && it.author === "agent";
     return (
       <li className={clsx("max-w-[42rem]", !inbound && "ml-auto")}>

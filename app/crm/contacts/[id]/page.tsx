@@ -11,6 +11,8 @@ import { addNote, addTask, askAssistant, setAgentMode, setStage, toggleTask, upd
 import { getAssistantSettings } from "@/lib/crm/settings";
 import { Avatar, Badge, Card, Label, Skeleton, StageBadge, Stat, btnCls, btnGhostCls, inputCls, selectCls } from "@/components/crm/ui";
 import { Stagger, StaggerItem } from "@/components/crm/motion";
+import { duplicateReason } from "@/lib/agent/graduation";
+import { outcomeOf } from "@/lib/crm/pipeline";
 import { Composer } from "@/components/crm/Composer";
 import { GiveAnswer } from "@/components/crm/GiveAnswer";
 import { Drafts } from "@/components/crm/Drafts";
@@ -55,6 +57,17 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
   // The list came from FMCSA carrier records: that describes a carrier, not a driver, until they tell us otherwise.
   const fromList = c.source === "toss_import";
   const cdlConfirmed = !!form?.completed_at || Object.keys(facts).some((k) => /cdl/i.test(k));
+  const phoneMatch = phones.flatMap((x) => [`phone.eq.${x}`, `cell_phone.eq.${x}`]).join(",");
+  const personCols = "id, first_name, last_name, phone, cell_phone, company_name, state";
+  const [samePhone, sameName] = await Promise.all([
+    phoneMatch ? supabase.from("contacts").select(personCols).or(phoneMatch).neq("id", c.id).limit(5) : Promise.resolve({ data: [] }),
+    c.first_name && c.last_name && c.state ? supabase.from("contacts").select(personCols).ilike("first_name", c.first_name).ilike("last_name", c.last_name).eq("state", c.state).neq("id", c.id).limit(5) : Promise.resolve({ data: [] }),
+  ]);
+  const duplicates = [...(samePhone.data ?? []), ...(sameName.data ?? [])]
+    .filter((x, i, all) => all.findIndex((y) => y.id === x.id) === i)
+    .map((x) => ({ ...x, why: duplicateReason(c, x) }))
+    .filter((x) => x.why);
+  const outcome = outcomeOf({ stage: c.stage, doNotContact: c.do_not_contact, agentMode: c.agent_mode, formCompleted: !!form?.completed_at, lastInboundAt: c.last_inbound_at, lastOutboundAt: c.last_outbound_at, now: new Date() });
   const waitingOnKen = ["applied", "qualified", "sent_to_ken"].includes(c.stage);
   const call = c.cell_phone ?? c.phone;
 
@@ -72,6 +85,7 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <StageBadge stage={c.stage} />
+          {outcome !== "In progress" && <Badge tone={outcome === "Form completed" || outcome === "Hired" ? "good" : outcome === "Went quiet" || outcome === "Handed off" ? "warn" : "neutral"}>{outcome}</Badge>}
           <Badge dot tone={c.agent_mode === "auto" ? "info" : "warn"}>{c.agent_mode === "auto" ? "Assistant on" : "Manual"}</Badge>
           {!cdlConfirmed && fromList && <Badge tone="warn">Carrier record, CDL not confirmed</Badge>}
         </div>
@@ -141,6 +155,14 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
             </div>
           ))}
         </dl>
+
+        {duplicates.length > 0 && (
+          <div className="rounded-[12px] border border-line bg-subtle px-3 py-2 text-[0.8rem]">
+            <p className="font-medium text-fg-2">Might be the same driver</p>
+            <ul className="mt-1 space-y-1">{duplicates.map((x) => <li key={x.id}><Link href={`/crm/contacts/${x.id}`} className="text-fg underline-offset-4 hover:underline">{fullName(x)}</Link> <span className="text-faint">· {x.why}</span></li>)}</ul>
+            <p className="mt-1 text-[0.72rem] text-faint">Not merged: a phone can be shared by several drivers.</p>
+          </div>
+        )}
 
         <details className="group rounded-[14px] border border-line bg-surface shadow-card">
           <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-[0.84rem] font-medium text-fg-2 hover:text-fg">Edit details<span className="text-faint transition-transform group-open:rotate-180">⌄</span></summary>

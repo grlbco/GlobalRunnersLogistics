@@ -1,5 +1,7 @@
 "use server";
 
+import { RISK_GROUPS, groupFromKey, reviewProgress, type RiskGroup } from "@/lib/agent/graduation";
+import { reviewsFrom } from "@/lib/crm/format";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requirePerm } from "@/lib/crm/auth";
@@ -73,6 +75,48 @@ export async function giveAnswer(formData: FormData) {
   }
   revalidatePath(`/crm/contacts/${parsed.data.id}`);
   revalidatePath("/crm/inbox");
+}
+
+/** Spot-check a reply the assistant really sent. This is how silent mistakes get found. */
+export async function reviewReply(formData: FormData) {
+  const { staff } = await requirePerm("assistant.manage");
+  const parsed = z.object({ message_id: id, contact_id: id, ok: z.enum(["0", "1"]) }).safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return;
+  const { adminDb } = await import("@/lib/crm/admin");
+  await adminDb().from("activities").insert({ contact_id: parsed.data.contact_id, type: "reply_review", data: { message_id: parsed.data.message_id, ok: parsed.data.ok === "1" }, actor: `user:${staff.id}` });
+  revalidatePath("/crm/assistant");
+}
+
+/** Sign off the facts sheet exactly as it reads right now. */
+export async function approveFacts() {
+  const { staff } = await requirePerm("assistant.manage");
+  const { adminDb } = await import("@/lib/crm/admin");
+  const { factsVersion } = await import("@/lib/agent/versions");
+  await adminDb().from("app_settings").upsert({ key: "facts_approval", value: { version: factsVersion(), by: staff.name, at: new Date().toISOString() }, updated_at: new Date().toISOString() });
+  revalidatePath("/crm/assistant");
+  revalidatePath("/crm");
+}
+
+/** Switch one kind of message to auto-send or back. Rechecked here: the button being visible isn't enough. */
+export async function setAutoSend(formData: FormData) {
+  const { staff } = await requirePerm("assistant.manage");
+  const parsed = z.object({ group: z.enum(RISK_GROUPS.map((g) => g.key) as [RiskGroup, ...RiskGroup[]]), on: z.enum(["0", "1"]) }).safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return;
+  const { adminDb } = await import("@/lib/crm/admin");
+  const { getAutoGroups, getFactsApproval } = await import("@/lib/crm/settings");
+  const { factsVersion } = await import("@/lib/agent/versions");
+  const db = adminDb();
+  const on = parsed.data.on === "1";
+  if (on) {
+    const { data: rows } = await db.from("activities").select("type, data").in("type", ["draft_approved", "draft_discarded"]).limit(5000);
+    const ok = reviewProgress(parsed.data.group, reviewsFrom(rows ?? [])).ready && (await getFactsApproval())?.version === factsVersion();
+    if (!ok) return;
+  }
+  const groups = new Set(await getAutoGroups());
+  if (on) groups.add(parsed.data.group);
+  else groups.delete(parsed.data.group);
+  await db.from("app_settings").upsert({ key: "autosend", value: { groups: [...groups], changed_by: staff.name }, updated_at: new Date().toISOString() });
+  revalidatePath("/crm/assistant");
 }
 
 export type SendState = { ok: boolean; message: string } | null;
@@ -174,14 +218,21 @@ export async function markRead(contactId: string) {
 /** Approve an assistant draft (optionally edited) and send it now. */
 export async function approveDraft(formData: FormData) {
   const { supabase, staff } = await requirePerm("contacts.message");
-  const parsed = z.object({ id, contact_id: id, body: z.string().trim().min(1).max(1500) }).safeParse(Object.fromEntries(formData));
+  const parsed = z.object({ id, contact_id: id, body: z.string().trim().min(1).max(1500), reason: z.string().trim().max(200).optional() }).safeParse(Object.fromEntries(formData));
   if (!parsed.success) return;
-  const { data: orig } = await supabase.from("outbox").select("body").eq("id", parsed.data.id).maybeSingle();
+  const { data: orig } = await supabase.from("outbox").select("body, dedupe_key").eq("id", parsed.data.id).maybeSingle();
   // A person approved it: send now, no quiet-hour hold.
   await supabase.from("outbox").update({ status: "pending", body: parsed.data.body, send_after: new Date().toISOString(), author_id: staff.id, is_reply: true, error: null }).eq("id", parsed.data.id).in("status", ["draft", "pending"]);
   const { processRow } = await import("@/lib/crm/outbox");
   const out = await processRow(parsed.data.id);
-  await supabase.from("activities").insert({ contact_id: parsed.data.contact_id, type: out.ok ? "draft_approved" : "draft_failed", data: out.ok ? { edited: (orig?.body ?? "").trim() !== parsed.data.body } : { reason: out.reason }, actor: `user:${staff.id}` });
+  await supabase.from("activities").insert({ contact_id: parsed.data.contact_id, type: out.ok ? "draft_approved" : "draft_failed", data: out.ok ? { edited: (orig?.body ?? "").trim() !== parsed.data.body, group: groupFromKey(orig?.dedupe_key), reason: parsed.data.reason || null } : { reason: out.reason }, actor: `user:${staff.id}` });
+  if (out.ok && out.messageId) {
+    // The timeline shows a person checked this, and whether they changed it.
+    const { adminDb } = await import("@/lib/crm/admin");
+    const db = adminDb();
+    const { data: msg } = await db.from("messages").select("meta").eq("id", out.messageId).maybeSingle();
+    await db.from("messages").update({ meta: { ...((msg?.meta as object) ?? {}), approved_by_person: true, edited_by_person: (orig?.body ?? "").trim() !== parsed.data.body } }).eq("id", out.messageId);
+  }
   if (out.ok) await maybeLeaveDraftMode();
   revalidatePath(`/crm/contacts/${parsed.data.contact_id}`);
   revalidatePath("/crm/inbox");
@@ -189,10 +240,11 @@ export async function approveDraft(formData: FormData) {
 
 export async function discardDraft(formData: FormData) {
   const { supabase, staff } = await requirePerm("contacts.message");
-  const parsed = z.object({ id, contact_id: id }).safeParse(Object.fromEntries(formData));
+  const parsed = z.object({ id, contact_id: id, reason: z.string().trim().max(200).optional() }).safeParse(Object.fromEntries(formData));
   if (!parsed.success) return;
+  const { data: orig } = await supabase.from("outbox").select("dedupe_key").eq("id", parsed.data.id).maybeSingle();
   await supabase.from("outbox").update({ status: "cancelled", error: "discarded by staff" }).eq("id", parsed.data.id).in("status", ["draft", "pending"]);
-  await supabase.from("activities").insert({ contact_id: parsed.data.contact_id, type: "draft_discarded", actor: `user:${staff.id}` });
+  await supabase.from("activities").insert({ contact_id: parsed.data.contact_id, type: "draft_discarded", data: { group: groupFromKey(orig?.dedupe_key), reason: parsed.data.reason || null }, actor: `user:${staff.id}` });
   revalidatePath(`/crm/contacts/${parsed.data.contact_id}`);
   revalidatePath("/crm/inbox");
 }

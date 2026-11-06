@@ -110,6 +110,9 @@ export type NewMessage = {
   at?: string;
 };
 
+/** A Social Security number sent by mistake is never stored, shown to staff, or passed to the AI. */
+export const redact = (body: string) => body.replace(/\b\d{3}[- ]\d{2}[- ]\d{4}\b/g, "[SSN removed]");
+
 /** Inserts a message once. Returns the new row id, or null if it was already stored. */
 export async function recordMessage(m: NewMessage): Promise<string | null> {
   const db = adminDb();
@@ -119,7 +122,7 @@ export async function recordMessage(m: NewMessage): Promise<string | null> {
     .from("messages")
     .insert({
       contact_id: m.contactId, conversation_id: conversationId, channel: m.channel, direction: m.direction, author: m.author,
-      author_id: m.authorId ?? null, subject: m.subject ?? null, body: m.body, external_id: m.externalId ?? null,
+      author_id: m.authorId ?? null, subject: m.subject ?? null, body: redact(m.body), external_id: m.externalId ?? null,
       status: m.status ?? (m.direction === "inbound" ? "received" : "sent"), meta: m.meta ?? {}, created_at: at,
     })
     .select("id")

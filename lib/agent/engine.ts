@@ -1,8 +1,12 @@
 import "server-only";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { adminDb } from "@/lib/crm/admin";
 import { activity, moveStage, suppress, type Contact } from "@/lib/crm/ingest";
-import { getAssistantSettings } from "@/lib/crm/settings";
+import { getAssistantSettings, getAutoGroups, getFactsApproval } from "@/lib/crm/settings";
+import { canAutoSend, groupKey, riskGroup } from "./graduation";
+import { isClosed } from "@/lib/crm/pipeline";
+import { factsVersion, promptVersion } from "./versions";
 import { notifyTeam } from "@/lib/crm/notify";
 import { sendTelegram, esc } from "@/lib/integrations/telegram";
 import { localTime } from "@/lib/crm/timezones";
@@ -61,7 +65,7 @@ const NURTURE_GAP_H = 90 * 24;
 const NURTURE_MAX = 2;
 export type FollowupKind = "nudge" | "chase" | "chase_extra" | "nurture";
 // Asking for a person, legal words, threats. ("are you human?" / "is this a scam?" get an honest answer instead.)
-export const HUMAN_WORDS = /\b((talk|speak|chat)\s+(to|with)\s+(a\s+|an\s+)?(real\s+)?(person|human|manager|supervisor|someone|recruiter)|manager|supervisor|lawyer|attorney|sue you|lawsuit|complaint|harass\w*|police|report you)\b/i;
+export const HUMAN_WORDS = /\b((talk|speak|chat)\s+(to|with)\s+(a\s+|an\s+)?(real\s+)?(person|human|manager|supervisor|someone|recruiter)|manager|supervisor|lawyer|attorney|sue you|lawsuit|complaint|harass\w*|police|report you|discriminat\w*|eeoc|osha|because (i'?m|i am|of my)|too old|disabilit\w*|accommodat\w*|diabet\w*|medical|medication|(got|was|been) (hurt|injured)|injury|owes? me|still owe|back pay|unpaid|didn'?t pay me)\b/i;
 
 /** Moves a follow-up time into a good texting window in the driver's zone: 10-11am or 5-6:30pm, Mon-Sat. */
 export function inGoodWindow(due: Date, tz: string | null): Date {
@@ -110,17 +114,22 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
     if (!dry) {
       if (!settings.enabled) return (await log({ action: "ignored", decision: { reason: "assistant is off" } }), { action: "ignored", reason: "Assistant is off" });
       const driverWrote = input.trigger === "text_received" || input.trigger === "email_received";
-      const tellHandler = async () => {
+      const driverName = [c.first_name, c.last_name].filter(Boolean).join(" ") || "driver";
+      const tellPerson = async (title: string) => {
         if (!driverWrote) return;
-        const title = `Driver replied while you were handling: ${[c.first_name, c.last_name].filter(Boolean).join(" ") || "driver"}`;
         const { count: open } = await db.from("tasks").select("*", { count: "exact", head: true }).eq("contact_id", c.id).is("done_at", null).eq("title", title);
         if (!open) await db.from("tasks").insert({ contact_id: c.id, title, due_at: new Date().toISOString(), created_by: "agent" });
       };
+      const tellHandler = () => tellPerson(`Driver replied while you were handling: ${driverName}`);
+      // A closed file writing back is for a person. It reopens the conversation, but never restores permission to contact them.
+      if (c.do_not_contact || (isClosed(c.stage) && input.trigger !== "manual")) {
+        await tellPerson(`Driver wrote after their file was closed: ${driverName}`);
+        return (await log({ action: "ignored", decision: { reason: c.do_not_contact ? "do not contact" : "closed file" } }), { action: "ignored", reason: c.do_not_contact ? "Do not contact" : "This driver's file is closed" });
+      }
       if (c.agent_mode !== "auto") {
         await tellHandler();
         return (await log({ action: "ignored", decision: { reason: "manual" } }), { action: "ignored", reason: "A person is handling this driver" });
       }
-      if (c.do_not_contact) return (await log({ action: "ignored", decision: { reason: "do not contact" } }), { action: "ignored", reason: "Do not contact" });
       if (input.trigger !== "manual" && c.agent_paused_until && new Date(c.agent_paused_until) > new Date()) {
         await tellHandler();
         return (await log({ action: "ignored", decision: { reason: "a person replied recently (paused)" } }), { action: "ignored", reason: "Paused: a person replied recently" });
@@ -321,6 +330,11 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
     // The first message on each channel says it's AI. Code does this, so it can't be forgotten or talked out of.
     const firstOn = async (ch: "email" | "sms") => !(await db.from("messages").select("*", { count: "exact", head: true }).eq("contact_id", c.id).eq("channel", ch).eq("author", "agent")).count;
     const parts = withDisclosure(decision.replies, channel, await firstOn(channel), fixed?.intent === "identity");
+    // Auto-send is earned per kind of message, and never happens on facts nobody has approved.
+    const [approval, autoGroups] = await Promise.all([getFactsApproval(), getAutoGroups()]);
+    const group = riskGroup({ trigger: input.trigger, intent: decision.intent, fixed: !!fixed });
+    const asDraft = !canAutoSend({ group, draftMode: settings.draft_mode, factsApproved: approval?.version === factsVersion(), autoGroups });
+    const versions = { prompt_version: promptVersion(), facts_version: factsVersion(), group, fixed_answer: fixed?.intent ?? null };
     if (parts.length) {
       const manual = input.trigger === "manual";
       // Human timing: quick in a live back-and-forth, slower after a long silence; extra texts follow like someone typing.
@@ -337,7 +351,7 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
         if (i > 0) at += 1000 * (8 + Math.random() * 12 + parts[i].length * 0.15);
         await db.from("outbox").insert({
           contact_id: c.id, channel, author: "agent", subject: i === 0 ? decision.subject ?? null : null, body: parts[i],
-          status: settings.draft_mode ? "draft" : "pending", send_after: new Date(at).toISOString(), is_reply: isReply,
+          status: asDraft ? "draft" : "pending", send_after: new Date(at).toISOString(), is_reply: isReply, dedupe_key: groupKey(group, randomUUID()),
         });
       }
       // The extra text that goes with an email reply.
@@ -345,14 +359,14 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
       const texts = withDisclosure(checkedTexts, "sms", await firstOn("sms"));
       let tAt = Date.now() + 1000 * (90 + Math.random() * 60);
       for (const t of texts) {
-        await db.from("outbox").insert({ contact_id: c.id, channel: "sms", author: "agent", body: t, status: settings.draft_mode ? "draft" : "pending", send_after: new Date(tAt).toISOString(), is_reply: false });
+        await db.from("outbox").insert({ contact_id: c.id, channel: "sms", author: "agent", body: t, dedupe_key: groupKey(group, randomUUID()), status: asDraft ? "draft" : "pending", send_after: new Date(tAt).toISOString(), is_reply: false });
         tAt += 1000 * (10 + Math.random() * 15);
       }
       if ([...parts, ...texts].some((t) => t.includes(link.url)) && !link.form.sent) {
         // Sending the link isn't progress by the driver, so the card stays put until they open the form.
         await db.from("form_links").update({ sent_at: new Date().toISOString() }).eq("token", link.token);
       }
-      action = settings.draft_mode ? "draft" : "replied";
+      action = asDraft ? "draft" : "replied";
     }
 
     // Next touch. The extra email of a "text + email" chase step leaves the schedule alone.
@@ -363,7 +377,7 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
       if (!done && !link.form.completed) await scheduleNext(c, { linkOut, kind: input.trigger === "followup" ? input.followupKind ?? "nudge" : null, attempt: input.followupAttempt ?? 0, maxNudges: settings.max_followups });
     }
 
-    await log({ action, decision, reply: parts.join("\n\n") || null, checks: { problems }, ...meta });
+    await log({ action, decision, reply: parts.join("\n\n") || null, checks: { problems, ...versions }, ...meta });
     return { action, reply: parts.join("\n\n"), channel, decision, costUsd };
   } catch (e) {
     const reason = e instanceof Error ? e.message : String(e);

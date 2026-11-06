@@ -9,7 +9,7 @@ import * as instantly from "@/lib/integrations/instantly";
  * kill switch, do-not-contact, suppression list, consent, quiet hours (automatic sends), thread availability.
  */
 import { isSendingOn } from "./sending";
-import { gate } from "./sendGate";
+import { EMAIL_FOOTER, gate } from "./sendGate";
 export { inQuietHours } from "./sendGate";
 /** @deprecated use isSendingOn() (env + CRM switch). */
 export const sendingEnabled = () => process.env.SENDING_ENABLED === "true";
@@ -66,7 +66,7 @@ async function sendOne(row: Row): Promise<SendOutcome> {
     const messageId = await recordMessage({ contactId: c.id, channel: "email", direction: "outbound", author: row.author === "workflow" ? "system" : row.author, authorId: row.author_id, subject, body: row.body, externalId: r.id ? `resend:${r.id}` : null, meta: { via: "resend" }, status: "sent" });
     return { ok: true, messageId };
   }
-  const r = await instantly.replyToEmail({ eaccount, replyToUuid: last.external_id, subject: row.subject ?? last.subject ?? "Driving with Global Runners", text: row.body });
+  const r = await instantly.replyToEmail({ eaccount, replyToUuid: last.external_id, subject: row.subject ?? last.subject ?? "Driving with Global Runners", text: row.author === "human" ? row.body : row.body + EMAIL_FOOTER });
   const messageId = await recordMessage({ contactId: c.id, channel: "email", direction: "outbound", author: row.author === "workflow" ? "system" : row.author, authorId: row.author_id, subject: row.subject ?? last.subject, body: row.body, externalId: r.id ?? null, meta: { eaccount }, status: "sent" });
   return { ok: true, messageId };
 }

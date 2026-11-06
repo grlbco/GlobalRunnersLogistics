@@ -12,8 +12,8 @@ export function CampaignControls({ id, created, status, leadsAdded, available }:
   const [msg, setMsg] = useState<Res>(null);
   const [busy, start] = useTransition();
   const [tiers, setTiers] = useState<number[]>([1]);
-  const [states, setStates] = useState("");
-  const [count, setCount] = useState(200);
+  const [states, setStates] = useState("NV"); // Pilot default: Nevada first, 10 at a time
+  const [count, setCount] = useState(10);
   const run = (fn: () => Promise<Res>) => start(async () => setMsg(await fn()));
 
   return (

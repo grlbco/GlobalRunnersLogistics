@@ -60,12 +60,19 @@ async function Body({ searchParams }: { searchParams: Promise<{ range?: string }
   const runs = Number(r.assistant.replied) + Number(r.assistant.handed_off) + Number(r.assistant.failed);
   const head2 = { count: "exact" as const, head: true };
   const moves = (actor: string, decision: string) => supabase.from("stage_events").select("*", head2).eq("actor_type", actor).eq("decision", decision).gte("created_at", since);
-  const [leftWaiting, aiMoves, aiRejected, personMoves] = await Promise.all([
+  const [leftWaiting, aiMoves, aiRejected, personMoves, checked, labelled, aiInterested] = await Promise.all([
     supabase.from("tasks").select("*", head2).like("title", "Driver waiting%").gte("created_at", since),
     moves("ai", "applied"),
     moves("ai", "rejected"),
     moves("human", "applied"),
+    supabase.from("activities").select("data").eq("type", "reply_review").gte("created_at", since).limit(5000),
+    supabase.from("events").select("contact_id").eq("source", "instantly").eq("type", "lead_interested").gte("created_at", since).limit(5000),
+    supabase.from("stage_events").select("contact_id").eq("actor_type", "ai").eq("decision", "applied").eq("to_stage", "interested").gte("created_at", since).limit(5000),
   ]);
+  const wrong = (checked.data ?? []).filter((x) => (x.data as { ok?: boolean }).ok === false).length;
+  // Instantly's label accuracy isn't published, so measure it: when it says interested, does the assistant agree after reading the reply?
+  const labelledIds = new Set((labelled.data ?? []).map((x) => x.contact_id));
+  const agreed = new Set((aiInterested.data ?? []).map((x) => x.contact_id).filter((x) => labelledIds.has(x))).size;
 
   return (
     <>
@@ -116,7 +123,7 @@ async function Body({ searchParams }: { searchParams: Promise<{ range?: string }
 
         <Panel title="How far to trust the assistant" sub={sel[1]}>
           <dl className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            {([["Drivers left waiting", leftWaiting.count, "Should be zero: the assistant couldn't answer and a person was alerted"], ["Cards it moved", aiMoves.count, "With the driver's words as proof"], ["Moves the rules stopped", aiRejected.count, "It proposed something the rules wouldn't allow"], ["Cards people moved", personMoves.count, "Each one takes over from the assistant"]] as const).map(([l, v, h]) => (
+            {([["Drivers left waiting", leftWaiting.count, "Should be zero: the assistant couldn't answer and a person was alerted"], ["Cards it moved", aiMoves.count, "With the driver's words as proof"], ["Moves the rules stopped", aiRejected.count, "It proposed something the rules wouldn't allow"], ["Cards people moved", personMoves.count, "Each one takes over from the assistant"], ["Replies spot-checked", checked.data?.length, "On the Assistant page"], ["Marked wrong", wrong, "Add each one to the test set"], ["Instantly said interested", labelledIds.size, "Drivers it labelled"], ["Assistant agreed", agreed, "After reading what they wrote"]] as const).map(([l, v, h]) => (
               <div key={l}><dt className="text-[0.8rem] text-muted">{l}</dt><dd className="mt-1 text-[1.35rem] font-semibold tracking-[-0.02em]"><CountUp value={v ?? 0} /></dd><p className="mt-1 text-[0.75rem] leading-snug text-faint">{h}</p></div>
             ))}
           </dl>

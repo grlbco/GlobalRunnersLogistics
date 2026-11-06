@@ -21,3 +21,11 @@ export function ago(iso?: string | null, now = Date.now()) {
 }
 
 export const n = (v: number | null | undefined) => (v ?? 0).toLocaleString("en-US");
+
+/** Reviewed drafts, from the activity log, in the shape the auto-send rules read. */
+export function reviewsFrom(rows: { type: string; data: unknown }[]) {
+  return rows.map((r) => {
+    const d = (r.data ?? {}) as { group?: string | null; edited?: boolean };
+    return { group: d.group, edited: d.edited, discarded: r.type === "draft_discarded" };
+  });
+}

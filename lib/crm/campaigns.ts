@@ -1,4 +1,5 @@
 import "server-only";
+import { EMAIL_FOOTER } from "./sendGate";
 import { adminDb } from "./admin";
 import * as instantly from "@/lib/integrations/instantly";
 
@@ -6,7 +7,7 @@ export type Variant = { subject: string; body: string };
 export type SeqStep = { delay_days: number; variants: Variant[] };
 export type CampaignSettings = { accounts: string[]; daily_limit: number; from: string; to: string; days: number[]; timezone: string; tiers?: number[] };
 
-const FOOTER = "\n\nGlobal Runners Logistics LLC · 732 S 6th St, Ste V, Las Vegas, NV 89101\nNot interested? Reply \"stop\" and we won't email again.";
+const FOOTER = EMAIL_FOOTER;
 
 /** Starter sequence (Claude's first draft): 3 steps, A/B/C on the opener. Only confirmed facts, no pay rates. */
 export const DEFAULT_SEQUENCE: SeqStep[] = [

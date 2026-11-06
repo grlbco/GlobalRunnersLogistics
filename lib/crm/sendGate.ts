@@ -4,6 +4,8 @@
  */
 export const REPLY_WINDOW_MS = 2 * 3600_000;
 export const MAX_PROACTIVE_TEXTS_24H = 3;
+/** Every automated email carries who we are, where we are, and how to stop. */
+export const EMAIL_FOOTER = "\n\nGlobal Runners Logistics LLC · 732 S 6th St, Ste V, Las Vegas, NV 89101\nNot interested? Reply \"stop\" and we won't email again.";
 
 function isQuietIn(zone: string, at: Date) {
   const parts = new Intl.DateTimeFormat("en-US", { timeZone: zone, hour: "numeric", hour12: false, weekday: "short" }).formatToParts(at);

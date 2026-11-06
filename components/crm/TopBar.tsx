@@ -31,8 +31,12 @@ function ThemeToggle() {
       document.documentElement.dataset.theme = next;
       try { localStorage.setItem("crm-theme", next); } catch { /* private mode: the choice just isn't remembered */ }
     };
-    if ("startViewTransition" in document && !matchMedia("(prefers-reduced-motion: reduce)").matches) document.startViewTransition(apply);
-    else apply();
+    // The crossfade is only decoration: a hidden tab rejects it, and that must not surface as an error.
+    if ("startViewTransition" in document && document.visibilityState === "visible" && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      const t = document.startViewTransition(apply);
+      t.ready.catch(() => {});
+      t.finished.catch(() => {});
+    } else apply();
   };
   return (
     <div className={GROUP} role="group" aria-label="Theme">
