@@ -12,8 +12,9 @@ import { getAssistantSettings } from "@/lib/crm/settings";
 import { Avatar, Badge, Card, Label, Skeleton, StageBadge, Stat, btnCls, btnGhostCls, inputCls, selectCls } from "@/components/crm/ui";
 import { Stagger, StaggerItem } from "@/components/crm/motion";
 import { Composer } from "@/components/crm/Composer";
+import { GiveAnswer } from "@/components/crm/GiveAnswer";
 import { Drafts } from "@/components/crm/Drafts";
-import { Timeline, loadTimeline } from "@/components/crm/Timeline";
+import { Timeline, answeringText, loadTimeline } from "@/components/crm/Timeline";
 
 export default function ContactPage({ params }: { params: Promise<{ id: string }> }) {
   return (
@@ -28,7 +29,7 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
   const { supabase } = await requireStaff(`/crm/contacts/${id}`, "contacts.view");
 
-  const [{ data: c }, items, memory, runs, followups, forms, tasks, assistant, lastMove] = await Promise.all([
+  const [{ data: c }, items, memory, runs, followups, forms, tasks, assistant, lastMove, formNote] = await Promise.all([
     supabase.from("contacts").select("*").eq("id", id).maybeSingle(),
     loadTimeline(supabase, id),
     supabase.from("agent_memory").select("*").eq("contact_id", id).maybeSingle(),
@@ -38,12 +39,24 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
     supabase.from("tasks").select("id, title, due_at, done_at").eq("contact_id", id).order("done_at", { nullsFirst: true }).order("due_at", { nullsFirst: false }).limit(20),
     getAssistantSettings(),
     supabase.from("stage_events").select("from_stage, to_stage, actor_type, evidence_quote, decision").eq("contact_id", id).eq("decision", "applied").order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("notes").select("body").eq("contact_id", id).eq("author_kind", "system").like("body", "Driver form completed%").order("created_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
   if (!c) notFound();
 
   const form = forms.data?.[0];
   const hasEmailThread = items.some((m) => m.kind === "message" && m.channel === "email");
   const facts = (memory.data?.facts ?? {}) as Record<string, unknown>;
+  const phones = [c.cell_phone, c.phone].filter(Boolean) as string[];
+  const [byPhone, byEmail] = await Promise.all([
+    phones.length ? supabase.from("consents").select("created_at, page, consent_text, granted").in("phone", phones) : Promise.resolve({ data: [] }),
+    c.email ? supabase.from("consents").select("created_at, page, consent_text, granted").eq("email", c.email) : Promise.resolve({ data: [] }),
+  ]);
+  const consentLog = [...(byPhone.data ?? []), ...(byEmail.data ?? [])].filter((x, i, all) => all.findIndex((y) => y.created_at === x.created_at) === i).sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 5);
+  // The list came from FMCSA carrier records: that describes a carrier, not a driver, until they tell us otherwise.
+  const fromList = c.source === "toss_import";
+  const cdlConfirmed = !!form?.completed_at || Object.keys(facts).some((k) => /cdl/i.test(k));
+  const waitingOnKen = ["applied", "qualified", "sent_to_ken"].includes(c.stage);
+  const call = c.cell_phone ?? c.phone;
 
   return (
     <div className="space-y-3 px-5 md:px-6">
@@ -60,8 +73,25 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
         <div className="flex flex-wrap items-center gap-1.5">
           <StageBadge stage={c.stage} />
           <Badge dot tone={c.agent_mode === "auto" ? "info" : "warn"}>{c.agent_mode === "auto" ? "Assistant on" : "Manual"}</Badge>
+          {!cdlConfirmed && fromList && <Badge tone="warn">Carrier record, CDL not confirmed</Badge>}
         </div>
+        {(memory.data?.summary || memory.data?.next_step) && (
+          <div className="w-full border-t border-line pt-3 text-[0.875rem] leading-relaxed">
+            {memory.data?.summary && <p className="text-fg-2">{memory.data.summary}</p>}
+            {memory.data?.next_step && <p className="mt-0.5 text-muted">Next: {memory.data.next_step}</p>}
+            <p className="mt-1 text-[0.72rem] text-faint">Written by the assistant</p>
+          </div>
+        )}
       </Card>
+      {waitingOnKen && (
+        <Card className="flex flex-wrap items-start justify-between gap-4 p-4">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-[0.95rem] font-medium tracking-[-0.01em]">Before you call</h2>
+            <p className="mt-1 whitespace-pre-wrap text-[0.875rem] leading-relaxed text-fg-2">{formNote.data?.body.replace(/^Driver form completed\.\n?/, "") || memory.data?.summary || "No form answers on file."}</p>
+          </div>
+          {call && <a href={`tel:${call}`} className={btnCls}>Call {phoneDisplay(call)}</a>}
+        </Card>
+      )}
       <Stagger className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <StaggerItem><Stat label="Messages" value={items.filter((m) => m.kind === "message").length} hint={`${items.filter((m) => m.kind === "message" && m.direction === "inbound").length} from the driver`} /></StaggerItem>
         <StaggerItem><Stat label="Last reply" value={c.last_inbound_at ? ago(c.last_inbound_at) : "None"} hint={c.last_inbound_at ? "ago" : "Hasn't written back yet"} /></StaggerItem>
@@ -106,7 +136,7 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
             ["Officer 2", c.officer_2],
           ].map(([k, v]) => (
             <div key={k as string}>
-              <dt className="text-[0.72rem] text-faint">{k}</dt>
+              <dt className="text-[0.72rem] text-faint">{k}{fromList && v && ["Email", "Phone", "Location", "USDOT", "Officer 2"].includes(k as string) ? " · FMCSA record" : ""}</dt>
               <dd className="mt-0.5 break-words text-[0.875rem] text-fg">{v || <span className="text-ghost">—</span>}</dd>
             </div>
           ))}
@@ -138,18 +168,30 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
             {c.do_not_contact && <Badge dot tone="bad">Do not contact</Badge>}
             {(c.tags as string[]).map((t) => <Badge key={t}>#{t}</Badge>)}
           </div>
+          {consentLog.length > 0 && (
+            <ul className="space-y-2 pt-1 text-[0.78rem]">
+              {consentLog.map((x) => (
+                <li key={x.created_at}>
+                  <span className={x.granted ? "font-medium text-emerald-700" : "font-medium text-red-600"}>{x.granted ? "Agreed" : "Opted out"}</span>
+                  <span className="text-faint"> · {x.page ?? "website form"} · {new Date(x.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+                  <span className="mt-0.5 block truncate text-muted" title={x.consent_text}>&ldquo;{x.consent_text}&rdquo;</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </aside>
 
       {/* Center: conversation + timeline */}
       <section className="min-w-0 space-y-3">
         <Drafts supabase={supabase} contactId={c.id} />
+        <GiveAnswer contactId={c.id} />
         <div>
           <Composer
             contactId={c.id}
             sendingOn={await isSendingOn()}
             email={c.do_not_contact || !c.email_consent ? { ok: false, why: "Email is off for this driver" } : hasEmailThread ? { ok: true } : { ok: false, why: "No email thread yet: the first email comes from a campaign" }}
-            sms={c.do_not_contact ? { ok: false, why: "Driver is do-not-contact" } : c.sms_consent ? { ok: true } : { ok: false, why: "No text consent yet: the driver must text us first or tick the form box" }}
+            sms={c.do_not_contact ? { ok: false, why: "Driver is do-not-contact" } : c.sms_consent || answeringText(items) ? { ok: true } : { ok: false, why: "No text consent yet: the driver must text us first or tick the form box" }}
           />
         </div>
         <form action={addNote} className="flex gap-2">
@@ -217,7 +259,7 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
             {memory.data?.next_step && <div><p className="text-xs text-faint">Next step</p><p className="mt-1 text-fg-2">{memory.data.next_step}</p></div>}
             {Object.keys(facts).length > 0 && (
               <div>
-                <p className="text-xs text-faint">Known facts</p>
+                <p className="text-xs text-faint">What the driver said, noted by the assistant</p>
                 <ul className="mt-1 space-y-1">{Object.entries(facts).map(([k, v]) => <li key={k} className="flex justify-between gap-3"><span className="text-faint">{k.replace(/_/g, " ")}</span><span className="text-right text-fg-2">{String(v)}</span></li>)}</ul>
               </div>
             )}

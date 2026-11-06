@@ -52,6 +52,29 @@ export async function setAgentMode(formData: FormData) {
   revalidatePath(`/crm/contacts/${parsed.data.id}`);
 }
 
+/** A person supplies the fact the assistant was missing: it answers the driver and the thread stays automated. */
+export async function giveAnswer(formData: FormData) {
+  const { staff } = await requirePerm("contacts.message");
+  const parsed = z.object({ id, answer: z.string().trim().min(1).max(500) }).safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return;
+  const { adminDb } = await import("@/lib/crm/admin");
+  const db = adminDb();
+  const { data: mem } = await db.from("agent_memory").select("facts").eq("contact_id", parsed.data.id).maybeSingle();
+  const facts = { ...((mem?.facts as Record<string, unknown>) ?? {}), [`answer_from_team_${Date.now()}`]: parsed.data.answer };
+  await db.from("agent_memory").upsert({ contact_id: parsed.data.id, facts, updated_at: new Date().toISOString() });
+  await db.from("contacts").update({ agent_mode: "auto", agent_paused_until: null, stage_locked_at: null, stage_locked_by: null }).eq("id", parsed.data.id);
+  await db.from("tasks").update({ done_at: new Date().toISOString() }).eq("contact_id", parsed.data.id).eq("created_by", "agent").is("done_at", null);
+  await db.from("activities").insert({ contact_id: parsed.data.id, type: "assistant_resumed", data: { answer: parsed.data.answer }, actor: `user:${staff.id}` });
+  const { runAgent } = await import("@/lib/agent/engine");
+  const r = await runAgent({ contactId: parsed.data.id, trigger: "manual" });
+  if (r.action === "failed") {
+    const { escalateToPerson } = await import("@/lib/agent/rescue");
+    await escalateToPerson(parsed.data.id, `The assistant couldn't use your answer: ${r.reason ?? "unknown error"}`);
+  }
+  revalidatePath(`/crm/contacts/${parsed.data.id}`);
+  revalidatePath("/crm/inbox");
+}
+
 export type SendState = { ok: boolean; message: string } | null;
 
 /** Manual email/text from the profile. Goes through the outbox so every check applies. */

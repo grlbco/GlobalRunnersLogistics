@@ -27,11 +27,12 @@ async function sendOne(row: Row): Promise<SendOutcome> {
   const { count: recentTexts } = row.channel === "sms"
     ? await db.from("messages").select("*", { count: "exact", head: true }).eq("contact_id", c.id).eq("channel", "sms").eq("direction", "outbound").neq("author", "human").gte("created_at", new Date(Date.now() - 86400_000).toISOString())
     : { count: 0 };
+  const { data: lastIn } = await db.from("messages").select("channel").eq("contact_id", c.id).eq("direction", "inbound").neq("channel", "call").order("created_at", { ascending: false }).limit(1).maybeSingle();
   const verdict = gate({
     channel: row.channel, author: row.author, approvedByPerson: !!row.author_id, isReply: row.is_reply, createdAt: row.created_at,
     contact: { doNotContact: c.do_not_contact, emailConsent: c.email_consent, smsConsent: c.sms_consent, email: c.email, phone: to, timezone: c.timezone, agentMode: c.agent_mode, pausedUntil: c.agent_paused_until },
     suppressed: await isSuppressed(row.channel, row.channel === "sms" ? to : c.email),
-    lastInboundAt: c.last_inbound_at, proactiveTexts24h: recentTexts ?? 0, now: new Date(),
+    lastInboundAt: c.last_inbound_at, lastInboundChannel: lastIn?.channel ?? null, proactiveTexts24h: recentTexts ?? 0, now: new Date(),
   });
   if (verdict.action === "wait") return { ok: false, reason: verdict.reason, retry: true };
   if (verdict.action === "cancel") return { ok: false, reason: verdict.reason, cancel: true };
@@ -71,10 +72,10 @@ async function sendOne(row: Row): Promise<SendOutcome> {
 }
 
 /** Claims and sends one outbox row. */
-/** A person wrote to the driver: the assistant steps back for 2 hours so nobody talks over each other. */
-export async function pauseAssistantForHuman(contactId: string, hours = 2) {
+/** A person wrote to the driver: the assistant stops until someone hands back, so nobody talks over each other. */
+export async function pauseAssistantForHuman(contactId: string) {
   const db = adminDb();
-  await db.from("contacts").update({ agent_paused_until: new Date(Date.now() + hours * 3600_000).toISOString() }).eq("id", contactId);
+  await db.from("contacts").update({ agent_mode: "manual" }).eq("id", contactId);
   await db.from("outbox").update({ status: "cancelled", error: "a person replied" }).eq("contact_id", contactId).eq("author", "agent").in("status", ["draft", "pending"]);
 }
 

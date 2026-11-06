@@ -10,7 +10,9 @@ import { company } from "@/content/facts";
 import { chatJson, chatText, extractJson, type ChatMsg } from "@/lib/integrations/deepseek";
 import { checkReply } from "./checks";
 import { STAGES_AGENT_MAY_SET, buildMessages, type Turn } from "./prompt";
+import { FIXED_REPEAT_REASON, fixedAnswer, withDisclosure } from "./fixed";
 import { FOLLOWUP_LEASE_MS, MAX_TRIES, failureKind } from "./recovery";
+import { REPLY_WINDOW_MS } from "@/lib/crm/sendGate";
 import { escalateToPerson } from "./rescue";
 
 const str = z.preprocess((v) => (v === undefined || v === null ? null : String(v)), z.string().nullable());
@@ -44,23 +46,19 @@ export type Decision = z.infer<typeof Decision>;
 const FOLLOWUP_LADDER_H = [24, 72, 168, 336];
 const MAX_TEXT_FOLLOWUPS = 3;
 /**
- * After the form link is out and 2h pass without it: the chase. Front-loaded like inbound-lead cadences
- * (3 touches in the first 48h, 8 in 14 days, never more than 2 a day), texts and emails alternating,
- * stops the second they fill it or reply. Then monthly nurture emails.
+ * After the form link is out: the chase. Drivers can be behind the wheel 11 hours in a 14-hour day, so daytime
+ * silence means little and there's no same-day nudge. A text where allowed, otherwise email. It stops the second
+ * they fill it in or reply, then a rare check-in. A starting schedule to test in the pilot, not a proven one.
  */
-type ChaseStep = { gapH: number; ch: "both" | "sms" | "email" };
+type ChaseStep = { gapH: number; ch: "any" | "email" };
 const CHASE: ChaseStep[] = [
-  { gapH: 2, ch: "both" },   // 2h after the link: text + email
-  { gapH: 20, ch: "sms" },   // next day
-  { gapH: 24, ch: "email" }, // day 2
-  { gapH: 24, ch: "sms" },   // day 3
-  { gapH: 48, ch: "email" }, // day 5
-  { gapH: 48, ch: "sms" },   // day 7
-  { gapH: 72, ch: "email" }, // day 10
-  { gapH: 96, ch: "both" },  // day 14: last one
+  { gapH: 24, ch: "any" },    // next day
+  { gapH: 48, ch: "any" },    // day 3
+  { gapH: 72, ch: "email" },  // day 6
+  { gapH: 168, ch: "email" }, // day 13: last one
 ];
-const NURTURE_GAP_H = 30 * 24;
-const NURTURE_MAX = 3;
+const NURTURE_GAP_H = 90 * 24;
+const NURTURE_MAX = 2;
 export type FollowupKind = "nudge" | "chase" | "chase_extra" | "nurture";
 // Asking for a person, legal words, threats. ("are you human?" / "is this a scam?" get an honest answer instead.)
 export const HUMAN_WORDS = /\b((talk|speak|chat)\s+(to|with)\s+(a\s+|an\s+)?(real\s+)?(person|human|manager|supervisor|someone|recruiter)|manager|supervisor|lawyer|attorney|sue you|lawsuit|complaint|harass\w*|police|report you)\b/i;
@@ -111,11 +109,20 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
     if (!c) return { action: "ignored", reason: "contact not found" };
     if (!dry) {
       if (!settings.enabled) return (await log({ action: "ignored", decision: { reason: "assistant is off" } }), { action: "ignored", reason: "Assistant is off" });
-      if (c.agent_mode !== "auto") return (await log({ action: "ignored", decision: { reason: "manual" } }), { action: "ignored", reason: "A person is handling this driver" });
+      const driverWrote = input.trigger === "text_received" || input.trigger === "email_received";
+      const tellHandler = async () => {
+        if (!driverWrote) return;
+        const title = `Driver replied while you were handling: ${[c.first_name, c.last_name].filter(Boolean).join(" ") || "driver"}`;
+        const { count: open } = await db.from("tasks").select("*", { count: "exact", head: true }).eq("contact_id", c.id).is("done_at", null).eq("title", title);
+        if (!open) await db.from("tasks").insert({ contact_id: c.id, title, due_at: new Date().toISOString(), created_by: "agent" });
+      };
+      if (c.agent_mode !== "auto") {
+        await tellHandler();
+        return (await log({ action: "ignored", decision: { reason: "manual" } }), { action: "ignored", reason: "A person is handling this driver" });
+      }
       if (c.do_not_contact) return (await log({ action: "ignored", decision: { reason: "do not contact" } }), { action: "ignored", reason: "Do not contact" });
       if (input.trigger !== "manual" && c.agent_paused_until && new Date(c.agent_paused_until) > new Date()) {
-        if (input.trigger === "text_received" || input.trigger === "email_received")
-          await db.from("tasks").insert({ contact_id: c.id, title: `Driver replied while you were handling: ${[c.first_name, c.last_name].filter(Boolean).join(" ") || "driver"}`, due_at: new Date().toISOString(), created_by: "agent" });
+        await tellHandler();
         return (await log({ action: "ignored", decision: { reason: "a person replied recently (paused)" } }), { action: "ignored", reason: "Paused: a person replied recently" });
       }
       // 5) monthly AI budget
@@ -194,7 +201,9 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
     // "Reply now" from staff: answer the driver if they wrote last, otherwise a fresh nudge.
     const driverWroteLast = turns.at(-1)?.direction === "inbound";
     const promptTrigger = input.trigger === "manual" ? (driverWroteLast ? "text_received" : "followup") : input.trigger === "test" ? "text_received" : input.trigger === "interest_label" && driverWroteLast ? "text_received" : input.trigger;
-    if (channel === "sms" && !c.sms_consent) channel = "email";
+    // Someone who just texted us may be answered in that conversation. Anything beyond that needs a recorded yes.
+    const answeringTheirText = lastInbound?.channel === "sms" && Date.now() - new Date(lastInbound.at).getTime() < REPLY_WINDOW_MS && input.trigger !== "followup" && input.trigger !== "form_abandoned";
+    if (channel === "sms" && !c.sms_consent && !answeringTheirText) channel = "email";
     if (!dry && channel === "email" && !(c.email && (await canEmailContact(c.id))))
       return (await log({ action: "ignored", decision: { reason: "no way to reach: no text consent and no email thread" } }), { action: "ignored", reason: "Can't text (no consent) and no email thread yet" });
 
@@ -206,6 +215,8 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
     const base = { name, city: c.city, state: c.state, localTime: localTime(c.timezone), stage: c.stage, channel, smsConsent: c.sms_consent, hasPhone: !!(c.cell_phone || c.phone), formUrl: link.url, form: link.form, memory: { facts: (mem?.facts as Record<string, unknown>) ?? {}, summary: mem?.summary, next_step: mem?.next_step }, turns, trigger: promptTrigger, followupAttempt: input.followupAttempt, followupKind: input.followupKind, chaseTotal: CHASE.length, alsoText, formSubmitted: input.formSubmitted, otherForms, kenAvailable };
 
     // Decide: JSON first (2 tries with the checker's feedback), then a plain-text fallback so a driver is never left hanging.
+    // Numbers a person gave the assistant to use count as approved.
+    const teamAnswers = Object.entries((mem?.facts as Record<string, unknown>) ?? {}).filter(([k]) => k.startsWith("answer_from_team")).map(([, v]) => String(v));
     const messages: ChatMsg[] = buildMessages(base);
     let decision: Decision | null = null;
     let problems: string[] = [];
@@ -218,6 +229,13 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
       const raw = (d.replies.length ? d.replies : d.reply ? [d.reply] : []).map(clean).filter(Boolean);
       return channel === "email" ? (raw.length ? [raw.join("\n\n")] : []) : raw.slice(0, 3);
     };
+    // The questions that cost the most to get wrong are answered by code, not the AI. Asking again goes to a person.
+    const fixed = driverWroteLast && lastInboundTurn && input.trigger !== "followup" && input.trigger !== "form_submitted" ? fixedAnswer(lastInboundTurn.body) : null;
+    if (fixed) {
+      const alreadySaid = turns.some((t) => t.direction === "outbound" && t.body.includes(fixed.replies[0]));
+      const replies = channel === "email" ? [`${fixed.replies.join("\n\n")}\n\nGlobal Runners team`] : fixed.replies;
+      decision = { intent: "question", replies: alreadySaid ? [] : replies, facts: {}, stage: null, followup_hours: null, sms_replies: [], handoff: alreadySaid ? FIXED_REPEAT_REASON[fixed.intent] : null } as Decision;
+    }
     for (let attempt = 0; attempt < 2 && !decision; attempt++) {
       const r = await chatJson(messages, { temperature: attempt ? 0.5 : 0.8 });
       track(r);
@@ -232,7 +250,7 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
       }
       const parts = partsOf(parsed);
       if (!parts.length || parsed.handoff) { decision = parsed; problems = []; break; }
-      const bad = parts.flatMap((t) => checkReply(t, { channel, formUrl: link.url }).problems);
+      const bad = parts.flatMap((t) => checkReply(t, { channel, formUrl: link.url, extraAllowed: teamAnswers }).problems);
       if (!bad.length) { decision = { ...parsed, replies: parts }; problems = []; break; }
       problems = bad;
       messages.push({ role: "assistant", content: r.content.slice(0, 2000) }, { role: "user", content: `[INSTRUCTION] Your texts broke these rules: ${bad.join("; ")}. Rewrite them so every rule is followed. Return the full JSON again.` });
@@ -242,7 +260,7 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
       const r = await chatText([...buildMessages(base).slice(0, -1), { role: "user", content: `[INSTRUCTION] Reply to their latest message on ${channel}. Write ONLY the message text${channel === "sms" ? " (1-2 short sentences, under 200 characters)" : ""}, nothing else. No em dashes.` }], { temperature: 0.6, maxTokens: 400 });
       track(r);
       const text = clean(r.content.replace(/^["']|["']$/g, ""));
-      const check = checkReply(text, { channel, formUrl: link.url });
+      const check = checkReply(text, { channel, formUrl: link.url, extraAllowed: teamAnswers });
       if (text && check.ok) decision = { intent: "other", replies: [text], facts: {}, stage: null, followup_hours: null } as Decision;
       else problems = [...problems, ...check.problems.map((x) => `fallback: ${x}`)];
     }
@@ -300,7 +318,9 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
     }
 
     let action = "no_reply";
-    const parts = decision.replies;
+    // The first message on each channel says it's AI. Code does this, so it can't be forgotten or talked out of.
+    const firstOn = async (ch: "email" | "sms") => !(await db.from("messages").select("*", { count: "exact", head: true }).eq("contact_id", c.id).eq("channel", ch).eq("author", "agent")).count;
+    const parts = withDisclosure(decision.replies, channel, await firstOn(channel), fixed?.intent === "identity");
     if (parts.length) {
       const manual = input.trigger === "manual";
       // Human timing: quick in a live back-and-forth, slower after a long silence; extra texts follow like someone typing.
@@ -321,7 +341,8 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
         });
       }
       // The extra text that goes with an email reply.
-      const texts = alsoText ? decision.sms_replies.map(clean).filter((t) => t && checkReply(t, { channel: "sms", formUrl: link.url }).ok).slice(0, 2) : [];
+      const checkedTexts = alsoText ? decision.sms_replies.map(clean).filter((t) => t && checkReply(t, { channel: "sms", formUrl: link.url, extraAllowed: teamAnswers }).ok).slice(0, 2) : [];
+      const texts = withDisclosure(checkedTexts, "sms", await firstOn("sms"));
       let tAt = Date.now() + 1000 * (90 + Math.random() * 60);
       for (const t of texts) {
         await db.from("outbox").insert({ contact_id: c.id, channel: "sms", author: "agent", body: t, status: settings.draft_mode ? "draft" : "pending", send_after: new Date(tAt).toISOString(), is_reply: false });
@@ -388,22 +409,13 @@ export async function scheduleNext(
     let gap = 0;
     while (i < CHASE.length) {
       gap += CHASE[i].gapH;
-      const ch = CHASE[i].ch;
-      if (ch === "both" || (ch === "sms" && canText) || (ch === "email" && canEmail)) break;
+      if (canEmail || (CHASE[i].ch === "any" && canText)) break;
       i++;
     }
     if (i >= CHASE.length) return;
-    const step = CHASE[i];
-    const raw = new Date(Date.now() + gap * 3600_000);
-    const due = i === 0 ? raw : inGoodWindow(raw, c.timezone);
+    const channel: "email" | "sms" = CHASE[i].ch === "any" && canText ? "sms" : "email";
     const n = i + 1;
-    if (step.ch === "both") {
-      if (canText) await add(n, "chase", "sms", due, `Form follow-up #${n} (text)`);
-      if (canEmail) await add(n, canText ? "chase_extra" : "chase", "email", new Date(due.getTime() + (canText ? 4 * 60_000 : 0)), `Form follow-up #${n} (email)`);
-      if (!canText && !canEmail) return;
-    } else {
-      await add(n, "chase", step.ch, due, `Form follow-up #${n} (${step.ch === "sms" ? "text" : "email"})`);
-    }
+    await add(n, "chase", channel, inGoodWindow(new Date(Date.now() + gap * 3600_000), c.timezone), `Form follow-up #${n} (${channel === "sms" ? "text" : "email"})`);
     return;
   }
 

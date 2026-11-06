@@ -9,19 +9,20 @@ import { Avatar, Badge, Card, Empty, Label, Skeleton, StageBadge } from "@/compo
 import { TIERS } from "@/lib/crm/stages";
 import { Composer } from "@/components/crm/Composer";
 import { Drafts } from "@/components/crm/Drafts";
-import { Timeline, loadTimeline } from "@/components/crm/Timeline";
+import { Timeline, answeringText, loadTimeline } from "@/components/crm/Timeline";
 import { MarkRead } from "@/components/crm/MarkRead";
+import { GiveAnswer } from "@/components/crm/GiveAnswer";
+import { setAgentMode } from "@/app/crm/actions";
 
 export const metadata = { title: "Inbox" };
 
 type SP = Promise<{ c?: string; f?: string }>;
 const FILTERS = [
   { key: "needs", label: "Needs you" },
+  { key: "assistant", label: "Assistant handling" },
+  { key: "call", label: "Form done: call driver" },
   { key: "all", label: "All" },
   { key: "unread", label: "Unread" },
-  { key: "reply", label: "Needs reply" },
-  { key: "sms", label: "Texts" },
-  { key: "email", label: "Emails" },
 ] as const;
 
 export default function InboxPage({ searchParams }: { searchParams: SP }) {
@@ -32,6 +33,9 @@ export default function InboxPage({ searchParams }: { searchParams: SP }) {
   );
 }
 
+/** The form is done, so the next move is Ken's call. */
+const CALL_STAGES = new Set(["applied", "qualified", "sent_to_ken"]);
+
 type Contact = { id: string; first_name: string | null; last_name: string | null; company_name: string | null; stage: string; agent_mode: string; cell_phone: string | null; phone: string | null; email: string | null; timezone: string | null; do_not_contact: boolean; email_consent: boolean; sms_consent: boolean; tier: number | null; city: string | null; state: string | null; last_inbound_at: string | null };
 
 async function Inbox({ searchParams }: { searchParams: SP }) {
@@ -39,21 +43,25 @@ async function Inbox({ searchParams }: { searchParams: SP }) {
   const f = FILTERS.some((x) => x.key === sp.f) ? sp.f! : "needs";
   const { supabase } = await requireStaff("/crm/inbox", "inbox.view");
 
-  let q = supabase
+  const q = supabase
     .from("messages")
     .select("id, channel, direction, author, body, created_at, contact:contacts(id, first_name, last_name, company_name, stage, agent_mode, cell_phone, phone, email, timezone, do_not_contact, email_consent, sms_consent, tier, city, state, last_inbound_at)")
     .neq("channel", "call")
     .order("created_at", { ascending: false })
     .limit(500);
-  if (f === "sms" || f === "email") q = q.eq("channel", f);
   // Needs you: an open task, a draft waiting for approval, or a message that failed to send.
   const [{ data }, { data: unreadRows }, { data: openTasks }, { data: waitingSends }] = await Promise.all([
     q,
     supabase.from("conversations").select("contact_id").eq("unread", true),
-    supabase.from("tasks").select("contact_id").is("done_at", null).not("contact_id", "is", null),
-    supabase.from("outbox").select("contact_id").in("status", ["draft", "failed"]),
+    supabase.from("tasks").select("contact_id, title").is("done_at", null).not("contact_id", "is", null).order("created_at"),
+    supabase.from("outbox").select("contact_id, status").in("status", ["draft", "failed"]),
   ]);
-  const needsYou = new Set([...(openTasks ?? []), ...(waitingSends ?? [])].map((r) => r.contact_id as string));
+  // Why each driver needs someone. A task says it best, then a failed send, then a draft.
+  const why = new Map<string, string>();
+  for (const o of waitingSends ?? []) if (o.status === "draft") why.set(o.contact_id, "Draft to approve");
+  for (const o of waitingSends ?? []) if (o.status === "failed") why.set(o.contact_id, "A message failed to send");
+  for (const t of openTasks ?? []) why.set(t.contact_id as string, t.title as string);
+  const needsYou = new Set(why.keys());
   const unreadSet = new Set((unreadRows ?? []).map((r) => r.contact_id as string));
 
   const seen = new Set<string>();
@@ -64,6 +72,8 @@ async function Inbox({ searchParams }: { searchParams: SP }) {
     return true;
   });
   if (f === "needs") threads = threads.filter((m) => needsYou.has((m.contact as unknown as Contact).id)).reverse(); // longest wait first
+  if (f === "assistant") threads = threads.filter((m) => { const c = m.contact as unknown as Contact; return c.agent_mode === "auto" && !c.do_not_contact && !needsYou.has(c.id) && !CALL_STAGES.has(c.stage); });
+  if (f === "call") threads = threads.filter((m) => CALL_STAGES.has((m.contact as unknown as Contact).stage));
   if (f === "unread") threads = threads.filter((m) => unreadSet.has((m.contact as unknown as Contact).id));
   if (f === "reply") threads = threads.filter((m) => m.direction === "inbound");
 
@@ -118,12 +128,13 @@ async function Inbox({ searchParams }: { searchParams: SP }) {
                       <Badge>{m.channel === "sms" ? "Text" : "Email"}</Badge>
                       <StageBadge stage={c.stage} />
                     </span>
+                    {f === "needs" && why.get(c.id) && <span className="mt-1.5 block truncate text-[0.75rem] font-medium text-red-600" title={why.get(c.id)}>{why.get(c.id)}</span>}
                   </span>
                 </Link>
               </li>
             );
           })}
-          {!threads.length && <li className="p-2"><Empty title={f === "needs" ? "Nothing needs you" : "Nothing here"}>{f === "needs" ? "The assistant is handling everything right now. Tasks, drafts to approve and failed sends show up here." : "Replies from drivers land here, email and text together."}</Empty></li>}
+          {!threads.length && <li className="p-2"><Empty title={f === "needs" ? "Nothing needs you" : "Nothing here"}>{f === "needs" ? "Tasks, drafts to approve and failed sends show up here." : "Replies from drivers land here, email and text together."}</Empty></li>}
         </ul>
       </section>
 
@@ -195,16 +206,22 @@ async function Thread({ contact: c, unread, back }: { contact: Contact; unread: 
         <div className="flex items-center gap-2">
           <StageBadge stage={c.stage} />
           <Badge tone={c.agent_mode === "auto" ? "info" : "warn"} dot>{c.agent_mode === "auto" ? "Assistant on" : "Manual"}</Badge>
+          <form action={setAgentMode}>
+            <input type="hidden" name="id" value={c.id} />
+            <input type="hidden" name="mode" value={c.agent_mode === "auto" ? "manual" : "auto"} />
+            <button className="rounded-[9px] border border-line-strong px-2.5 py-1 text-[0.78rem] font-medium transition-colors duration-150 hover:bg-hover">{c.agent_mode === "auto" ? "Take over" : "Hand back to assistant"}</button>
+          </form>
         </div>
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5"><Timeline items={items} oldestFirst /></div>
       <div className="space-y-3 p-3">
         <Drafts supabase={supabase} contactId={c.id} />
+        <GiveAnswer contactId={c.id} />
         <Composer
           contactId={c.id}
           sendingOn={await isSendingOn()}
           email={c.do_not_contact || !c.email_consent ? { ok: false, why: "Email is off for this driver" } : hasEmailThread ? { ok: true } : { ok: false, why: "No email thread yet: the first email comes from a campaign" }}
-          sms={c.do_not_contact ? { ok: false, why: "Driver is do-not-contact" } : c.sms_consent ? { ok: true } : { ok: false, why: "No text consent yet" }}
+          sms={c.do_not_contact ? { ok: false, why: "Driver is do-not-contact" } : c.sms_consent || answeringText(items) ? { ok: true } : { ok: false, why: "No text consent yet" }}
         />
       </div>
     </>

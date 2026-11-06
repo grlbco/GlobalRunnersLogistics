@@ -17,6 +17,8 @@ async function run(req: Request) {
   const devLocal = process.env.NODE_ENV !== "production";
   const ok = req.headers.get("x-worker-secret") === process.env.WORKER_SECRET && !!process.env.WORKER_SECRET;
   if (!ok && !devLocal) return new Response("Unauthorized", { status: 401 });
+  // There's one database and it's live. Local keys alone must never start the worker on it.
+  if (devLocal && !ok && process.env.ALLOW_LOCAL_WORKER !== "true") return Response.json({ ok: false, skipped: "Local worker is off. Set ALLOW_LOCAL_WORKER=true to run it." }, { headers: { "Cache-Control": "no-store" } });
   const started = Date.now();
   // One failing step must not stop the others: a sync error shouldn't leave drivers unanswered.
   const errors: Record<string, string> = {};

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition, useRef } from "react";
 import { trackFormStep } from "@/app/actions/forms";
 import { AnimatePresence, motion } from "motion/react";
 import { clsx } from "clsx";
@@ -47,7 +47,7 @@ const t = {
     none: "None",
     violations: "Moving violations in the last 3 years",
     accidents: "Accidents in the last 3 years",
-    dui: "Have you ever had a DUI?",
+    dui: "Have you ever been convicted of a DUI?",
     drug: "Ever failed or refused a drug/alcohol test, or done a SAP program?",
     auth: "Are you authorized to work in the U.S.?",
     age: "Are you 21 or older?",
@@ -100,7 +100,7 @@ const t = {
     none: "Ninguno",
     violations: "Infracciones de tránsito en los últimos 3 años",
     accidents: "Accidentes en los últimos 3 años",
-    dui: "¿Has tenido alguna vez un DUI?",
+    dui: "¿Alguna vez te han condenado por un DUI?",
     drug: "¿Alguna vez fallaste o rechazaste una prueba de drogas/alcohol, o hiciste un programa SAP?",
     auth: "¿Estás autorizado para trabajar en EE. UU.?",
     age: "¿Tienes 21 años o más?",
@@ -143,6 +143,21 @@ export function DriverApplyForm({
   useEffect(() => {
     if (token) trackFormStep(token, step);
   }, [token, step]);
+  // Save progress on this phone for a week, so a driver who has to stop can pick up where they left off.
+  const saveKey = `grl-apply-${token ?? "web"}`;
+  const restored = useRef(false);
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(saveKey) ?? "null") as { at: number; step: number; data: Partial<State> } | null;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage can only be read after hydration
+      if (saved && Date.now() - saved.at < 7 * 86400_000) { setData((d) => ({ ...d, ...saved.data, sms_consent: false })); setStep(saved.step); }
+    } catch { /* no saved progress */ }
+    restored.current = true;
+  }, [saveKey]);
+  useEffect(() => {
+    if (!restored.current) return;
+    try { localStorage.setItem(saveKey, JSON.stringify({ at: Date.now(), step, data: { ...data, sms_consent: false } })); } catch { /* private mode */ }
+  }, [saveKey, step, data]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   // Personal link with a known phone: one-tap confirm instead of typing.
   const [editing, setEditing] = useState(!prefill?.phone);
@@ -194,6 +209,7 @@ export function DriverApplyForm({
     start(async () => {
       const res = await submitDriverLead({ ...(data as DriverLeadInput), ...(token ? { t: token } : {}), company_website: hp, ...getAttr() });
       if (res.ok) {
+        try { localStorage.removeItem(saveKey); } catch { /* private mode */ }
         setDone(true);
         window.scrollTo({ top: 0, behavior: "smooth" });
       } else {

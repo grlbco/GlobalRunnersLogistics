@@ -34,7 +34,7 @@ export default function CrmLayout({ children }: { children: React.ReactNode }) {
             </Suspense>
             {children}
           </main>
-          <LiveSync dev={process.env.NODE_ENV !== "production"} />
+          <LiveSync dev={process.env.NODE_ENV !== "production" && process.env.ALLOW_LOCAL_WORKER === "true"} />
         </div>
       </body>
     </html>

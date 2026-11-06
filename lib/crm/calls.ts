@@ -56,7 +56,7 @@ export async function ingestQuoCall(c: quo.QuoCall): Promise<"new" | "updated" |
   if (c.answeredAt && !c.aiHandled) {
     // a person talked to the driver: the assistant steps back and the card moves on
     const { pauseAssistantForHuman } = await import("./outbox");
-    await pauseAssistantForHuman(contact.id, 4);
+    await pauseAssistantForHuman(contact.id);
     await moveStage(contact, "interested", "quo");
   }
   if (meta.summary_done) await saveSummary(contact.id, c);

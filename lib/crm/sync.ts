@@ -2,10 +2,11 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { adminDb } from "./admin";
 import {
-  activity, contactByEmail, contactByPhone, createInboundContact, isOptOut, isWrongNumber, logEvent, moveStage, recordMessage, suppress, type Contact,
+  activity, contactByEmail, contactByPhone, createInboundContact, isOptOut, isWrongNumber, logEvent, moveStage, recordConsent, recordMessage, suppress, type Contact,
 } from "./ingest";
 import * as quo from "@/lib/integrations/quo";
 import { emit } from "@/lib/automations/engine";
+import { consentFromEmail, consentFromText } from "./consent";
 import * as instantly from "@/lib/integrations/instantly";
 
 /**
@@ -63,8 +64,14 @@ export async function ingestQuoMessage(m: quo.QuoMessage): Promise<string | null
     await moveStage(contact, "not_fit", "quo");
     return id;
   }
-  // Texting us first = consent to reply by text (TCPA: responding to an inbound message).
-  await moveStage(contact, "replied", "quo", { sms_consent: true, ...(contact.cell_phone ? {} : { cell_phone: other }) });
+  // Texting us first allows an answer in this conversation. Ongoing texts need them to say yes.
+  const { data: lastOut } = await adminDb().from("messages").select("body").eq("contact_id", contact.id).eq("channel", "sms").eq("direction", "outbound").order("created_at", { ascending: false }).limit(1).maybeSingle();
+  const saidYes = !contact.sms_consent && consentFromText(m.text ?? "", lastOut?.body ?? null);
+  if (saidYes) {
+    await recordConsent({ source: "said yes by text", phone: other, text: m.text ?? "" });
+    await activity(contact.id, "sms_consent", { source: "said yes by text" }, "quo");
+  }
+  await moveStage(contact, "replied", "quo", { ...(saidYes ? { sms_consent: true, sms_consent_source: "said yes by text" } : {}), ...(contact.cell_phone ? {} : { cell_phone: other }) });
   await enqueueAgent(contact.id, id, "text_received");
   await emit("text_received", contact.id, {});
   return id;
@@ -122,15 +129,15 @@ export async function ingestInstantlyEmail(e: instantly.InstantlyEmail): Promise
     await moveStage(contact, "unsubscribed", "instantly");
     return id;
   }
-  // Consent to text from an email: they gave us their cell, or asked us to text them (TCPA prior express consent).
+  // Permission to text from an email: they said yes, or told us to text them. A number alone isn't permission.
   const own = ownWords(body);
-  const given = own.match(/(?:\+?1[\s.-]?)?\(?([2-9]\d{2})\)?[\s.-]?(\d{3})[\s.-]?(\d{4})\b/);
-  const askedText = /\b(text|txt|sms)\s+(me|is fine|works|is better|ok)\b|\byou can text\b|\bok(ay)?\s+to\s+text\b/i.test(own);
+  const { cell, consent } = consentFromEmail(own, !!(contact.cell_phone || contact.phone));
   const extra: Record<string, unknown> = {};
-  if (given) Object.assign(extra, { cell_phone: `+1${given[1]}${given[2]}${given[3]}` });
-  if ((given || (askedText && (contact.cell_phone || contact.phone))) && !contact.sms_consent) {
-    Object.assign(extra, { sms_consent: true, sms_consent_source: given ? "gave cell by email" : "asked to be texted by email" });
-    await activity(contact.id, "sms_consent", { source: extra.sms_consent_source }, "instantly");
+  if (cell) extra.cell_phone = cell;
+  if (consent && !contact.sms_consent) {
+    Object.assign(extra, { sms_consent: true, sms_consent_source: "said yes by email" });
+    await activity(contact.id, "sms_consent", { source: "said yes by email" }, "instantly");
+    await recordConsent({ source: "said yes by email", phone: cell ?? contact.cell_phone ?? contact.phone, email: contact.email, text: own });
   }
   await moveStage(contact, "replied", "instantly", extra);
   await enqueueAgent(contact.id, id, "email_received");

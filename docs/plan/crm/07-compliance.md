@@ -7,7 +7,7 @@ Not legal advice — have a TCPA attorney review the texting flow before launch.
 - **A2P 10DLC approved** in Quo before any automated text (sample messages include "Reply STOP to opt out").
 - **Opt-out:** STOP, QUIT, END, REVOKE, OPT OUT, CANCEL, UNSUBSCRIBE, and any clear "don't text me" → suppress immediately, one confirmation text within 5 minutes with no marketing, cancel all runs. Revocation rules have moved dates several times (current FCC delays push parts to 2027) — we follow the strictest version now.
 - **Quiet hours (George, 2026-11-05: "always on"):** replies to a driver who just texted/emailed go out 24/7 (responding to their own inbound message). Texts we start ourselves (follow-ups, automations) only 9:00–20:00 driver local time, Sunday from noon, at most 3 in 24 hours. A reply counts as a reply for 2 hours after the driver's message. Enforced in `lib/crm/sendGate.ts`. Email has no quiet hours.
-- First text identifies us: "Ken from Global Runners Logistics".
+- The first message on each channel says it comes from the AI assistant for Global Runners Logistics (code adds it, `lib/agent/fixed.ts`). The AI never uses Ken's name or claims to be human.
 
 ## Email (CAN-SPAM)
 Instantly handles unsubscribe links; every email includes the office address (732 S 6th St Ste V, Las Vegas, NV 89101); honest subject lines; unsubscribes synced to `suppressions` within minutes.

@@ -58,6 +58,14 @@ async function Body({ searchParams }: { searchParams: Promise<{ range?: string }
   const steps = Object.entries(r.chase.by_step).sort((a, b) => Number(a[0]) - Number(b[0]));
   const days = ((daily.data ?? []) as Daily[]).map((d) => ({ ...d, replies: Number(d.replies), answered: Number(d.answered), forms: Number(d.forms), applied: Number(d.applied) }));
   const runs = Number(r.assistant.replied) + Number(r.assistant.handed_off) + Number(r.assistant.failed);
+  const head2 = { count: "exact" as const, head: true };
+  const moves = (actor: string, decision: string) => supabase.from("stage_events").select("*", head2).eq("actor_type", actor).eq("decision", decision).gte("created_at", since);
+  const [leftWaiting, aiMoves, aiRejected, personMoves] = await Promise.all([
+    supabase.from("tasks").select("*", head2).like("title", "Driver waiting%").gte("created_at", since),
+    moves("ai", "applied"),
+    moves("ai", "rejected"),
+    moves("human", "applied"),
+  ]);
 
   return (
     <>
@@ -106,7 +114,15 @@ async function Body({ searchParams }: { searchParams: Promise<{ range?: string }
           </Panel>
         </div>
 
-        <Panel title="Form follow-ups" sub="14-day chase after a driver gets the link">
+        <Panel title="How far to trust the assistant" sub={sel[1]}>
+          <dl className="grid grid-cols-2 gap-4 md:grid-cols-4">
+            {([["Drivers left waiting", leftWaiting.count, "Should be zero: the assistant couldn't answer and a person was alerted"], ["Cards it moved", aiMoves.count, "With the driver's words as proof"], ["Moves the rules stopped", aiRejected.count, "It proposed something the rules wouldn't allow"], ["Cards people moved", personMoves.count, "Each one takes over from the assistant"]] as const).map(([l, v, h]) => (
+              <div key={l}><dt className="text-[0.8rem] text-muted">{l}</dt><dd className="mt-1 text-[1.35rem] font-semibold tracking-[-0.02em]"><CountUp value={v ?? 0} /></dd><p className="mt-1 text-[0.75rem] leading-snug text-faint">{h}</p></div>
+            ))}
+          </dl>
+        </Panel>
+
+        <Panel title="Form follow-ups" sub="After a driver gets the link">
           <p className="text-[0.875rem] text-muted">{n(r.chase.chased)} drivers got the link and didn&apos;t fill it right away. <span className="font-medium text-fg">{n(r.chase.completed_after)} ({pct(r.chase.completed_after, r.chase.chased)})</span> filled it during the follow-ups.</p>
           {steps.length > 0 && <div className="mt-4"><BarList items={steps.map(([s, c]) => ({ label: `After follow-up #${s}`, value: Number(c) }))} /></div>}
         </Panel>

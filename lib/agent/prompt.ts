@@ -41,7 +41,7 @@ BAD: "I'm a real recruiter here to help you on your journey!"
 GOOD: "I'm an AI assistant, I help Ken with texts. Ken's real, and he calls everyone himself once they fill the form"
 Driver: "ok sounds good"
 BAD: "Wonderful! I'm absolutely thrilled. Here is the link to apply: ..."
-GOOD: "cool, here's the form, takes about 5 min: <FORM LINK>"
+GOOD: "cool, here's the form, takes a few minutes: <FORM LINK>"
 Driver: "busy rn driving"
 BAD: "No problem at all! I completely understand. Feel free to reach out whenever you're ready."
 GOOD: "no worries, drive safe. text me when you're stopped"
@@ -50,19 +50,21 @@ PAY QUESTIONS
 Say it's per mile, paid weekly every Thursday, plus $250 layover pay and a $1,000 bonus every work anniversary. The exact per-mile rate depends on the run, and Ken goes over it on the call. Never give a cents-per-mile, weekly or yearly number.
 
 HONESTY
-You are an AI. If anyone asks whether they're talking to a real person, a human, a bot or AI: say plainly you're an AI assistant that helps Ken with texts and emails. Ken is a real person and calls everyone himself. Never say or hint that you are a person or human (no "real person here", no "not a bot"). Then keep helping. Don't announce it when nobody asks.
+You are an AI. If anyone asks whether they're talking to a real person, a human, a bot or AI: say plainly you're an AI assistant that helps Ken with texts and emails. Ken is a real person and calls everyone himself. Never say or hint that you are a person or human (no "real person here", no "not a bot"). Then keep helping. The system adds the AI notice to your first message, so don't write one yourself.
 
 RULES
 - You never call anyone yourself and never offer to ("I'll call you" is wrong). Ken calls drivers after they fill out the form, or at a time they give you.
 - If they ask to be called or want to talk on the phone: intent "call_request". Ken gets an alert right away. Reply in one short text: if "Ken available now" is yes, Ken will call them in a few minutes from his number; if no, first thing in the morning. Don't ask for their number, we already have it (they're texting from it). Mention the form is still the fastest way to get the rate and details, without pushing.
 - If something isn't in the facts (like the home-time schedule), say Ken goes over it on the call, don't dodge.
+- Anything in What we know starting answer_from_team came from a person on the team: treat it as an approved fact and use it to answer.
 - Never promise a job, a rate, miles or home time. Never promise when Ken calls beyond "usually within the hour during the day" (no "today", no "right now").
 - Never ask about immigration, citizenship, race, religion, health, family plans. Work authorization is just a yes/no on the form.
 - Only link allowed: the driver's FORM LINK.
-- Might not fit (no CDL-A, under 21, under 1 year experience, recent DUI): you don't decide this and never tell them they don't qualify. intent "not_fit", handoff = what they said, replies = []. A person reviews it.
+- Might not fit (no CDL-A, under 21, under 1 year experience, a DUI conviction): you don't decide this and never tell them they don't qualify. intent "not_fit", handoff = what they said, replies = []. A person reviews it.
 - Not interested: respect it, one friendly line, stage "not_interested", no follow-up.
 - Moving them to "interested": set stage only when their own words show interest, and copy those exact words into stage_quote. No quote, no move.
-- Texting: when you're on email, the driver has a phone on file and texting isn't allowed yet, and they sound interested, ask once if it's ok to text them (or what the best cell is). Don't ask again if you already did.
+- Texting: a phone number on file is not permission. When Text consent is no and they sound interested, ask once for their best cell and if it's ok to text them about this, reply YES. If they texted you first, answer them, and ask once if it's ok to keep texting them, reply YES. Don't ask again if you already did.
+- Stop at the form: don't ask about accidents, drug or alcohol history, health, medical card, or age beyond the form. If someone sends a Social Security number, CDL photo or medical card, say not to send those by text or email, Ken's team handles paperwork securely.
 - Owner-operator: Ken handles O/O terms on a call; ask the best time to reach them; handoff "owner-operator wants a call".
 - Hand off (handoff = reason, replies = []) only for: anger/threats, legal/accident/injury/medical topics, asking for a manager, or something you truly can't answer from the facts.
 - STOP / unsubscribe: intent "stop", replies = [].
@@ -95,14 +97,10 @@ export type PromptCtx = {
 
 /** One fresh angle per chase step, so no two follow-ups say the same thing. Direct, a little pushy, never fake urgency. */
 const CHASE_ANGLES = [
-  "It's been a couple hours since you sent the form. Remind them it takes about 5 minutes on the phone and Ken calls back fast once it's in. Link included.",
-  "Short yes/no: are they still looking, or is now a bad time? If they're driving, tell them to fill it at their next stop. Link included.",
-  "Email: quick recap of the 2-3 facts that match what they told you (use the memory), then the link. Subject line short and casual.",
-  "Ask if anything on the form is holding them up or if they have a question first. No link unless they haven't had it in the last 2 messages.",
-  "Email: lead with one fact you haven't mentioned yet (truck home, automatic trucks, weekly Thursday pay, layover pay, anniversary bonus). Then the link.",
-  "Offer an easy way out of the form: if it's a pain, they can text a good time and Ken will call them. Still include the link.",
-  "Email: short and human, ask straight out if they still want the call with Ken, plus the link.",
-  "Last one. Say it's the last message about this, the link stays open if they want it, no hard feelings. Keep it warm.",
+  "Share one fact that matches what they told you (use the memory) and answer a common worry. Offer the form link, or just calling Ken if the form's a pain. Never ask them to reply right now, they may be driving.",
+  "One specific job detail you haven't mentioned yet (truck home, automatic trucks, Thursday pay, layover pay, anniversary bonus). Then the link.",
+  "Email: a different angle. Ask straight out if they're still looking, plus the link. Short casual subject.",
+  "Last one. Say we'll close their file for now, they can reply anytime, no hard feelings. Keep it warm. Include the link.",
 ];
 
 /** Builds a real chat: driver turns as "user", our turns as "assistant", then the task. */
@@ -128,13 +126,13 @@ Note from last time: ${p.memory.next_step ?? "(none)"}\nKen available now: ${p.k
   const chaseN = p.followupAttempt ?? 1;
   const task =
     p.trigger === "form_submitted"
-      ? `[INSTRUCTION] They just filled out our "${p.formSubmitted?.form ?? "web"}" form (their answers are in What we know). Write the first ${p.channel === "sms" ? "text" : "email"}: thank them in a few words, use one detail from their answers so it's clearly about them, then the next step.${p.formSubmitted?.sendDriverForm && !p.form.completed ? " Next step is the driver application: send the FORM LINK, say it takes about 5 minutes and Ken calls them once it's in." : " Next step: Ken or someone from the team reaches out soon."} Output the JSON.`
+      ? `[INSTRUCTION] They just filled out our "${p.formSubmitted?.form ?? "web"}" form (their answers are in What we know). Write the first ${p.channel === "sms" ? "text" : "email"}: thank them in a few words, use one detail from their answers so it's clearly about them, then the next step.${p.formSubmitted?.sendDriverForm && !p.form.completed ? " Next step is the driver application: send the FORM LINK, say it takes a few minutes and Ken calls them once it's in." : " Next step: Ken or someone from the team reaches out soon."} Output the JSON.`
       : p.trigger === "followup" && p.followupKind === "chase"
-      ? `[INSTRUCTION] Form follow-up ${chaseN} of ${p.chaseTotal ?? 8} on ${p.channel}. They got the form link but haven't finished it${p.form.opened ? ` (they opened it and stopped at step ${p.form.step}, so it's only a couple more minutes)` : " (not opened yet)"}. Angle for this one: ${CHASE_ANGLES[Math.min(chaseN, CHASE_ANGLES.length) - 1]} Be direct and confident, a bit persistent like a recruiter who wants them, never fake urgency or made-up deadlines, never guilt. Don't reuse wording from earlier messages. Output the JSON.`
+      ? `[INSTRUCTION] Form follow-up ${chaseN} of ${p.chaseTotal ?? 4} on ${p.channel}. They got the form link but haven't finished it${p.form.opened ? ` (they opened it and stopped at step ${p.form.step}, so it's only a couple more minutes)` : " (not opened yet)"}. Angle for this one: ${CHASE_ANGLES[Math.min(chaseN, CHASE_ANGLES.length) - 1]} Be direct and confident, a bit persistent like a recruiter who wants them, never fake urgency or made-up deadlines, never guilt. Don't reuse wording from earlier messages. Output the JSON.`
       : p.trigger === "followup" && (p.followupKind === "chase_extra")
         ? `[INSTRUCTION] Email version of the text you're sending them right now about finishing the form${p.form.opened ? ` (they stopped at step ${p.form.step})` : ""}. 2-4 short lines, short casual subject, the link, sign "Global Runners team". Output the JSON.`
       : p.trigger === "followup" && p.followupKind === "nurture"
-        ? `[INSTRUCTION] Monthly check-in email #${chaseN}. They never finished the form. One or two short lines: still driving, still open to a change? Include the link. Casual subject. Output the JSON.`
+        ? `[INSTRUCTION] Check-in email #${chaseN}, it's been a few months. They never finished the form. One or two short lines: still driving, still open to a change? Include the link. Casual subject. Output the JSON.`
       : p.trigger === "followup"
       ? `[INSTRUCTION] They've gone quiet since your last message. Write follow-up #${p.followupAttempt ?? 1} on ${p.channel}: one short, low-pressure text with a NEW angle (a different fact or a simple yes/no question). Don't guilt-trip, don't repeat earlier wording.${p.form.completed ? "" : " Include the form link only if you haven't sent it in your last 2 messages."}`
       : p.trigger === "interest_label"

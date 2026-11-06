@@ -133,6 +133,12 @@ export async function recordMessage(m: NewMessage): Promise<string | null> {
   return data.id as string;
 }
 
+/** The record of who agreed to what, in their own words. How they said it goes in `page`. Never blocks the message that triggered it. */
+export async function recordConsent(p: { source: string; phone?: string | null; email?: string | null; text: string; granted?: boolean }) {
+  const { error } = await adminDb().from("consents").insert({ source: "contact", page: p.source, phone: p.phone ?? null, email: p.email ?? null, consent_text: p.text.slice(0, 1000), granted: p.granted ?? true });
+  if (error) console.error("recordConsent", error.message);
+}
+
 /** STOP-style keywords + plain-language requests. Checked in code before any assistant reply. */
 const OPT_OUT = /^\s*(please\s+)?(stop|stopall|unsubscribe|cancel|end|quit|revoke|opt[\s-]?out)(\s+(please|now|it|this))*\s*[.!]*\s*$/i;
 const OPT_OUT_PHRASES = /\b(don'?t (text|email|contact|message) me|(stop|quit) (texting|emailing|messaging|contacting)|remove me|take me off|unsubscribe me|leave me alone|do not contact|no more (texts?|messages?|emails?)|(lose|delete) my (number|email|info)|no me (escribas|mandes|envies|envíes|contactes)|deja de (escribir|mandar|enviar|contactar))/i;
@@ -148,6 +154,7 @@ export async function suppress(contact: Contact, channel: "email" | "sms", reaso
   await db.from("outbox").update({ status: "cancelled", error: `suppressed: ${reason}` }).eq("contact_id", contact.id).in("status", ["pending", "draft"]);
   await db.from("followups").update({ status: "cancelled" }).eq("contact_id", contact.id).eq("status", "pending");
   await activity(contact.id, "suppressed", { channel, reason });
+  if (channel === "sms" && value) await recordConsent({ source: `opt-out: ${reason}`, phone: value, text: reason, granted: false });
 }
 
 export async function isSuppressed(channel: "email" | "sms", value: string | null | undefined) {

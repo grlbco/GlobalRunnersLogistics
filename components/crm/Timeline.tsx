@@ -1,6 +1,7 @@
 import { clsx } from "clsx";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { stageLabel } from "@/lib/crm/stages";
+import { REPLY_WINDOW_MS } from "@/lib/crm/sendGate";
 
 export type Item =
   | { kind: "message"; at: string; channel: string; direction: string; author: string; subject: string | null; body: string; status: string }
@@ -19,6 +20,12 @@ export async function loadTimeline(supabase: SupabaseClient, id: string): Promis
     ...(acts.data ?? []).map((a) => ({ kind: "activity" as const, at: a.created_at, type: a.type, data: a.data, actor: a.actor })),
     ...(notes.data ?? []).map((nt) => ({ kind: "note" as const, at: nt.created_at, body: nt.body, author_kind: nt.author_kind })),
   ].sort((a, b) => b.at.localeCompare(a.at));
+}
+
+/** The driver's latest message is a recent text: a person may answer it in that conversation. */
+export function answeringText(items: Item[]) {
+  const last = items.find((m) => m.kind === "message" && m.direction === "inbound" && m.channel !== "call");
+  return !!last && last.kind === "message" && last.channel === "sms" && new Date().getTime() - new Date(last.at).getTime() < REPLY_WINDOW_MS;
 }
 
 export function Timeline({ items, oldestFirst = false }: { items: Item[]; oldestFirst?: boolean }) {

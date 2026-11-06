@@ -130,17 +130,15 @@ export async function completeForm(f: Completion): Promise<string | null> {
 
 /**
  * Worker. Unfinished forms are chased by the assistant's follow-up cadence (lib/agent/engine.ts),
- * which already knows whether the form was opened and how far they got. This only covers links
- * sent without the assistant (no pending follow-up): they get one nudge after 2h.
+ * which already knows whether the form was opened and how far they got. This adds one resume nudge
+ * an hour after they stop; the assistant then replans the chase from there (+1 day, +3 days).
  */
 export async function queueAbandonedNudges() {
   const db = adminDb();
-  const cutoff = new Date(Date.now() - 2 * 3600_000).toISOString();
+  const cutoff = new Date(Date.now() - 3600_000).toISOString();
   const { data } = await db.from("form_links").select("token, contact_id").lte("opened_at", cutoff).is("completed_at", null).is("nudged_at", null).limit(20);
   for (const l of data ?? []) {
     await db.from("form_links").update({ nudged_at: new Date().toISOString() }).eq("token", l.token);
-    const { count } = await db.from("followups").select("*", { count: "exact", head: true }).eq("contact_id", l.contact_id).eq("status", "pending");
-    if (count) continue;
     await db.from("agent_runs").insert({ contact_id: l.contact_id, trigger: "form_abandoned", action: "queued" });
   }
   return data?.length ?? 0;

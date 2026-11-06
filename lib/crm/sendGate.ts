@@ -35,6 +35,7 @@ export type GateInput = {
   };
   suppressed: boolean;
   lastInboundAt: string | null;
+  lastInboundChannel?: string | null;
   proactiveTexts24h: number;
   now: Date;
 };
@@ -68,7 +69,9 @@ export function gate(g: GateInput): GateResult {
   }
 
   if (!c.phone) return { action: "fail", reason: "No phone number on this contact" };
-  if (!c.smsConsent) return { action: "fail", reason: "No text consent yet (driver must text us first or tick the form box)" };
+  // Someone who just texted us may be answered in that conversation. Anything beyond that needs a recorded yes.
+  const answeringTheirText = g.lastInboundChannel === "sms" && !!g.lastInboundAt && g.now.getTime() - time(g.lastInboundAt) < REPLY_WINDOW_MS && (g.isReply || byPerson);
+  if (!c.smsConsent && !answeringTheirText) return { action: "fail", reason: "No text consent yet (driver must text us first or tick the form box)" };
   if (g.suppressed) return { action: "fail", reason: "Number is on the opt-out list" };
 
   if (!byPerson) {

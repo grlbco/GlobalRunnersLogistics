@@ -39,7 +39,7 @@ async function run() {
   const c1 = await contact();
   await scheduleNext(c1, { linkOut: true, kind: null, attempt: 0, maxNudges: 5 });
   const f1 = await pendingFollowups();
-  check("chase planned: follow-up #1 in ~2h", f1.length > 0 && f1[0].kind === "chase" && f1[0].attempt === 1, f1);
+  check("chase planned: follow-up #1 next day", f1.length > 0 && f1[0].kind === "chase" && f1[0].attempt === 1, f1);
 
   // 2) 2h pass: follow-up #1 runs for real
   await db.from("followups").update({ due_at: new Date(Date.now() - 1000).toISOString() }).eq("contact_id", id).eq("status", "pending");

@@ -3,12 +3,23 @@ import { Suspense } from "react";
 import { requireStaff } from "@/lib/crm/auth";
 import { STAGES, TIERS } from "@/lib/crm/stages";
 import { ago, fullName, n, phoneDisplay } from "@/lib/crm/format";
-import { Avatar, btnCls, btnGhostCls, Empty, inputCls, PageHead, selectCls, Skeleton, StageBadge } from "@/components/crm/ui";
+import { Avatar, btnCls, btnGhostCls, Empty, inputCls, LinkTabs, PageHead, selectCls, Skeleton, StageBadge } from "@/components/crm/ui";
 
 export const metadata = { title: "Contacts" };
 const PAGE = 50;
 
-type SP = Promise<{ q?: string; stage?: string; tier?: string; state?: string; page?: string }>;
+type SP = Promise<{ q?: string; stage?: string; tier?: string; state?: string; page?: string; view?: string }>;
+
+/** Saved lists: the daily queues. Each is a plain, visible rule. */
+const VIEWS = [
+  { key: "all", label: "All" },
+  { key: "ken", label: "Ready for Ken" },
+  { key: "started", label: "Form started, not finished" },
+  { key: "quiet", label: "Replied then quiet" },
+  { key: "cold", label: "Best cold leads next" },
+  { key: "bad", label: "Bad data" },
+  { key: "out", label: "Opted out" },
+] as const;
 
 export default function ContactsPage({ searchParams }: { searchParams: SP }) {
   return (
@@ -37,6 +48,13 @@ async function Table({ searchParams }: { searchParams: SP }) {
   if (sp.stage) query = query.eq("stage", sp.stage);
   if (sp.tier) query = query.eq("tier", Number(sp.tier));
   if (sp.state) query = query.eq("state", sp.state.toUpperCase());
+  const view = VIEWS.some((v) => v.key === sp.view) ? sp.view! : "all";
+  if (view === "ken") query = query.in("stage", ["applied", "qualified", "sent_to_ken"]);
+  if (view === "started") query = query.eq("stage", "form_sent");
+  if (view === "quiet") query = query.in("stage", ["replied", "interested"]).lt("last_inbound_at", new Date(new Date().getTime() - 3 * 86400_000).toISOString());
+  if (view === "cold") query = query.eq("stage", "new").eq("state", "NV").eq("do_not_contact", false).not("email", "is", null);
+  if (view === "bad") query = query.is("email", null).is("phone", null).is("cell_phone", null);
+  if (view === "out") query = query.eq("do_not_contact", true);
   const { data, count, error } = await query;
 
   const qs = (patch: Record<string, string | undefined>) => {
@@ -47,6 +65,7 @@ async function Table({ searchParams }: { searchParams: SP }) {
 
   return (
     <div className="px-5 md:px-6">
+      <div className="mb-3 overflow-x-auto"><LinkTabs active={view} items={VIEWS.map((v) => ({ key: v.key, label: v.label, href: v.key === "all" ? "/crm/contacts" : `/crm/contacts?view=${v.key}` }))} /></div>
       <form className="grid gap-3 md:grid-cols-[1fr_11rem_11rem_6rem_auto]" action="/crm/contacts">
         <label className="relative">
           <svg viewBox="0 0 24 24" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg>
@@ -65,7 +84,7 @@ async function Table({ searchParams }: { searchParams: SP }) {
       </form>
 
       <p className="mt-4 text-xs text-faint">
-        {error ? <span className="text-red-600">{error.message}</span> : <>~{n(count)} contacts{q || sp.stage || sp.tier || sp.state ? " match" : ""} · page {page} of {n(pages)}</>}
+        {error ? <span className="text-red-600">{error.message}</span> : <>~{n(count)} contacts{q || sp.stage || sp.tier || sp.state || view !== "all" ? " match" : ""} · page {page} of {n(pages)}</>}
       </p>
 
       <div className="mt-3 overflow-x-auto rounded-[14px] border border-line bg-surface shadow-card">
