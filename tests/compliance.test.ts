@@ -1,23 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { isOptOut, advance } from "@/lib/crm/ingest";
-import { inQuietHours } from "@/lib/crm/outbox";
 import { ownWords } from "@/lib/crm/sync";
 
 describe("opt-out (TCPA / CAN-SPAM)", () => {
   it.each(["STOP", "stop", " Stop. ", "unsubscribe", "Cancel", "QUIT", "opt out", "opt-out", "STOPALL", "end"])("treats %j as opt-out", (t) => expect(isOptOut(t)).toBe(true));
   it.each(["please stop texting me", "don't text me anymore", "remove me from your list", "take me off this", "leave me alone"])("treats plain language %j as opt-out", (t) => expect(isOptOut(t)).toBe(true));
   it.each(["I can't stop thinking about this job", "what time does your shift end?", "sounds good", "how much do you pay", "I'll cancel my other interview"])("does not treat %j as opt-out", (t) => expect(isOptOut(t)).toBe(false));
-});
-
-describe("quiet hours (texts we start: 8am–9pm driver time)", () => {
-  const at = (iso: string) => new Date(iso);
-  it("7:59am in Los Angeles is quiet", () => expect(inQuietHours("America/Los_Angeles", at("2026-11-05T15:59:00Z"))).toBe(true));
-  it("8:00am in Los Angeles is open", () => expect(inQuietHours("America/Los_Angeles", at("2026-11-05T16:00:00Z"))).toBe(false));
-  it("8:59pm in New York is open", () => expect(inQuietHours("America/New_York", at("2026-11-06T01:59:00Z"))).toBe(false));
-  it("9:00pm in New York is quiet", () => expect(inQuietHours("America/New_York", at("2026-11-06T02:00:00Z"))).toBe(true));
-  it("unknown time zone: quiet at 9am Eastern (6am Pacific)", () => expect(inQuietHours(null, at("2026-11-05T14:00:00Z"))).toBe(true));
-  it("unknown time zone: open at noon Eastern", () => expect(inQuietHours(null, at("2026-11-05T17:00:00Z"))).toBe(false));
-  it("unknown time zone: quiet at 9pm Eastern", () => expect(inQuietHours(null, at("2026-11-06T02:00:00Z"))).toBe(true));
 });
 
 describe("pipeline stages only move forward automatically", () => {

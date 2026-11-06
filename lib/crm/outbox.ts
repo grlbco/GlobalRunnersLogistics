@@ -9,48 +9,40 @@ import * as instantly from "@/lib/integrations/instantly";
  * kill switch, do-not-contact, suppression list, consent, quiet hours (automatic sends), thread availability.
  */
 import { isSendingOn } from "./sending";
+import { gate } from "./sendGate";
+export { inQuietHours } from "./sendGate";
 /** @deprecated use isSendingOn() (env + CRM switch). */
 export const sendingEnabled = () => process.env.SENDING_ENABLED === "true";
 
-type Row = { id: string; contact_id: string; channel: "email" | "sms"; author: "agent" | "human" | "workflow"; author_id: string | null; subject: string | null; body: string; attempts: number; is_reply: boolean };
+type Row = { id: string; contact_id: string; channel: "email" | "sms"; author: "agent" | "human" | "workflow"; author_id: string | null; subject: string | null; body: string; attempts: number; is_reply: boolean; created_at: string };
 
-/**
- * Quiet hours apply only to texts WE start (follow-ups, automations): 8am–9pm driver time.
- * Replies to a driver who just messaged us go out 24/7. Email has no quiet hours.
- */
-export function inQuietHours(tz: string | null, at = new Date()) {
-  const hourIn = (zone: string) => Number(new Intl.DateTimeFormat("en-US", { timeZone: zone, hour: "numeric", hour12: false }).formatToParts(at).find((p) => p.type === "hour")?.value ?? 12) % 24;
-  // Unknown zone (new contact from a text, call or form): only when it's 8am–9pm everywhere in the lower 48 → 11am–9pm Eastern.
-  if (!tz) {
-    const ny = hourIn("America/New_York");
-    return ny < 11 || ny >= 21;
-  }
-  const hour = hourIn(tz);
-  return hour < 8 || hour >= 21;
-}
-
-export type SendOutcome = { ok: true; messageId: string | null } | { ok: false; reason: string; retry?: boolean };
+export type SendOutcome = { ok: true; messageId: string | null } | { ok: false; reason: string; retry?: boolean; cancel?: boolean };
 
 async function sendOne(row: Row): Promise<SendOutcome> {
   const db = adminDb();
   if (!(await isSendingOn())) return { ok: false, reason: "Sending is switched off (Settings → All sending, or SENDING_ENABLED)", retry: true };
-  const { data: c } = await db.from("contacts").select("id, email, phone, cell_phone, timezone, do_not_contact, email_consent, sms_consent").eq("id", row.contact_id).single();
+  const { data: c } = await db.from("contacts").select("id, email, phone, cell_phone, timezone, do_not_contact, email_consent, sms_consent, agent_mode, agent_paused_until, last_inbound_at").eq("id", row.contact_id).single();
   if (!c) return { ok: false, reason: "Contact not found" };
-  if (c.do_not_contact) return { ok: false, reason: "Contact is do-not-contact" };
-  if (row.channel === "sms" && row.author !== "human" && !row.is_reply && inQuietHours(c.timezone)) return { ok: false, reason: "Follow-up waits for 8am in the driver's time zone", retry: true };
+  const to = c.cell_phone ?? c.phone;
+  const { count: recentTexts } = row.channel === "sms"
+    ? await db.from("messages").select("*", { count: "exact", head: true }).eq("contact_id", c.id).eq("channel", "sms").eq("direction", "outbound").neq("author", "human").gte("created_at", new Date(Date.now() - 86400_000).toISOString())
+    : { count: 0 };
+  const verdict = gate({
+    channel: row.channel, author: row.author, approvedByPerson: !!row.author_id, isReply: row.is_reply, createdAt: row.created_at,
+    contact: { doNotContact: c.do_not_contact, emailConsent: c.email_consent, smsConsent: c.sms_consent, email: c.email, phone: to, timezone: c.timezone, agentMode: c.agent_mode, pausedUntil: c.agent_paused_until },
+    suppressed: await isSuppressed(row.channel, row.channel === "sms" ? to : c.email),
+    lastInboundAt: c.last_inbound_at, proactiveTexts24h: recentTexts ?? 0, now: new Date(),
+  });
+  if (verdict.action === "wait") return { ok: false, reason: verdict.reason, retry: true };
+  if (verdict.action === "cancel") return { ok: false, reason: verdict.reason, cancel: true };
+  if (verdict.action === "fail") return { ok: false, reason: verdict.reason };
 
   if (row.channel === "sms") {
-    const to = c.cell_phone ?? c.phone;
-    if (!to) return { ok: false, reason: "No phone number on this contact" };
-    if (!c.sms_consent) return { ok: false, reason: "No text consent yet (driver must text us first or tick the form box)" };
-    if (await isSuppressed("sms", to)) return { ok: false, reason: "Number is on the opt-out list" };
     const r = await quo.sendText(to!, row.body);
     const messageId = await recordMessage({ contactId: c.id, channel: "sms", direction: "outbound", author: row.author === "workflow" ? "system" : row.author, authorId: row.author_id, body: row.body, externalId: r.id ?? null, status: "sent" });
     return { ok: true, messageId };
   }
 
-  if (!c.email_consent) return { ok: false, reason: "Email is off for this contact (unsubscribed)" };
-  if (await isSuppressed("email", c.email)) return { ok: false, reason: "Email is on the opt-out list" };
   // Replies go in the existing Instantly thread from the inbox that's talking to the driver.
   const { data: last } = await db
     .from("messages")
@@ -88,7 +80,7 @@ export async function pauseAssistantForHuman(contactId: string, hours = 2) {
 
 export async function processRow(id: string): Promise<SendOutcome> {
   const db = adminDb();
-  const { data: row } = await db.from("outbox").update({ status: "sending" }).eq("id", id).eq("status", "pending").select("id, contact_id, channel, author, author_id, subject, body, attempts, is_reply").maybeSingle();
+  const { data: row } = await db.from("outbox").update({ status: "sending" }).eq("id", id).eq("status", "pending").select("id, contact_id, channel, author, author_id, subject, body, attempts, is_reply, created_at").maybeSingle();
   if (!row) return { ok: false, reason: "Already sent or cancelled" };
   try {
     const out = await sendOne(row as Row);
@@ -96,6 +88,7 @@ export async function processRow(id: string): Promise<SendOutcome> {
       await db.from("outbox").update({ status: "sent", message_id: out.messageId, attempts: row.attempts + 1 }).eq("id", id);
       if (row.author === "human") await pauseAssistantForHuman(row.contact_id);
     }
+    else if (out.cancel) await db.from("outbox").update({ status: "cancelled", error: out.reason }).eq("id", id);
     else if (out.retry) await db.from("outbox").update({ status: "pending", send_after: new Date(Date.now() + 30 * 60_000).toISOString(), error: out.reason }).eq("id", id);
     else await db.from("outbox").update({ status: "failed", error: out.reason, attempts: row.attempts + 1 }).eq("id", id);
     return out;

@@ -10,6 +10,8 @@ import { company } from "@/content/facts";
 import { chatJson, chatText, extractJson, type ChatMsg } from "@/lib/integrations/deepseek";
 import { checkReply } from "./checks";
 import { STAGES_AGENT_MAY_SET, buildMessages, type Turn } from "./prompt";
+import { FOLLOWUP_LEASE_MS, MAX_TRIES, failureKind } from "./recovery";
+import { escalateToPerson } from "./rescue";
 
 const str = z.preprocess((v) => (v === undefined || v === null ? null : String(v)), z.string().nullable());
 // Models sometimes put an email body under "body"/"email"/"message": fold those into replies.
@@ -90,9 +92,9 @@ export async function formLinkFor(contactId: string) {
 }
 
 type RunInput = { simTurns?: Turn[]; contactId: string; trigger: "text_received" | "email_received" | "followup" | "form_abandoned" | "form_submitted" | "manual" | "test"; formSubmitted?: { form: string; sendDriverForm?: boolean }; inputMessageId?: string | null; followupAttempt?: number; followupKind?: FollowupKind; followupChannel?: "email" | "sms" | null; runId?: string; dryRunMessage?: { channel: "email" | "sms"; body: string } };
-export type RunResult = { action: string; reply?: string | null; channel?: "email" | "sms"; decision?: Decision; problems?: string[]; reason?: string; costUsd?: number };
+export type RunResult = { action: string; retryable?: boolean; reply?: string | null; channel?: "email" | "sms"; decision?: Decision; problems?: string[]; reason?: string; costUsd?: number };
 
-/** One assistant decision for one driver. Never throws: failures hand the driver to a person. */
+/** One assistant decision for one driver. Never throws: failures come back as "failed", and the worker retries or gets a person. */
 export async function runAgent(input: RunInput): Promise<RunResult> {
   const db = adminDb();
   const dry = input.trigger === "test" || !!input.simTurns; // harness runs never write or send
@@ -338,7 +340,7 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
   } catch (e) {
     const reason = e instanceof Error ? e.message : String(e);
     await log({ action: "failed", decision: { error: reason.slice(0, 500) } }).catch(() => {});
-    return { action: "failed", reason };
+    return { action: "failed", reason, retryable: failureKind(e) === "retry" };
   }
 }
 
@@ -440,17 +442,32 @@ export async function processAgentQueue(limit = 10) {
       continue;
     }
     seen.add(q.contact_id);
-    await db.from("agent_runs").update({ action: "running" }).eq("id", q.id);
+    // Only one worker may take a run, even if two ticks overlap.
+    const { data: claimed } = await db.from("agent_runs").update({ action: "running" }).eq("id", q.id).eq("action", "queued").select("id").maybeSingle();
+    if (!claimed) continue;
     const fi = formInfo.get(q.contact_id);
     const trig = (fi && q.trigger !== "text_received" && q.trigger !== "email_received" ? "form_submitted" : q.trigger) as RunInput["trigger"];
     const r = await runAgent({ contactId: q.contact_id, trigger: trig, inputMessageId: q.input_message_id, runId: q.id, formSubmitted: fi });
     out.push({ contactId: q.contact_id, action: r.action });
+    if (r.action === "failed") {
+      const { count: fails } = await db.from("agent_runs").select("*", { count: "exact", head: true }).eq("contact_id", q.contact_id).eq("action", "failed").gte("created_at", new Date(Date.now() - 3600_000).toISOString());
+      if (r.retryable && (fails ?? 0) < MAX_TRIES) await db.from("agent_runs").insert({ contact_id: q.contact_id, trigger: q.trigger, input_message_id: q.input_message_id, action: "queued", decision: q.decision });
+      else await escalateToPerson(q.contact_id, `The assistant couldn't reply: ${r.reason ?? "unknown error"}`);
+    }
   }
-  const { data: due } = await db.from("followups").select("id, contact_id, attempt, kind, channel").eq("status", "pending").lte("due_at", new Date().toISOString()).order("due_at").limit(limit);
+  const { data: due } = await db.from("followups").select("id, contact_id, attempt, kind, channel, due_at").eq("status", "pending").lte("due_at", new Date().toISOString()).order("due_at").limit(limit);
   for (const f of due ?? []) {
-    await db.from("followups").update({ status: "done" }).eq("id", f.id);
+    // Claim by pushing the due time forward: if this worker dies, the follow-up comes back on its own instead of vanishing.
+    const { data: claimed } = await db.from("followups").update({ due_at: new Date(Date.now() + FOLLOWUP_LEASE_MS).toISOString() }).eq("id", f.id).eq("status", "pending").eq("due_at", f.due_at).select("id").maybeSingle();
+    if (!claimed) continue;
     const r = await runAgent({ contactId: f.contact_id, trigger: "followup", followupAttempt: f.attempt, followupKind: (f.kind as FollowupKind) ?? "nudge", followupChannel: (f.channel as "email" | "sms" | null) ?? null });
     out.push({ contactId: f.contact_id, action: `followup:${r.action}` });
+    if (r.action === "failed") {
+      const { count: fails } = await db.from("agent_runs").select("*", { count: "exact", head: true }).eq("contact_id", f.contact_id).eq("trigger", "followup").eq("action", "failed").gte("created_at", new Date(Date.now() - 6 * 3600_000).toISOString());
+      if (r.retryable && (fails ?? 0) < MAX_TRIES) continue; // the lease brings it back in 10 minutes
+      await escalateToPerson(f.contact_id, `A follow-up couldn't be written: ${r.reason ?? "unknown error"}`);
+    }
+    await db.from("followups").update({ status: "done" }).eq("id", f.id).eq("status", "pending");
   }
   return out;
 }

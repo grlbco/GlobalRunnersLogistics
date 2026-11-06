@@ -5,6 +5,7 @@ import { queueAbandonedNudges } from "@/lib/crm/forms";
 import { processWorkflows } from "@/lib/automations/engine";
 import { maybeSendDigest } from "@/lib/automations/digest";
 import { syncCampaignStats } from "@/lib/crm/campaigns";
+import { sweepStuck } from "@/lib/agent/rescue";
 
 export const maxDuration = 60;
 
@@ -17,19 +18,31 @@ async function run(req: Request) {
   const ok = req.headers.get("x-worker-secret") === process.env.WORKER_SECRET && !!process.env.WORKER_SECRET;
   if (!ok && !devLocal) return new Response("Unauthorized", { status: 401 });
   const started = Date.now();
-  const sync = await syncAll();
-  const nudges = await queueAbandonedNudges();
-  const workflows = await processWorkflows();
-  const agent = await processAgentQueue();
-  const sent = await processDue();
-  const digest = await maybeSendDigest().catch(() => false);
-  const campaigns = await syncCampaignStats().catch(() => 0);
+  // One failing step must not stop the others: a sync error shouldn't leave drivers unanswered.
+  const errors: Record<string, string> = {};
+  const step = async <T,>(name: string, fn: () => Promise<T>): Promise<T | null> => {
+    try {
+      return await fn();
+    } catch (e) {
+      errors[name] = (e instanceof Error ? e.message : String(e)).slice(0, 300);
+      console.error(`worker step ${name} failed`, e);
+      return null;
+    }
+  };
+  const sync = await step("sync", syncAll);
+  const nudges = await step("nudges", queueAbandonedNudges);
+  const workflows = await step("workflows", processWorkflows);
+  const agent = await step("agent", processAgentQueue);
+  const sent = await step("send", processDue);
+  const sweep = await step("sweep", sweepStuck);
+  const digest = await step("digest", maybeSendDigest);
+  const campaigns = await step("campaigns", syncCampaignStats);
   // heartbeat for the go-live checklist (production worker only)
   if (!devLocal) {
     const { adminDb } = await import("@/lib/crm/admin");
-    await adminDb().from("app_settings").upsert({ key: "worker", value: { last_tick: new Date().toISOString(), ms: Date.now() - started }, updated_at: new Date().toISOString() }).then(() => {}, () => {});
+    await adminDb().from("app_settings").upsert({ key: "worker", value: { last_tick: new Date().toISOString(), ms: Date.now() - started, errors }, updated_at: new Date().toISOString() }).then(() => {}, () => {});
   }
-  return Response.json({ ok: true, ms: Date.now() - started, sync, nudges, workflows, agent, sent, digest, campaigns }, { headers: { "Cache-Control": "no-store" } });
+  return Response.json({ ok: Object.keys(errors).length === 0, errors, ms: Date.now() - started, sync, nudges, workflows, agent, sent, sweep, digest, campaigns }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export const GET = run;

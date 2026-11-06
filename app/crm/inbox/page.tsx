@@ -16,6 +16,7 @@ export const metadata = { title: "Inbox" };
 
 type SP = Promise<{ c?: string; f?: string }>;
 const FILTERS = [
+  { key: "needs", label: "Needs you" },
   { key: "all", label: "All" },
   { key: "unread", label: "Unread" },
   { key: "reply", label: "Needs reply" },
@@ -35,7 +36,7 @@ type Contact = { id: string; first_name: string | null; last_name: string | null
 
 async function Inbox({ searchParams }: { searchParams: SP }) {
   const sp = await searchParams;
-  const f = FILTERS.some((x) => x.key === sp.f) ? sp.f! : "all";
+  const f = FILTERS.some((x) => x.key === sp.f) ? sp.f! : "needs";
   const { supabase } = await requireStaff("/crm/inbox", "inbox.view");
 
   let q = supabase
@@ -45,7 +46,14 @@ async function Inbox({ searchParams }: { searchParams: SP }) {
     .order("created_at", { ascending: false })
     .limit(500);
   if (f === "sms" || f === "email") q = q.eq("channel", f);
-  const [{ data }, { data: unreadRows }] = await Promise.all([q, supabase.from("conversations").select("contact_id").eq("unread", true)]);
+  // Needs you: an open task, a draft waiting for approval, or a message that failed to send.
+  const [{ data }, { data: unreadRows }, { data: openTasks }, { data: waitingSends }] = await Promise.all([
+    q,
+    supabase.from("conversations").select("contact_id").eq("unread", true),
+    supabase.from("tasks").select("contact_id").is("done_at", null).not("contact_id", "is", null),
+    supabase.from("outbox").select("contact_id").in("status", ["draft", "failed"]),
+  ]);
+  const needsYou = new Set([...(openTasks ?? []), ...(waitingSends ?? [])].map((r) => r.contact_id as string));
   const unreadSet = new Set((unreadRows ?? []).map((r) => r.contact_id as string));
 
   const seen = new Set<string>();
@@ -55,6 +63,7 @@ async function Inbox({ searchParams }: { searchParams: SP }) {
     seen.add(c.id);
     return true;
   });
+  if (f === "needs") threads = threads.filter((m) => needsYou.has((m.contact as unknown as Contact).id)).reverse(); // longest wait first
   if (f === "unread") threads = threads.filter((m) => unreadSet.has((m.contact as unknown as Contact).id));
   if (f === "reply") threads = threads.filter((m) => m.direction === "inbound");
 
@@ -63,7 +72,7 @@ async function Inbox({ searchParams }: { searchParams: SP }) {
   const href = (patch: { c?: string; f?: string }) => {
     const p = new URLSearchParams();
     const nf = patch.f ?? f;
-    if (nf !== "all") p.set("f", nf);
+    if (nf !== "needs") p.set("f", nf);
     const nc = patch.c ?? (patch.f ? undefined : selectedId);
     if (nc) p.set("c", nc);
     return `/crm/inbox${p.size ? `?${p}` : ""}`;
@@ -81,7 +90,7 @@ async function Inbox({ searchParams }: { searchParams: SP }) {
           <nav className="mt-3 flex flex-wrap gap-1">
             {FILTERS.map((x) => (
               <Link key={x.key} href={href({ f: x.key })} className={clsx("rounded-[10px] border px-2.5 py-1.5 text-[0.78rem] font-medium transition-colors duration-150", f === x.key ? "border-fg bg-fg text-surface" : "border-line text-muted hover:text-fg")}>
-                {x.label}
+                {x.label}{x.key === "needs" && needsYou.size > 0 ? ` ${needsYou.size}` : ""}
               </Link>
             ))}
           </nav>
@@ -114,7 +123,7 @@ async function Inbox({ searchParams }: { searchParams: SP }) {
               </li>
             );
           })}
-          {!threads.length && <li className="p-2"><Empty title="Nothing here">Replies from drivers land here, email and text together.</Empty></li>}
+          {!threads.length && <li className="p-2"><Empty title={f === "needs" ? "Nothing needs you" : "Nothing here"}>{f === "needs" ? "The assistant is handling everything right now. Tasks, drafts to approve and failed sends show up here." : "Replies from drivers land here, email and text together."}</Empty></li>}
         </ul>
       </section>
 

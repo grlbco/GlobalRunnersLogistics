@@ -125,9 +125,10 @@ export async function recordMessage(m: NewMessage): Promise<string | null> {
 }
 
 /** STOP-style keywords + plain-language requests. Checked in code before any assistant reply. */
-const OPT_OUT = /^\s*(stop|stopall|unsubscribe|cancel|end|quit|revoke|opt[\s-]?out)\s*[.!]*\s*$/i;
-const OPT_OUT_PHRASES = /\b(don'?t (text|email|contact|message) me|stop (texting|emailing|messaging|contacting)|remove me|take me off|unsubscribe me|leave me alone|do not contact)\b/i;
+const OPT_OUT = /^\s*(please\s+)?(stop|stopall|unsubscribe|cancel|end|quit|revoke|opt[\s-]?out)(\s+(please|now|it|this))*\s*[.!]*\s*$/i;
+const OPT_OUT_PHRASES = /\b(don'?t (text|email|contact|message) me|(stop|quit) (texting|emailing|messaging|contacting)|remove me|take me off|unsubscribe me|leave me alone|do not contact|no more (texts?|messages?|emails?)|(lose|delete) my (number|email|info)|no me (escribas|mandes|envies|envíes|contactes)|deja de (escribir|mandar|enviar|contactar))/i;
 export const isOptOut = (text: string) => OPT_OUT.test(text) || OPT_OUT_PHRASES.test(text);
+export const isWrongNumber = (text: string) => /\bwrong (number|person|guy)\b|\bnot the right person\b|\bno one by that name\b/i.test(text);
 
 export async function suppress(contact: Contact, channel: "email" | "sms", reason: "stop" | "unsubscribe" | "bounce" | "complaint" | "manual" | "wrong_person") {
   const db = adminDb();

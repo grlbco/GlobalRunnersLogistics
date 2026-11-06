@@ -1,7 +1,7 @@
 import "server-only";
 import { adminDb } from "./admin";
 import {
-  activity, contactByEmail, contactByPhone, createInboundContact, isOptOut, logEvent, moveStage, recordMessage, suppress, type Contact,
+  activity, contactByEmail, contactByPhone, createInboundContact, isOptOut, isWrongNumber, logEvent, moveStage, recordMessage, suppress, type Contact,
 } from "./ingest";
 import * as quo from "@/lib/integrations/quo";
 import { emit } from "@/lib/automations/engine";
@@ -55,6 +55,11 @@ export async function ingestQuoMessage(m: quo.QuoMessage): Promise<string | null
   if (isOptOut(m.text)) {
     await suppress(contact, "sms", "stop");
     await moveStage(contact, "unsubscribed", "quo");
+    return id;
+  }
+  if (isWrongNumber(m.text ?? "")) {
+    await suppress(contact, "sms", "wrong_person");
+    await moveStage(contact, "not_fit", "quo");
     return id;
   }
   // Texting us first = consent to reply by text (TCPA: responding to an inbound message).
