@@ -1,23 +1,13 @@
 import "server-only";
 import { adminDb } from "./admin";
 import type { Stage } from "./stages";
+import { actorType, advance, decideMove } from "./pipeline";
 
 /**
  * Everything that enters the CRM from Instantly, Quo or the website goes through here,
- * so a message is stored once (unique external id) and stage moves stay forward-only.
+ * so a message is stored once (unique external id) and stage moves follow lib/crm/pipeline.ts.
  */
-const RANK: Record<Stage, number> = {
-  new: 0, contacted: 1, replied: 2, interested: 3, form_sent: 4, chasing: 4.5, applied: 5, qualified: 6, sent_to_ken: 7, hired: 8,
-  nurture: 1.5, not_fit: 9, not_interested: 9, unsubscribed: 10, bounced: 10,
-};
-const TERMINAL = new Set<Stage>(["hired", "not_fit", "unsubscribed", "bounced"]);
-
-/** Automatic moves only go forward; opt-out/bounce always win. Humans can move anywhere (via the UI). */
-export function advance(current: Stage, next: Stage): Stage {
-  if (next === "unsubscribed" || next === "bounced") return next;
-  if (TERMINAL.has(current)) return current;
-  return RANK[next] > RANK[current] ? next : current;
-}
+export { advance };
 
 export type Contact = { id: string; stage: Stage; email: string | null; phone: string | null; cell_phone: string | null; do_not_contact: boolean; sms_consent: boolean; agent_mode: string; first_name: string | null };
 const COLS = "id, stage, email, phone, cell_phone, do_not_contact, sms_consent, agent_mode, first_name";
@@ -44,25 +34,44 @@ export async function createInboundContact(p: { email?: string; phone?: string; 
   return data as Contact;
 }
 
-export async function moveStage(contact: Contact, next: Stage, actor = "system", extra: Record<string, unknown> = {}, force = false) {
-  const to = force && !TERMINAL.has(contact.stage) && contact.stage !== "applied" ? next : advance(contact.stage, next);
-  const patch: Record<string, unknown> = { ...extra };
-  if (to !== contact.stage) Object.assign(patch, { stage: to, stage_changed_at: new Date().toISOString() });
-  if (Object.keys(patch).length) await adminDb().from("contacts").update(patch).eq("id", contact.id);
-  if (to !== contact.stage) {
-    await adminDb().from("activities").insert({ contact_id: contact.id, type: "stage_changed", data: { from: contact.stage, to }, actor });
-    const { emit } = await import("@/lib/automations/engine");
-    await emit("stage_changed", contact.id, { from: contact.stage, to });
+export type MoveOptions = { force?: boolean; quote?: string | null; driverText?: string | null; reason?: string | null; model?: string | null };
+
+/** Moves a card if the rules allow it, and records who, why and on what evidence. Rejected AI proposals are recorded too. */
+export async function moveStage(contact: Contact, next: Stage, actor = "system", extra: Record<string, unknown> = {}, opts: MoveOptions = {}) {
+  const db = adminDb();
+  const { data: fresh } = await db.from("contacts").select("stage, stage_locked_at").eq("id", contact.id).maybeSingle();
+  const current = (fresh?.stage ?? contact.stage) as Stage;
+  const type = actorType(actor);
+  const verdict = decideMove({ current, to: next, actor: type, locked: !!fresh?.stage_locked_at, force: opts.force, quote: opts.quote, driverText: opts.driverText });
+  const event = { contact_id: contact.id, from_stage: current, actor_type: type, actor, reason: opts.reason ?? null, evidence_quote: opts.quote ?? null, model: opts.model ?? null };
+
+  if (Object.keys(extra).length) await db.from("contacts").update(extra).eq("id", contact.id);
+  if (!verdict.apply) {
+    if (!verdict.quiet) await db.from("stage_events").insert({ ...event, to_stage: next, decision: "rejected", reject_reason: verdict.reason });
+    return { ...contact, ...extra, stage: current } as Contact;
   }
-  return { ...contact, ...patch, stage: to } as Contact;
+
+  // Only if the card is still where we read it: a person may have just moved it.
+  const { data: moved } = await db.from("contacts").update({ stage: verdict.to, stage_changed_at: new Date().toISOString() }).eq("id", contact.id).eq("stage", current).select("id").maybeSingle();
+  if (!moved) {
+    await db.from("stage_events").insert({ ...event, to_stage: next, decision: "rejected", reject_reason: "The card changed while this was being decided" });
+    return { ...contact, ...extra, stage: current } as Contact;
+  }
+  await db.from("stage_events").insert({ ...event, to_stage: verdict.to, decision: "applied" });
+  await db.from("activities").insert({ contact_id: contact.id, type: "stage_changed", data: { from: current, to: verdict.to, ...(opts.quote ? { quote: opts.quote } : {}) }, actor });
+  const { emit } = await import("@/lib/automations/engine");
+  await emit("stage_changed", contact.id, { from: current, to: verdict.to });
+  return { ...contact, ...extra, stage: verdict.to } as Contact;
 }
 
 export async function activity(contactId: string, type: string, data: Record<string, unknown> = {}, actor = "system") {
   await adminDb().from("activities").insert({ contact_id: contactId, type, data, actor });
 }
 
+/** Records a provider event. Returns false when this exact event was already recorded, so retries do nothing. */
 export async function logEvent(source: "instantly" | "quo" | "website" | "system", type: string, payload: unknown, contactId?: string | null, externalId?: string | null) {
-  await adminDb().from("events").insert({ source, type, payload, contact_id: contactId ?? null, external_id: externalId ?? null, processed_at: new Date().toISOString() });
+  const { error } = await adminDb().from("events").insert({ source, type, payload, contact_id: contactId ?? null, external_id: externalId ?? null, processed_at: new Date().toISOString() });
+  return error?.code !== "23505";
 }
 
 async function conversationFor(contactId: string, channel: "email" | "sms" | "call", externalId?: string | null) {

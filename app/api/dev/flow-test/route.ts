@@ -47,7 +47,7 @@ async function run() {
   const c2 = await contact();
   const { data: out2 } = await db.from("outbox").select("channel, body, status, send_after, error").eq("contact_id", id).eq("author", "agent").in("status", ["pending", "draft", "sent"]).order("created_at", { ascending: false }).limit(4);
   check("follow-up #1 ran", run.some((r) => r.action.startsWith("followup:")), run);
-  check("card moved to Following up", c2.stage === "chasing", c2.stage);
+  check("card stays put while we follow up", c2.stage === "form_sent", c2.stage);
   check("follow-up message queued", (out2 ?? []).length > 0, out2);
   const f2 = await pendingFollowups();
   check("next follow-up (#2) planned", f2.some((f) => f.attempt === 2 && f.kind === "chase"), f2);

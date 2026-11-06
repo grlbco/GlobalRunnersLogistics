@@ -72,5 +72,15 @@ export async function healthChecks(): Promise<Check[]> {
     Promise.resolve<Check>({ name: "Ken's alert phone", ok: !!env.NOTIFY_SMS_TO, detail: env.NOTIFY_SMS_TO ?? "Not set", fix: env.NOTIFY_SMS_TO ? undefined : "Add NOTIFY_SMS_TO" }),
     Promise.resolve<Check>({ name: "Background worker", ok: env.NODE_ENV !== "production" ? null : !!env.WORKER_SECRET, detail: env.NODE_ENV !== "production" ? "Runs from the open CRM tab while testing locally" : env.WORKER_SECRET ? "Scheduled every minute" : "WORKER_SECRET missing" }),
   ];
+  checks.push((async () => {
+    // Instantly can switch a failing webhook off silently, which would quietly stop "interested" reaching the assistant.
+    try {
+      const { data } = await adminDb().from("events").select("created_at").eq("source", "instantly").order("created_at", { ascending: false }).limit(1).maybeSingle();
+      if (!env.INSTANTLY_WEBHOOK_SECRET) return { name: "Instantly webhook", ok: false, detail: "Not connected", fix: "node scripts/register-webhooks.mjs" };
+      return { name: "Instantly webhook", ok: data ? true : null, detail: data ? `Last event ${new Date(data.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : "No events yet. Check again once a campaign is sending." };
+    } catch (e) {
+      return { name: "Instantly webhook", ok: false, detail: msg(e) };
+    }
+  })());
   return Promise.all(checks);
 }

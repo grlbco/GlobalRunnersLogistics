@@ -3,7 +3,7 @@ import { OFFER_FACTS } from "./knowledge";
 import type { ChatMsg } from "@/lib/integrations/deepseek";
 
 const KEN_PHONE = company.phone.display;
-export const STAGES_AGENT_MAY_SET = ["replied", "interested", "form_sent", "not_interested", "not_fit", "nurture"] as const;
+export const STAGES_AGENT_MAY_SET = ["interested", "not_interested", "nurture"] as const;
 
 /**
  * Stable system prompt (identical across runs → DeepSeek prefix cache).
@@ -59,8 +59,9 @@ RULES
 - Never promise a job, a rate, miles or home time. Never promise when Ken calls beyond "usually within the hour during the day" (no "today", no "right now").
 - Never ask about immigration, citizenship, race, religion, health, family plans. Work authorization is just a yes/no on the form.
 - Only link allowed: the driver's FORM LINK.
-- Not a fit (no CDL-A, under 21, under 1 year experience, recent DUI): be kind, say it won't work right now. stage "not_fit", no follow-up.
+- Might not fit (no CDL-A, under 21, under 1 year experience, recent DUI): you don't decide this and never tell them they don't qualify. intent "not_fit", handoff = what they said, replies = []. A person reviews it.
 - Not interested: respect it, one friendly line, stage "not_interested", no follow-up.
+- Moving them to "interested": set stage only when their own words show interest, and copy those exact words into stage_quote. No quote, no move.
 - Texting: when you're on email, the driver has a phone on file and texting isn't allowed yet, and they sound interested, ask once if it's ok to text them (or what the best cell is). Don't ask again if you already did.
 - Owner-operator: Ken handles O/O terms on a call; ask the best time to reach them; handoff "owner-operator wants a call".
 - Hand off (handoff = reason, replies = []) only for: anger/threats, legal/accident/injury/medical topics, asking for a manager, or something you truly can't answer from the facts.
@@ -71,6 +72,7 @@ OUTPUT: one JSON object only:
  "replies":["text 1","optional text 2","optional text 3"],
  "subject":null,
  "stage":null or one of ${STAGES_AGENT_MAY_SET.join("|")},
+ "stage_quote":null or the driver's exact words that justify the stage,
  "facts":{"key":"value"},
  "summary":"1-3 sentences about this driver for the team",
  "next_step":"short",
@@ -135,6 +137,8 @@ Note from last time: ${p.memory.next_step ?? "(none)"}\nKen available now: ${p.k
         ? `[INSTRUCTION] Monthly check-in email #${chaseN}. They never finished the form. One or two short lines: still driving, still open to a change? Include the link. Casual subject. Output the JSON.`
       : p.trigger === "followup"
       ? `[INSTRUCTION] They've gone quiet since your last message. Write follow-up #${p.followupAttempt ?? 1} on ${p.channel}: one short, low-pressure text with a NEW angle (a different fact or a simple yes/no question). Don't guilt-trip, don't repeat earlier wording.${p.form.completed ? "" : " Include the form link only if you haven't sent it in your last 2 messages."}`
+      : p.trigger === "interest_label"
+        ? `[INSTRUCTION] Our team marked them as interested, but they haven't written anything for you to answer. Write one short ${p.channel === "sms" ? "text" : "email"}: say you heard they might be interested in driving with us, share one useful fact, and offer the form link. Don't claim they said anything. Output the JSON.`
       : p.trigger === "form_abandoned"
         ? `[INSTRUCTION] They opened the form but stopped at step ${p.form.step}. Send one short, friendly nudge to finish it (it's about one more minute). Include the link.`
         : `[INSTRUCTION] Reply to their latest message on ${p.channel}, following HOW YOU TEXT.${p.alsoText ? ` They answered by email and we can text them, so ALSO put 1-2 short texts in "sms_replies" (like "hey it's Ken's team, just replied to your email" plus the form link if you're sending it). Not a copy of the email.` : ""} Output the JSON.`;

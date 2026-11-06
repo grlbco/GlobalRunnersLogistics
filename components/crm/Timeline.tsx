@@ -57,9 +57,9 @@ export function TimelineItem({ it }: { it: Item }) {
       </li>
     );
   }
-  const d = it.data as { from?: string; to?: string; form_name?: string; source?: string };
+  const d = it.data as { from?: string; to?: string; form_name?: string; source?: string; quote?: string };
   const text =
-    it.type === "stage_changed" ? `Moved from ${stageLabel(d.from ?? "")} to ${stageLabel(d.to ?? "")}` :
+    it.type === "stage_changed" ? `Moved from ${stageLabel(d.from ?? "")} to ${stageLabel(d.to ?? "")}${d.quote ? `: "${d.quote}"` : ""}` :
     it.type === "form_submitted" ? `Submitted the form "${d.form_name ?? "form"}"` :
     it.type === "sms_consent" ? `Agreed to texts (${d.source ?? "consent"})` :
     it.type === "taken_over" ? "Taken over by a person" :

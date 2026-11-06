@@ -44,7 +44,7 @@ async function Body() {
   const head = { count: "exact" as const, head: true };
   const nowIso = new Date().toISOString();
 
-  const [total, byStage, byTier, daily, recent, tasks, unread, drafts, failed, overdue] = await Promise.all([
+  const [total, byStage, byTier, daily, recent, tasks, unread, drafts, failed, overdue, waiting, chasing] = await Promise.all([
     count(supabase.from("contacts").select("*", head)),
     Promise.all(STAGES.map(async (s) => [s.key, await count(supabase.from("contacts").select("*", head).eq("stage", s.key))] as const)),
     Promise.all([1, 2, 3, 4, 5].map(async (t) => [t, await count(supabase.from("contacts").select("*", head).eq("tier", t)), await count(supabase.from("contacts").select("*", head).eq("tier", t).not("last_inbound_at", "is", null))] as const)),
@@ -55,6 +55,8 @@ async function Body() {
     count(supabase.from("outbox").select("*", head).eq("status", "draft")),
     count(supabase.from("outbox").select("*", head).eq("status", "failed")),
     count(supabase.from("tasks").select("*", head).is("done_at", null).lt("due_at", nowIso)),
+    count(supabase.from("form_links").select("*", head).not("sent_at", "is", null).is("completed_at", null)),
+    count(supabase.from("followups").select("*", head).eq("status", "pending").in("kind", ["chase", "chase_extra"])),
   ]);
   const stage = Object.fromEntries(byStage) as Record<string, number>;
   const days = ((daily.data ?? []) as Daily[]).map((d) => ({ ...d, replies: Number(d.replies), answered: Number(d.answered), forms: Number(d.forms), applied: Number(d.applied) }));
@@ -66,7 +68,6 @@ async function Body() {
     return later.reduce((s, k) => s + (stage[k] ?? 0), 0) + (key === "contacted" ? ["nurture", "not_fit", "not_interested", "unsubscribed", "bounced"].reduce((s, k) => s + (stage[k] ?? 0), 0) : 0);
   };
   const applied = (stage.applied ?? 0) + (stage.qualified ?? 0) + (stage.sent_to_ken ?? 0);
-  const waiting = (stage.form_sent ?? 0) + (stage.chasing ?? 0);
   const replies7 = windowDelta(col("replies"));
   const answered7 = windowDelta(col("answered"));
   const applied7 = windowDelta(col("applied"));
@@ -78,7 +79,7 @@ async function Body() {
     overdue > 0 && { title: `${plural(overdue, "task")} overdue`, detail: "Past the time they were due", action: staff.can("contacts.view") ? { label: "View drivers", href: "/crm/contacts" } : undefined, tone: "bad", icon: ICONS.clock },
     unread > 0 && { title: `${plural(unread, "unread conversation")}`, detail: "Drivers wrote and nobody has opened it", action: { label: "Open unread", href: "/crm/inbox?f=unread" }, tone: "bad", icon: ICONS.inbox },
     drafts > 0 && { title: `${plural(drafts, "draft")} to approve`, detail: "Assistant replies waiting for your OK", action: { label: "Review drafts", href: "/crm/inbox" }, tone: "warn", icon: ICONS.edit },
-    waiting > 0 && { title: `${plural(waiting, "driver")} waiting on a form`, detail: `${(stage.chasing ?? 0).toLocaleString("en-US")} being followed up`, action: { label: "View pipeline", href: "/crm/pipeline" }, tone: "warn", icon: ICONS.form },
+    waiting > 0 && { title: `${plural(waiting, "driver")} waiting on a form`, detail: `${chasing.toLocaleString("en-US")} follow-ups scheduled`, action: { label: "View pipeline", href: "/crm/pipeline" }, tone: "warn", icon: ICONS.form },
     applied > 0 && { title: `${plural(applied, "application")} in progress`, detail: `${(stage.hired ?? 0).toLocaleString("en-US")} hired so far`, action: { label: "View pipeline", href: "/crm/pipeline" }, tone: "good", icon: ICONS.check },
   ].filter(Boolean) as Insight[];
 
@@ -98,7 +99,7 @@ async function Body() {
         <Stagger className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <StaggerItem><Kpi label="Driver replies" href="/crm/inbox" value={replies7.now} delta={{ diff: replies7.diff, label: "vs. prior 7 days" }} /></StaggerItem>
           <StaggerItem><Kpi label="Our answers" href="/crm/inbox" value={answered7.now} delta={{ diff: answered7.diff, label: "vs. prior 7 days" }} /></StaggerItem>
-          <StaggerItem><Kpi label="Waiting on a form" href="/crm/pipeline" value={waiting} hint={`${(stage.chasing ?? 0).toLocaleString("en-US")} being followed up`} /></StaggerItem>
+          <StaggerItem><Kpi label="Waiting on a form" href="/crm/pipeline" value={waiting} hint={`${chasing.toLocaleString("en-US")} follow-ups scheduled`} /></StaggerItem>
           <StaggerItem><Kpi label="Applied" href="/crm/pipeline" value={applied} delta={{ diff: applied7.diff, label: "vs. prior 7 days" }} /></StaggerItem>
         </Stagger>
 

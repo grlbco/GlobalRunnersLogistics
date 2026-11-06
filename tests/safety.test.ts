@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { gate, inQuietHours, type GateInput } from "@/lib/crm/sendGate";
 import { failureKind, needsRescue } from "@/lib/agent/recovery";
 import { isOptOut, isWrongNumber } from "@/lib/crm/ingest";
+import { actorType, decideMove, quoteFound } from "@/lib/crm/pipeline";
 
 // Wednesday Nov 4 2026, noon in Las Vegas
 const NOON = new Date("2026-11-04T20:00:00Z");
@@ -70,4 +71,24 @@ describe("no driver left without an answer", () => {
   it("skips an out-of-office auto-reply", () => expect(needsRescue({ ...b, autoReply: true })).toBe(false));
   it("rescues when the assistant ignored the message", () => expect(needsRescue({ ...b, lastRunAction: "ignored" })).toBe(true));
   it("rescues when the last run failed", () => expect(needsRescue({ ...b, lastRunAction: "failed" })).toBe(true));
+});
+
+describe("pipeline: the AI proposes, rules decide", () => {
+  const ai = { actor: "ai" as const, locked: false };
+  const said = "yeah sounds good, how do I apply?";
+  it("moves to Interested with the driver's exact words", () => expect(decideMove({ ...ai, current: "replied", to: "interested", quote: "Sounds good", driverText: said })).toEqual({ apply: true, to: "interested" }));
+  it("rejects a made-up quote", () => expect(decideMove({ ...ai, current: "replied", to: "interested", quote: "I want the job", driverText: said }).apply).toBe(false));
+  it("rejects a move with no quote", () => expect(decideMove({ ...ai, current: "replied", to: "interested", driverText: said }).apply).toBe(false));
+  it.each(["not_fit", "applied", "qualified", "sent_to_ken", "hired", "form_sent"] as const)("the AI can't set %s", (to) => expect(decideMove({ ...ai, current: "replied", to, quote: "sounds good", driverText: said }).apply).toBe(false));
+  it("the AI can't touch a card a person locked", () => expect(decideMove({ ...ai, locked: true, current: "replied", to: "interested", quote: "sounds good", driverText: said }).apply).toBe(false));
+  it("the AI can stop outreach without a quote", () => expect(decideMove({ ...ai, current: "interested", to: "not_interested" }).apply).toBe(true));
+  it("the AI can't move a card backward", () => expect(decideMove({ ...ai, current: "applied", to: "interested", quote: "sounds good", driverText: said }).apply).toBe(false));
+  it("a person can move a card anywhere", () => expect(decideMove({ actor: "human", locked: false, current: "hired", to: "replied" })).toEqual({ apply: true, to: "replied" }));
+  it("a finished form moves a locked card", () => expect(decideMove({ actor: "system", locked: true, current: "interested", to: "applied" })).toEqual({ apply: true, to: "applied" }));
+  it("an opt-out moves a locked card", () => expect(decideMove({ actor: "system", locked: true, current: "applied", to: "unsubscribed" })).toEqual({ apply: true, to: "unsubscribed" }));
+  it("a routine event doesn't move a locked card", () => expect(decideMove({ actor: "system", locked: true, current: "contacted", to: "replied" })).toEqual({ apply: false, quiet: true }));
+  it("forward-only still applies to system moves", () => expect(decideMove({ actor: "system", locked: false, current: "applied", to: "replied" })).toEqual({ apply: false, quiet: true }));
+  it("running out of follow-ups can move a card back to Nurture", () => expect(decideMove({ actor: "system", locked: false, force: true, current: "interested", to: "nurture" })).toEqual({ apply: true, to: "nurture" }));
+  it("classifies actors", () => { expect(actorType("user:abc")).toBe("human"); expect(actorType("agent")).toBe("ai"); expect(actorType("instantly")).toBe("system"); });
+  it("quote matching ignores case, quotes and spacing", () => expect(quoteFound('"HOW  do I apply"', said)).toBe(true));
 });

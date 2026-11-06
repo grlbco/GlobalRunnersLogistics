@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { clsx } from "clsx";
 import { requireStaff } from "@/lib/crm/auth";
 import { isSendingOn } from "@/lib/crm/sending";
-import { STAGES, TIERS } from "@/lib/crm/stages";
+import { STAGES, TIERS, stageLabel } from "@/lib/crm/stages";
 import { localTime } from "@/lib/crm/timezones";
 import { ago, fullName, phoneDisplay } from "@/lib/crm/format";
 import { addNote, addTask, askAssistant, setAgentMode, setStage, toggleTask, updateContact } from "@/app/crm/actions";
@@ -28,7 +28,7 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
   const { supabase } = await requireStaff(`/crm/contacts/${id}`, "contacts.view");
 
-  const [{ data: c }, items, memory, runs, followups, forms, tasks, assistant] = await Promise.all([
+  const [{ data: c }, items, memory, runs, followups, forms, tasks, assistant, lastMove] = await Promise.all([
     supabase.from("contacts").select("*").eq("id", id).maybeSingle(),
     loadTimeline(supabase, id),
     supabase.from("agent_memory").select("*").eq("contact_id", id).maybeSingle(),
@@ -37,6 +37,7 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
     supabase.from("form_links").select("sent_at, opened_at, step_reached, completed_at").eq("contact_id", id).order("created_at", { ascending: false }).limit(1),
     supabase.from("tasks").select("id, title, due_at, done_at").eq("contact_id", id).order("done_at", { nullsFirst: true }).order("due_at", { nullsFirst: false }).limit(20),
     getAssistantSettings(),
+    supabase.from("stage_events").select("from_stage, to_stage, actor_type, evidence_quote, decision").eq("contact_id", id).eq("decision", "applied").order("created_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
   if (!c) notFound();
 
@@ -79,7 +80,19 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
             </select>
             <button className={btnGhostCls}>Move</button>
           </div>
+          <p className="text-[0.75rem] text-faint">Moving a card by hand takes over from the assistant.</p>
         </form>
+
+        {c.stage_locked_at && <p className="rounded-[12px] border border-line bg-subtle px-3 py-2 text-[0.8rem] text-muted">Moved by a person, so the assistant can&apos;t change this stage until you hand back.</p>}
+
+        {!c.stage_locked_at && lastMove.data?.actor_type === "ai" && lastMove.data.to_stage === c.stage && (
+          <form action={setStage} className="rounded-[12px] border border-line bg-subtle px-3 py-2 text-[0.8rem] text-muted">
+            <input type="hidden" name="id" value={c.id} />
+            <input type="hidden" name="stage" value={lastMove.data.from_stage ?? ""} />
+            <p>Moved by the assistant{lastMove.data.evidence_quote ? <>: &ldquo;{lastMove.data.evidence_quote}&rdquo;</> : "."}</p>
+            <button className="mt-1 font-medium text-fg underline-offset-4 hover:underline">Move back to {stageLabel(lastMove.data.from_stage ?? "")}</button>
+          </form>
+        )}
 
         <dl className="space-y-3 text-sm">
           {[

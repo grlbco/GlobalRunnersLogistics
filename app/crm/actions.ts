@@ -13,7 +13,11 @@ export async function setStage(formData: FormData) {
   if (!parsed.success) return;
   const { data: before } = await supabase.from("contacts").select("stage").eq("id", parsed.data.id).single();
   if (!before || before.stage === parsed.data.stage) return;
-  await supabase.from("contacts").update({ stage: parsed.data.stage, stage_changed_at: new Date().toISOString() }).eq("id", parsed.data.id);
+  // A person moved the card: lock it and take over, so the AI can't undo this or talk over them.
+  const now = new Date().toISOString();
+  await supabase.from("contacts").update({ stage: parsed.data.stage, stage_changed_at: now, stage_locked_at: now, stage_locked_by: staff.id, agent_mode: "manual" }).eq("id", parsed.data.id);
+  const { adminDb } = await import("@/lib/crm/admin");
+  await adminDb().from("stage_events").insert({ contact_id: parsed.data.id, from_stage: before.stage, to_stage: parsed.data.stage, actor_type: "human", actor: `user:${staff.id}`, decision: "applied" });
   await supabase.from("activities").insert({
     contact_id: parsed.data.id,
     type: "stage_changed",
@@ -38,7 +42,8 @@ export async function setAgentMode(formData: FormData) {
   const { supabase, staff } = await requirePerm("contacts.edit");
   const parsed = z.object({ id, mode: z.enum(["auto", "manual"]) }).safeParse(Object.fromEntries(formData));
   if (!parsed.success) return;
-  await supabase.from("contacts").update({ agent_mode: parsed.data.mode }).eq("id", parsed.data.id);
+  // Handing back is the only thing that unlocks a card a person moved.
+  await supabase.from("contacts").update({ agent_mode: parsed.data.mode, ...(parsed.data.mode === "auto" ? { stage_locked_at: null, stage_locked_by: null } : {}) }).eq("id", parsed.data.id);
   await supabase.from("activities").insert({
     contact_id: parsed.data.id,
     type: parsed.data.mode === "manual" ? "taken_over" : "assistant_resumed",

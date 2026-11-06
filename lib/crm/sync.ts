@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import { adminDb } from "./admin";
 import {
   activity, contactByEmail, contactByPhone, createInboundContact, isOptOut, isWrongNumber, logEvent, moveStage, recordMessage, suppress, type Contact,
@@ -157,11 +158,38 @@ export async function syncInstantly(since: string, search?: string): Promise<{ s
   return { scanned, newMessages };
 }
 
+/** Instantly's webhooks have no event id and may retry, so identical events are recognized by their contents. */
+const eventKey = (e: Record<string, unknown>) => createHash("sha256").update([e.event_type, e.lead_email, e.campaign_id, e.email_id, e.timestamp].map(String).join("|")).digest("hex");
+
+/**
+ * Instantly marked this lead interested. The label is a trigger, not the truth: read what the driver
+ * actually wrote, then let the assistant decide. Does nothing if an answer is already on its way.
+ */
+export async function startFromInterest(contact: Contact) {
+  const db = adminDb();
+  try {
+    await syncInstantly(new Date(Date.now() - 7 * 86400_000).toISOString(), contact.email ?? undefined);
+  } catch (e) {
+    console.error("interest: couldn't read the thread", contact.id, e);
+  }
+  const { data: last } = await db.from("messages").select("id, created_at").eq("contact_id", contact.id).eq("direction", "inbound").neq("channel", "call").order("created_at", { ascending: false }).limit(1).maybeSingle();
+  // No words to judge (a person set the label by hand), so the label itself is the only evidence.
+  if (!last) await moveStage(contact, "interested", "instantly", {}, { reason: "Marked interested in Instantly, no reply to read" });
+  const [{ count: runs }, { count: outgoing }, { data: c }] = await Promise.all([
+    db.from("agent_runs").select("*", { count: "exact", head: true }).eq("contact_id", contact.id).in("action", ["queued", "running"]),
+    db.from("outbox").select("*", { count: "exact", head: true }).eq("contact_id", contact.id).eq("author", "agent").in("status", ["draft", "pending", "sending"]),
+    db.from("contacts").select("last_inbound_at, last_outbound_at").eq("id", contact.id).maybeSingle(),
+  ]);
+  const answered = !!last && !!c?.last_outbound_at && !!c.last_inbound_at && c.last_outbound_at >= c.last_inbound_at;
+  if (runs || outgoing || answered) return;
+  await db.from("agent_runs").insert({ contact_id: contact.id, trigger: "interest_label", input_message_id: last?.id ?? null, action: "queued" });
+}
+
 /** Lead-status webhooks (opens, clicks, interest, bounces, unsubscribes). Replies are pulled by syncInstantly. */
 export async function handleInstantlyStatus(event: { event_type: string; lead_email?: string; [k: string]: unknown }) {
   const email = event.lead_email?.toLowerCase();
   const contact = email ? await contactByEmail(email) : null;
-  await logEvent("instantly", event.event_type, event, contact?.id);
+  if (!(await logEvent("instantly", event.event_type, event, contact?.id, eventKey(event)))) return;
   if (!contact) return;
   switch (event.event_type) {
     case "email_sent":
@@ -174,10 +202,12 @@ export async function handleInstantlyStatus(event: { event_type: string; lead_em
       await emit(event.event_type === "email_opened" ? "email_opened" : "link_clicked", contact.id, {});
       break;
     case "lead_interested":
-      await moveStage(contact, "interested", "instantly");
+      await startFromInterest(contact);
       break;
     case "lead_not_interested":
-      await moveStage(contact, "not_interested", "instantly");
+      await moveStage(contact, "not_interested", "instantly", {}, { reason: "Marked not interested in Instantly" });
+      await adminDb().from("followups").update({ status: "cancelled" }).eq("contact_id", contact.id).eq("status", "pending");
+      await adminDb().from("outbox").update({ status: "cancelled", error: "marked not interested" }).eq("contact_id", contact.id).eq("author", "agent").in("status", ["draft", "pending"]);
       break;
     case "lead_wrong_person":
       await suppress(contact, "email", "wrong_person");

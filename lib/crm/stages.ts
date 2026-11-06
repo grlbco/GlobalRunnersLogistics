@@ -9,10 +9,10 @@ export const STAGES: { key: Stage; label: string; tone: Tone }[] = [
   { key: "contacted", label: "Contacted", tone: "cold" },
   { key: "replied", label: "Replied", tone: "warm" },
   { key: "interested", label: "Interested", tone: "warm" },
-  { key: "form_sent", label: "Form sent", tone: "warm" },
+  { key: "form_sent", label: "Form started", tone: "warm" },
   { key: "chasing", label: "Following up", tone: "warm" },
-  { key: "applied", label: "Applied", tone: "hot" },
-  { key: "qualified", label: "Qualified", tone: "hot" },
+  { key: "applied", label: "Form done", tone: "hot" },
+  { key: "qualified", label: "Pre-screen passed", tone: "hot" },
   { key: "sent_to_ken", label: "With Ken", tone: "hot" },
   { key: "hired", label: "Hired", tone: "won" },
   { key: "nurture", label: "Nurture", tone: "cold" },
@@ -27,7 +27,10 @@ export const stageLabel = (s: string) => STAGES.find((x) => x.key === s)?.label 
 export const stageTone = (s: string): Tone => STAGES.find((x) => x.key === s)?.tone ?? "cold";
 
 /** Pipeline board columns. Cold stages live in the Contacts table. */
-export const BOARD: Stage[] = ["replied", "interested", "form_sent", "chasing", "applied", "qualified", "sent_to_ken", "hired", "nurture"];
+export const BOARD: Stage[] = ["replied", "interested", "form_sent", "applied", "sent_to_ken", "hired"];
+
+/** Off the board: paused or finished. Shown as counts that link to the contact list. */
+export const OFF_BOARD: Stage[] = ["nurture", "not_interested", "not_fit", "unsubscribed", "bounced"];
 
 /** Funnel shown on the dashboard, in order. */
 export const FUNNEL: Stage[] = ["contacted", "replied", "interested", "form_sent", "applied", "hired"];

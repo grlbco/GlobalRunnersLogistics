@@ -34,6 +34,8 @@ export async function trackStep(token: string, step: number) {
   await db.from("form_links").update(patch).eq("token", token);
   if (!link.opened_at) {
     await activity(link.contact_id, "form_opened", {}, "website");
+    const { data: c } = await db.from("contacts").select("id, stage, email, phone, cell_phone, do_not_contact, sms_consent, agent_mode, first_name").eq("id", link.contact_id).maybeSingle();
+    if (c) await moveStage(c as Contact, "form_sent", "website", {}, { reason: "Driver opened the form" });
     const { emit } = await import("@/lib/automations/engine");
     await emit("form_opened", link.contact_id, {});
   }
@@ -77,8 +79,9 @@ export async function completeForm(f: Completion): Promise<string | null> {
     ...(f.sms_consent ? { sms_consent: true } : {}),
   };
   if (f.email && !contact.email) patch.email = f.email.toLowerCase();
-  const next = f.flags.some((x) => ["no_cdl_a", "under_1yr", "dui", "drug_test_or_sap", "under_21"].includes(x)) ? "not_fit" : "applied";
-  await moveStage(contact, next, "website", patch);
+  // A person decides anything flagged: the form never rejects a driver on its own.
+  const flagged = f.flags.some((x) => ["no_cdl_a", "under_1yr", "dui", "drug_test_or_sap", "under_21"].includes(x));
+  await moveStage(contact, "applied", "website", patch, { reason: "Driver submitted the form" });
 
   const now = new Date().toISOString();
   if (token) await db.from("form_links").update({ completed_at: now, step_reached: 5 }).eq("token", token);
@@ -90,7 +93,9 @@ export async function completeForm(f: Completion): Promise<string | null> {
   await activity(contact.id, "form_completed", { flags: f.flags }, "website");
   const { emit } = await import("@/lib/automations/engine");
   await emit("form_completed", contact.id, {});
-  if (next === "applied") {
+  if (flagged) {
+    await db.from("tasks").insert({ contact_id: contact.id, title: `Review ${f.first_name} ${f.last_name}'s form: ${f.flags.join(", ")}`.slice(0, 300), due_at: new Date(Date.now() + 3600_000).toISOString(), created_by: "agent" });
+  } else {
     await db.from("tasks").insert({ contact_id: contact.id, title: `Call ${f.first_name} ${f.last_name}: form completed`, due_at: new Date(Date.now() + 3600_000).toISOString(), created_by: "workflow" });
     // Confirmation back to the driver, through the outbox so it shows in the timeline (texts only with consent).
     const smsOk = f.sms_consent || contact.sms_consent;
@@ -104,7 +109,7 @@ export async function completeForm(f: Completion): Promise<string | null> {
       await db.from("outbox").insert({ contact_id: contact.id, channel: "sms", author: "workflow", body: lines[Math.floor(Math.random() * lines.length)], status: "pending", send_after: new Date(Date.now() + 20_000).toISOString(), is_reply: true });
     }
   }
-  await db.from("agent_memory").upsert({ contact_id: contact.id, next_step: next === "applied" ? "Form completed. Waiting for Ken's call." : "Form completed, flagged as not a fit.", updated_at: now });
+  await db.from("agent_memory").upsert({ contact_id: contact.id, next_step: !flagged ? "Form completed. Waiting for Ken's call." : "Form completed, flagged as not a fit.", updated_at: now });
 
   // Telegram alert to Ken's group
   try {
@@ -112,7 +117,7 @@ export async function completeForm(f: Completion): Promise<string | null> {
     const { siteUrl } = await import("@/lib/site");
     const { data: full } = await db.from("contacts").select("state, city, tags").eq("id", contact.id).single();
     await sendTelegram(
-      `${next === "applied" ? "✅ <b>New driver form submitted</b>" : "⚠️ <b>Form submitted, not a fit</b>"}\n` +
+      `${!flagged ? "✅ <b>New driver form submitted</b>" : "⚠️ <b>Form submitted, needs review</b>"}\n` +
         `<b>${esc(f.first_name)} ${esc(f.last_name)}</b>${full?.state ? ` · ${esc([full.city, full.state].filter(Boolean).join(", "))}` : ""}\n` +
         `📞 ${esc(f.phone)}${f.email ? `\n✉️ ${esc(f.email)}` : ""}\n\n${esc(f.summary)}` +
         `${f.flags.length ? `\n\nFlags: ${esc(f.flags.join(", "))}` : ""}\n\n<a href="${siteUrl()}/crm/contacts/${contact.id}">Open in GRL Command</a>`,

@@ -29,6 +29,7 @@ const Decision = z.preprocess(foldBody, z.object({
   reply: str.optional(),
   subject: str.optional(),
   stage: z.enum(STAGES_AGENT_MAY_SET).nullable().optional().catch(null),
+  stage_quote: str.optional(),
   facts: z.preprocess((v) => (v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).filter(([, x]) => ["string", "number", "boolean"].includes(typeof x))) : {}), z.record(z.string(), z.union([z.string(), z.number(), z.boolean()]))).default({}),
   summary: str.optional(),
   next_step: str.optional(),
@@ -91,7 +92,7 @@ export async function formLinkFor(contactId: string) {
   return { url: `${siteUrl()}/apply/driver?t=${row.token}`, token: row.token as string, form: { sent: !!row.sent_at, opened: !!row.opened_at, step: row.step_reached ?? 0, completed: !!row.completed_at } };
 }
 
-type RunInput = { simTurns?: Turn[]; contactId: string; trigger: "text_received" | "email_received" | "followup" | "form_abandoned" | "form_submitted" | "manual" | "test"; formSubmitted?: { form: string; sendDriverForm?: boolean }; inputMessageId?: string | null; followupAttempt?: number; followupKind?: FollowupKind; followupChannel?: "email" | "sms" | null; runId?: string; dryRunMessage?: { channel: "email" | "sms"; body: string } };
+type RunInput = { simTurns?: Turn[]; contactId: string; trigger: "text_received" | "email_received" | "followup" | "form_abandoned" | "form_submitted" | "interest_label" | "manual" | "test"; formSubmitted?: { form: string; sendDriverForm?: boolean }; inputMessageId?: string | null; followupAttempt?: number; followupKind?: FollowupKind; followupChannel?: "email" | "sms" | null; runId?: string; dryRunMessage?: { channel: "email" | "sms"; body: string } };
 export type RunResult = { action: string; retryable?: boolean; reply?: string | null; channel?: "email" | "sms"; decision?: Decision; problems?: string[]; reason?: string; costUsd?: number };
 
 /** One assistant decision for one driver. Never throws: failures come back as "failed", and the worker retries or gets a person. */
@@ -133,7 +134,7 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
       }
       const since = new Date(Date.now() - 86400_000).toISOString();
       // Daily cap is for messages we start (follow-ups). Answering a driver who wrote is never capped.
-      const proactive = input.trigger === "followup" || input.trigger === "form_abandoned";
+      const proactive = input.trigger === "followup" || input.trigger === "form_abandoned" || input.trigger === "interest_label";
       const { count } = proactive ? await db.from("outbox").select("*", { count: "exact", head: true }).eq("contact_id", c.id).eq("author", "agent").eq("is_reply", false).gte("created_at", since).neq("status", "cancelled") : { count: 0 };
       if (proactive && (count ?? 0) >= Math.max(settings.max_per_day, 4)) return (await log({ action: "ignored", decision: { reason: "daily limit" } }), { action: "ignored", reason: "Daily message limit reached for this driver" });
     }
@@ -184,8 +185,6 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
     if (input.trigger === "form_submitted") channel = c.sms_consent ? "sms" : "email";
     if (input.trigger === "followup") channel = input.followupChannel ?? (c.sms_consent && (input.followupAttempt ?? 1) <= MAX_TEXT_FOLLOWUPS ? "sms" : "email");
     if (channel === "email" && !(c.email && (dry || (await canEmailContact(c.id))))) channel = "sms";
-    // First chase touch: the card moves to "Following up".
-    if (!dry && input.followupKind === "chase" && (input.followupAttempt ?? 1) === 1) await moveStage(c as Contact, "chasing", "agent");
     // Driver answered an email and we may text them: send a short text too (multi-channel, like a recruiter would).
     let alsoText = false;
     if (!dry && input.trigger === "email_received" && c.sms_consent && (c.cell_phone || c.phone)) {
@@ -193,7 +192,8 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
       alsoText = !recentSms;
     }
     // "Reply now" from staff: answer the driver if they wrote last, otherwise a fresh nudge.
-    const promptTrigger = input.trigger === "manual" ? (turns.at(-1)?.direction === "inbound" ? "text_received" : "followup") : input.trigger === "test" ? "text_received" : input.trigger;
+    const driverWroteLast = turns.at(-1)?.direction === "inbound";
+    const promptTrigger = input.trigger === "manual" ? (driverWroteLast ? "text_received" : "followup") : input.trigger === "test" ? "text_received" : input.trigger === "interest_label" && driverWroteLast ? "text_received" : input.trigger;
     if (channel === "sms" && !c.sms_consent) channel = "email";
     if (!dry && channel === "email" && !(c.email && (await canEmailContact(c.id))))
       return (await log({ action: "ignored", decision: { reason: "no way to reach: no text consent and no email thread" } }), { action: "ignored", reason: "Can't text (no consent) and no email thread yet" });
@@ -272,7 +272,7 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
     // Stop / wrong person
     if (decision.intent === "stop") {
       await suppress(c as Contact, channel, channel === "sms" ? "stop" : "unsubscribe");
-      await moveStage(c as Contact, "unsubscribed", "agent");
+      await moveStage(c as Contact, "unsubscribed", "agent", {}, { reason: "Driver asked to stop", model });
       await log({ action: "unsubscribed", decision, ...meta });
       return { action: "unsubscribed", decision };
     }
@@ -282,9 +282,16 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
     }
     if (decision.intent === "wrong_person") {
       await suppress(c as Contact, channel, "wrong_person");
-      await moveStage(c as Contact, "not_fit", "agent");
+      await moveStage(c as Contact, "not_fit", "opt-out", {}, { reason: "Driver said wrong person", model });
     }
-    if (decision.stage) await moveStage(c as Contact, decision.stage, "agent");
+    // The AI proposes, the rules decide: its evidence is checked against what the driver really wrote.
+    if (decision.stage) {
+      const lastOutAt = [...turns].reverse().find((t) => t.direction === "outbound")?.at ?? "";
+      const driverText = turns.filter((t) => t.direction === "inbound" && t.at > lastOutAt).map((t) => t.body).join("\n");
+      await moveStage(c as Contact, decision.stage, "agent", {}, { quote: decision.stage_quote, driverText, model, reason: decision.intent });
+    }
+    // Rejecting a driver is never the AI's call, even if it skipped the hand-off.
+    if (decision.intent === "not_fit" && !decision.handoff) decision.handoff = `Might not fit: ${decision.summary ?? "see the conversation"}`;
 
     if (decision.handoff) {
       await handoff(c, decision.handoff);
@@ -305,7 +312,7 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
       let at = Date.now() + 1000 * base;
       if (input.followupKind !== "chase_extra")
         await db.from("outbox").update({ status: "cancelled", error: "replaced by a newer reply" }).eq("contact_id", c.id).eq("author", "agent").in("status", ["draft", "pending"]);
-      const isReply = input.trigger === "text_received" || input.trigger === "email_received" || input.trigger === "form_submitted" || manual;
+      const isReply = input.trigger === "text_received" || input.trigger === "email_received" || input.trigger === "form_submitted" || manual || (input.trigger === "interest_label" && driverWroteLast);
       for (let i = 0; i < parts.length; i++) {
         if (i > 0) at += 1000 * (8 + Math.random() * 12 + parts[i].length * 0.15);
         await db.from("outbox").insert({
@@ -321,8 +328,8 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
         tAt += 1000 * (10 + Math.random() * 15);
       }
       if ([...parts, ...texts].some((t) => t.includes(link.url)) && !link.form.sent) {
+        // Sending the link isn't progress by the driver, so the card stays put until they open the form.
         await db.from("form_links").update({ sent_at: new Date().toISOString() }).eq("token", link.token);
-        await moveStage(c as Contact, "form_sent", "agent");
       }
       action = settings.draft_mode ? "draft" : "replied";
     }
@@ -330,7 +337,7 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
     // Next touch. The extra email of a "text + email" chase step leaves the schedule alone.
     if (input.followupKind !== "chase_extra") {
       await db.from("followups").update({ status: "cancelled" }).eq("contact_id", c.id).eq("status", "pending");
-      const done = ["not_interested", "not_fit", "stop", "wrong_person", "owner_operator"].includes(decision.intent) || decision.stage === "not_interested" || decision.stage === "not_fit";
+      const done = ["not_interested", "not_fit", "stop", "wrong_person", "owner_operator"].includes(decision.intent) || decision.stage === "not_interested";
       const linkOut = link.form.sent || [...parts].some((t) => t.includes(link.url)) || decision.sms_replies.some((t) => t.includes(link.url));
       if (!done && !link.form.completed) await scheduleNext(c, { linkOut, kind: input.trigger === "followup" ? input.followupKind ?? "nudge" : null, attempt: input.followupAttempt ?? 0, maxNudges: settings.max_followups });
     }
@@ -370,7 +377,7 @@ export async function scheduleNext(
   if (p.kind === "nurture" || (p.kind === "chase" && p.attempt >= CHASE.length)) {
     const n = p.kind === "nurture" ? p.attempt + 1 : 1;
     if (n > NURTURE_MAX || !canEmail) return;
-    if (n === 1) await moveStage(c as unknown as Contact, "nurture", "agent", {}, true);
+    if (n === 1) await moveStage(c as unknown as Contact, "nurture", "follow-ups", {}, { force: true, reason: "Follow-ups finished without a form" });
     await add(n, "nurture", "email", inGoodWindow(new Date(Date.now() + NURTURE_GAP_H * 3600_000), c.timezone), `Nurture email #${n}`);
     return;
   }

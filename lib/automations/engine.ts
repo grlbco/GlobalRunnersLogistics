@@ -1,6 +1,7 @@
 import "server-only";
 import { adminDb } from "@/lib/crm/admin";
-import { activity } from "@/lib/crm/ingest";
+import { activity, moveStage, type Contact } from "@/lib/crm/ingest";
+import type { Stage } from "@/lib/crm/stages";
 import { notifyTeam } from "@/lib/crm/notify";
 import { company } from "@/content/facts";
 import * as quo from "@/lib/integrations/quo";
@@ -90,14 +91,12 @@ async function runStep(step: Step, c: C, run: { id: string; created_at: string }
       await db.from("outbox").insert({ contact_id: c.id, channel: step.type === "send_text" ? "sms" : "email", author: "workflow", subject: step.type === "send_email" ? step.subject ?? null : null, body, dedupe_key: `wf:${run.id}:${step.type}:${body.length}` });
       return "next";
     }
-    case "move_stage":
-      if (c.stage !== step.stage) {
-        await db.from("contacts").update({ stage: step.stage, stage_changed_at: new Date().toISOString() }).eq("id", c.id);
-        await activity(c.id, "stage_changed", { from: c.stage, to: step.stage }, "workflow");
-        await emit("stage_changed", c.id, { from: c.stage, to: step.stage });
-        c.stage = step.stage;
-      }
+    case "move_stage": {
+      // Same rules as every other move: an automation can't override a person's lock.
+      const moved = await moveStage(c as unknown as Contact, step.stage as Stage, "workflow", {}, { force: true, reason: "Automation step" });
+      c.stage = moved.stage;
       return "next";
+    }
     case "add_tag":
       if (!c.tags.includes(step.tag)) {
         c.tags = [...c.tags, step.tag];

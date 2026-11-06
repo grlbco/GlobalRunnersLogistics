@@ -9,7 +9,7 @@ import { stageTone, toneDot } from "@/lib/crm/stages";
 import { Avatar } from "./ui";
 import { EASE } from "./motion";
 
-type Card = { id: string; name: string; company: string | null; place: string; when: string; email: string | null; phone: string | null; tier: number | null };
+type Card = { id: string; name: string; company: string | null; place: string; when: string; email: string | null; phone: string | null; tier: number | null; locked?: boolean };
 type Col = { stage: string; label: string; count: number; items: Card[] };
 
 const MailIcon = () => <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M4 6h16v12H4zM4 7l8 6 8-6" /></svg>;
@@ -89,6 +89,7 @@ export function Board({ columns }: { columns: Col[] }) {
                         <p className="truncate text-[0.84rem] font-medium leading-tight">{c.name}</p>
                         <p className="mt-0.5 truncate text-[0.72rem] text-faint">{c.when}{c.place && ` · ${c.place}`}</p>
                       </div>
+                      {c.locked && <span title="Moved by a person: the assistant is off for this driver" aria-label="Moved by a person" className="text-faint"><svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M6 11h12v9H6zM8.5 11V7.5a3.5 3.5 0 0 1 7 0V11" /></svg></span>}
                       {c.tier && <span className="rounded-[5px] border border-line px-1.5 py-px font-mono text-[0.62rem] text-faint">T{c.tier}</span>}
                     </div>
                     {(c.email || c.phone || c.company) && (

@@ -26,6 +26,9 @@ Everything runs locally today. This is the exact order to put it on globalrunner
 - Suspend blocks sign-in at once; Remove takes CRM access away but keeps the login (they may also be a driver).
 - Every sign-in and team change is logged (Team → Activity, table `staff_audit`).
 
+## 2b. Database changes come before the code
+Apply everything in `supabase/migrations/` that isn't on the live database yet, then deploy. The app reads the new columns on every stage move.
+
 ## 3. Background worker (every minute)
 Open the Supabase SQL editor, paste `supabase/deploy/worker-cron.sql`, replace `<WORKER_SECRET>`, run.
 Check: `select * from cron.job_run_details order by start_time desc limit 5;` shows `succeeded`.
