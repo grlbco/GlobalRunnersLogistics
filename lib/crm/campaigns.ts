@@ -74,7 +74,7 @@ export async function addWave(campaignId: string, opts: { tiers: number[]; state
     c.instantly_id,
     pick.map((r) => ({
       email: r.email!,
-      first_name: r.first_name ?? undefined,
+      first_name: r.first_name?.trim() || "there", // so "Hi {{firstName}}," never renders empty
       last_name: r.last_name ?? undefined,
       company_name: r.company_name ?? undefined,
       phone: r.phone ?? undefined,
