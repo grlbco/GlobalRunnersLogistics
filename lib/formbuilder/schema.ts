@@ -57,7 +57,7 @@ export type OnSubmit = {
   stage?: string;               // move the card (forward only)
   tags?: string[];              // add tags
   assistant?: "none" | "reply"; // assistant texts/emails a thank-you + next step
-  telegram?: boolean;           // alert Ken's group
+  telegram?: boolean;           // alert the team's group
   task?: boolean;               // task for the team
   sendDriverForm?: boolean;     // assistant includes the driver application link
 };
@@ -87,7 +87,7 @@ export const TEMPLATES: Record<string, { name: string; schema: FormSchema; on_su
   quick_interest: {
     name: "Quick interest",
     schema: {
-      settings: { title: "Interested in driving with Global Runners?", description: "Takes 30 seconds. Ken or someone from the team will reach out.", submitText: "Send", successMessage: "Got it, thanks! Someone from our team will reach out soon.", showProgress: false },
+      settings: { title: "Interested in driving with Global Runners?", description: "Takes 30 seconds. Someone from our team will reach out.", submitText: "Send", successMessage: "Got it, thanks! Someone from our team will reach out soon.", showProgress: false },
       pages: [{ id: "p1", fields: [
         { id: "fn", type: "text", label: "First name", required: true, map: "first_name" },
         { id: "ln", type: "text", label: "Last name", required: true, map: "last_name" },
@@ -102,7 +102,7 @@ export const TEMPLATES: Record<string, { name: string; schema: FormSchema; on_su
   owner_operator: {
     name: "Owner-operator interest",
     schema: {
-      settings: { title: "Owner-operators: lease on with Global Runners", description: "Tell us about your truck. Ken goes over the terms himself.", submitText: "Send", successMessage: "Thanks! Ken will reach out to go over the terms.", showProgress: true },
+      settings: { title: "Owner-operators: lease on with Global Runners", description: "Tell us about your truck. Our team goes over the terms with you on a call.", submitText: "Send", successMessage: "Thanks! Our team will reach out to go over the terms.", showProgress: true },
       pages: [
         { id: "p1", title: "You", fields: [
           { id: "fn", type: "text", label: "First name", required: true, map: "first_name" },
@@ -116,7 +116,7 @@ export const TEMPLATES: Record<string, { name: string; schema: FormSchema; on_su
           { id: "mk", type: "select", label: "Make", required: true, options: ["Freightliner", "Peterbilt", "Kenworth", "Volvo", "International", "Mack", "Other"] },
           { id: "trl", type: "yesno", label: "Do you have your own trailer?", required: true },
           { id: "auth", type: "yesno", label: "Do you have your own MC authority?", required: true },
-          { id: "best", type: "text", label: "Best time for Ken to call", required: false },
+          { id: "best", type: "text", label: "Best time for us to call", required: false },
           { id: "ok", type: "consent", label: SMS_CONSENT_LABEL, required: false },
         ] },
       ],

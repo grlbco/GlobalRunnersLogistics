@@ -60,16 +60,16 @@ export async function healthChecks(): Promise<Check[]> {
       }
     })(),
     (async () => {
-      if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) return { name: "Telegram (Ken's alerts)", ok: false, detail: "Not set up", fix: "Add TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID (steps in .env.example)" };
+      if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) return { name: "Telegram (team alerts)", ok: false, detail: "Not set up", fix: "Add TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID (steps in .env.example)" };
       try {
         const r = await timed(fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/getMe`));
         const j = (await r.json()) as { ok: boolean; result?: { username: string } };
-        return { name: "Telegram (Ken's alerts)", ok: j.ok, detail: j.ok ? `@${j.result?.username} → group ${env.TELEGRAM_CHAT_ID}` : "Bad token" };
+        return { name: "Telegram (team alerts)", ok: j.ok, detail: j.ok ? `@${j.result?.username} → group ${env.TELEGRAM_CHAT_ID}` : "Bad token" };
       } catch (e) {
-        return { name: "Telegram (Ken's alerts)", ok: false, detail: msg(e) };
+        return { name: "Telegram (team alerts)", ok: false, detail: msg(e) };
       }
     })(),
-    Promise.resolve<Check>({ name: "Ken's alert phone", ok: !!env.NOTIFY_SMS_TO, detail: env.NOTIFY_SMS_TO ?? "Not set", fix: env.NOTIFY_SMS_TO ? undefined : "Add NOTIFY_SMS_TO" }),
+    Promise.resolve<Check>({ name: "Team alert phone", ok: !!env.NOTIFY_SMS_TO, detail: env.NOTIFY_SMS_TO ?? "Not set", fix: env.NOTIFY_SMS_TO ? undefined : "Add NOTIFY_SMS_TO" }),
     Promise.resolve<Check>({ name: "Background worker", ok: env.NODE_ENV !== "production" ? null : !!env.WORKER_SECRET, detail: env.NODE_ENV !== "production" ? "Runs from the open CRM tab while testing locally" : env.WORKER_SECRET ? "Scheduled every minute" : "WORKER_SECRET missing" }),
   ];
   return Promise.all(checks);

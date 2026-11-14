@@ -14,7 +14,7 @@ export const metadata = { title: "Settings" };
 export default function SettingsPage() {
   return (
     <>
-      <PageHead title="Settings" sub="Sending, Ken's call hours and every connection." />
+      <PageHead title="Settings" sub="Sending, call hours and every connection." />
       <Suspense fallback={<div className="p-8"><Skeleton className="h-96" /></div>}>
         <Body />
       </Suspense>
@@ -38,8 +38,8 @@ async function Body() {
       </Card>
 
       <Card className="p-5">
-        <Label>Ken&apos;s call hours</Label>
-        <p className="mt-2 text-sm text-muted">&quot;Call me now&quot; inside these hours tells the driver Ken calls in a few minutes. Outside, it says first thing in the morning. Right now: <span className={clsx(inCallHours(hours) ? "text-emerald-700" : "text-muted")}>{inCallHours(hours) ? "Ken is available" : "after hours"}</span>.</p>
+        <Label>Call hours</Label>
+        <p className="mt-2 text-sm text-muted">&quot;Call me now&quot; inside these hours tells the driver we call in a few minutes. Outside, it says first thing in the morning. Right now: <span className={clsx(inCallHours(hours) ? "text-emerald-700" : "text-muted")}>{inCallHours(hours) ? "The team is available" : "after hours"}</span>.</p>
         <div className="mt-4"><CallHoursForm initial={hours} canEdit={isAdmin} /></div>
       </Card>
 

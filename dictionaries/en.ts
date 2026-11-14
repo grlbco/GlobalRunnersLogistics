@@ -90,7 +90,7 @@ const en = {
       title: ["From application", "to your first load."],
       items: [
         { t: "Apply in 2 minutes", d: "A short form with tap-to-answer questions. No SSN, no paperwork yet." },
-        { t: "Ken calls you", d: "Our recruiter calls you back — usually within the hour during office hours." },
+        { t: "We call you", d: "Someone from our team calls you back — usually within the hour during office hours." },
         { t: "Full application", d: "Create your driver account and finish your DOT application online, at your pace." },
         { t: "Orientation in Henderson", d: "One day at the yard. Travel covered if you live far away. Your first load goes out the next day." },
       ],

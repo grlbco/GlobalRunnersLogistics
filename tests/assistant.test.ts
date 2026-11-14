@@ -5,7 +5,7 @@ import { inGoodWindow } from "@/lib/agent/engine";
 const ctx = { channel: "sms" as const, formUrl: "https://globalrunnerslogistics.com/apply/driver?t=abc" };
 
 describe("assistant safety checks (every message before it sends)", () => {
-  it("passes a normal human text", () => expect(checkReply("It's per mile, paid every Thursday. Ken goes over the rate on the call", ctx).ok).toBe(true));
+  it("passes a normal human text", () => expect(checkReply("It's per mile, paid every Friday. Our team goes over the rate on the call", ctx).ok).toBe(true));
   it.each([
     ["em dash", "Great pay — weekly"],
     ["semicolon", "Paid weekly; plus bonus"],
@@ -17,9 +17,12 @@ describe("assistant safety checks (every message before it sends)", () => {
     ["not X it's Y", "It's not just a job, it's a career"],
     ["buzzword", "Rest assured, we got you"],
     ["foreign link", "Apply at https://example.com/apply"],
-    ["made-up rate", "We pay 70 cents per mile"],
+    ["made-up rate", "We pay 75 cents per mile"],
+    ["percent pay", "We pay 30% of the load"],
   ])("blocks %s", (_n, text) => expect(checkReply(text, ctx).ok).toBe(false));
-  it("allows an honest AI answer", () => expect(checkReply("I'm an AI assistant, I help Ken with texts. Ken's real, he calls everyone himself", ctx).ok).toBe(true));
+  it("allows an honest AI answer", () => expect(checkReply("I'm an AI assistant, I help our team with texts. The people who call you are real", ctx).ok).toBe(true));
+  it("allows the published pay ranges", () => expect(checkReply("solo is 60 to 70 cents a mile with a $1,500 to $1,700 guaranteed weekly minimum, paid every Friday", ctx).ok).toBe(true));
+  it("allows team rate in dollars", () => expect(checkReply("team runs $0.80 to $0.90 per mile", ctx).ok).toBe(true));
   it("allows the driver's own form link", () => expect(checkReply(`Here's the form: ${ctx.formUrl}`, ctx).ok).toBe(true));
   it("blocks texts that are too long", () => expect(checkReply("a ".repeat(200), ctx).ok).toBe(false));
 });

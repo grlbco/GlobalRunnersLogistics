@@ -22,7 +22,7 @@ export const PERMISSIONS = [
   { key: "assistant.manage", group: "Assistant", label: "Change the assistant's settings, switch it on/off" },
   { key: "reports.view", group: "Reports", label: "See reports" },
   { key: "settings.view", group: "Settings", label: "See settings and connections" },
-  { key: "settings.manage", group: "Settings", label: "Sending switch, Ken's call hours, costs, go-live checklist" },
+  { key: "settings.manage", group: "Settings", label: "Sending switch, call hours, costs, go-live checklist" },
   { key: "team.manage", group: "Team", label: "Add people, change roles and permissions, suspend access" },
 ] as const;
 

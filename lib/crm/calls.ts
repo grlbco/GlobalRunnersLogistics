@@ -69,7 +69,7 @@ export async function ingestQuoCall(c: quo.QuoCall): Promise<"new" | "updated" |
       const name = contact.first_name ? ` ${contact.first_name}` : "";
       await db.from("outbox").insert({
         contact_id: contact.id, channel: "sms", author: "workflow", status: "pending", is_reply: true, send_after: new Date(Date.now() + 45_000).toISOString(),
-        body: `Hey${name}, sorry we missed your call. This is Ken's team at Global Runners. Text back a good time and Ken will call you, or just text your question here.`,
+        body: `Hey${name}, sorry we missed your call. This is the Global Runners team. Text back a good time and we'll call you, or just text your question here.`,
       });
     }
     await db.from("tasks").insert({ contact_id: contact.id, title: `Call back: missed call from ${contact.first_name ?? phoneDisplay(other)}`, due_at: new Date().toISOString(), created_by: "workflow" });

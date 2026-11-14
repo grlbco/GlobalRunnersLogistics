@@ -13,18 +13,18 @@ export const DEFAULT_SEQUENCE: SeqStep[] = [
   {
     delay_days: 0,
     variants: [
-      { subject: "CDL-A jobs out of Henderson", body: `Hi {{firstName}},\n\nKen here, owner of Global Runners Logistics in Las Vegas. We're hiring CDL-A drivers out of our Henderson yard: automatic Peterbilts and Cascadias, weekly pay every Friday, and you take the truck home.\n\nWorth a quick call this week?\n\nKen Aman\nGlobal Runners Logistics${FOOTER}` },
-      { subject: "{{firstName}}, still driving?", body: `Hi {{firstName}},\n\nIf running your own authority is getting old, we're hiring company drivers in Las Vegas. Steady freight on our Nevada to Georgia lane, paid every Friday, and a $1,000 bonus every work anniversary.\n\nWant the details?\n\nKen Aman\nGlobal Runners Logistics${FOOTER}` },
-      { subject: "quick question", body: `Hi {{firstName}},\n\nWould you be open to a company driver seat with a dedicated dispatcher, 24/7 in English or Spanish, and no driver-facing camera?\n\nWe run 30 trucks out of Henderson, NV. Reply yes and I'll send the details.\n\nKen${FOOTER}` },
+      { subject: "CDL-A jobs out of Henderson", body: `Hi {{firstName}},\n\nWe're Global Runners Logistics, a family-owned fleet in Las Vegas, and we're hiring CDL-A drivers out of our Henderson yard: automatic Peterbilts and Cascadias, weekly pay every Friday, and you take the truck home.\n\nWorth a quick call this week?\n\nGlobal Runners Logistics team${FOOTER}` },
+      { subject: "{{firstName}}, still driving?", body: `Hi {{firstName}},\n\nIf running your own authority is getting old, we're hiring company drivers in Las Vegas. Steady freight on our Nevada to Georgia lane, paid every Friday, and a $1,000 bonus every work anniversary.\n\nWant the details?\n\nGlobal Runners Logistics team${FOOTER}` },
+      { subject: "quick question", body: `Hi {{firstName}},\n\nWould you be open to a company driver seat with a dedicated dispatcher, 24/7 in English or Spanish, and no driver-facing camera?\n\nWe run 30 trucks out of Henderson, NV. Reply yes and I'll send the details.\n\nGlobal Runners Logistics team${FOOTER}` },
     ],
   },
   {
     delay_days: 3,
-    variants: [{ subject: "", body: `Hi {{firstName}}, bumping this up. Riders and pets are welcome, and orientation is one day in Henderson.\n\nShould I send you the short form? Takes about a minute.\n\nKen${FOOTER}` }],
+    variants: [{ subject: "", body: `Hi {{firstName}}, bumping this up. Riders and pets are welcome, and orientation is one day in Henderson.\n\nWant us to send you the short form? Takes about a minute.\n\nGlobal Runners Logistics team${FOOTER}` }],
   },
   {
     delay_days: 4,
-    variants: [{ subject: "", body: `Last note from me, {{firstName}}. If now's not the time, no problem at all. If it is, reply "yes" and I'll give you a call.\n\nKen${FOOTER}` }],
+    variants: [{ subject: "", body: `Last note from us, {{firstName}}. If now's not the time, no problem at all. If it is, reply "yes" and we'll give you a call.\n\nGlobal Runners Logistics team${FOOTER}` }],
   },
 ];
 

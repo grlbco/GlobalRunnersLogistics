@@ -25,7 +25,7 @@ export async function GET(req: Request) {
   const out: Record<string, { transcript: string[]; problems: string[]; cost: number }> = {};
   for (const [name, lines] of Object.entries(SCENARIOS)) {
     if (only && only !== name) continue;
-    const turns: Turn[] = [{ at: new Date(Date.now() - 3600_000).toISOString(), direction: "outbound", channel: "email", author: "campaign", body: "Hi George, Ken here, owner of Global Runners Logistics in Las Vegas. We're hiring CDL-A drivers out of Henderson. Worth a quick call this week?" }];
+    const turns: Turn[] = [{ at: new Date(Date.now() - 3600_000).toISOString(), direction: "outbound", channel: "email", author: "campaign", body: "Hi George, this is the Global Runners Logistics team in Las Vegas. We're hiring CDL-A drivers out of Henderson. Worth a quick call this week?" }];
     const transcript: string[] = [];
     const problems: string[] = [];
     let cost = 0;
@@ -36,7 +36,7 @@ export async function GET(req: Request) {
       cost += r.costUsd ?? 0;
       if (r.problems?.length) problems.push(...r.problems);
       const parts = (r.decision?.replies ?? []) as string[];
-      if (r.decision?.intent === "call_request") transcript.push("  → intent call_request (Ken gets the Call now alert)");
+      if (r.decision?.intent === "call_request") transcript.push("  → intent call_request (team gets the Call now alert)");
       if (!parts.length) transcript.push(`  → (${r.action}${r.decision?.handoff ? `: handoff "${r.decision.handoff}"` : ""}${r.decision?.intent ? `, intent ${r.decision.intent}` : ""}${r.decision?.stage ? `, stage ${r.decision.stage}` : ""})`);
       for (const t of parts) {
         transcript.push(`US: ${t}`);

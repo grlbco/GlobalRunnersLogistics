@@ -94,7 +94,7 @@ export function CampaignEditor({ id, initial, accounts, locked }: { id: string; 
           {msg && <span className={clsx("text-sm", msg.ok ? "text-emerald-700" : "text-red-600")}>{msg.message}</span>}
         </div>
       )}
-      <p className="text-xs text-faint">Variables: {"{{firstName}} {{lastName}} {{companyName}} {{city}} {{state}}"} · Keep pay rates out until Ken confirms them. Each email ends with the office address and a reply-stop line (CAN-SPAM).</p>
+      <p className="text-xs text-faint">Variables: {"{{firstName}} {{lastName}} {{companyName}} {{city}} {{state}}"} · Only quote the published pay ranges. Each email ends with the office address and a reply-stop line (CAN-SPAM).</p>
     </div>
   );
 }

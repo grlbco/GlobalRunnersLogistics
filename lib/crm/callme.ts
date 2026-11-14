@@ -6,7 +6,7 @@ import { siteUrl } from "@/lib/site";
 import { sendTelegram, esc } from "@/lib/integrations/telegram";
 import { phoneDisplay } from "./format";
 
-/** Ken's call window (Settings → Calls). Outside it, "Call me now" becomes "first thing tomorrow". */
+/** The team's call window (Settings → Calls). Outside it, "Call me now" becomes "first thing tomorrow". */
 export type CallHours = { start: string; end: string; tz: string; days: number[] };
 const DEFAULT_HOURS: CallHours = { start: "07:00", end: "19:00", tz: "America/Los_Angeles", days: [1, 2, 3, 4, 5, 6] };
 
@@ -29,8 +29,8 @@ export type CallRequest = { ok: true; inHours: boolean; kenPhone: string; contac
 
 /**
  * A driver asked to be called now (button, personal link, or a text like "call me").
- * Ken gets it instantly (Telegram + text to his cell), the team gets an urgent task,
- * the card moves forward and the driver hears back with Ken's number.
+ * The team gets it instantly (Telegram + text to the alert phone), the team gets an urgent task,
+ * the card moves forward and the driver hears back with our number.
  */
 export async function requestCall(p: { contactId?: string | null; phone?: string | null; name?: string | null; source: string; notifyDriver?: boolean }): Promise<CallRequest> {
   const db = adminDb();
@@ -71,8 +71,8 @@ export async function requestCall(p: { contactId?: string | null; phone?: string
   // let the driver know (only by text when they agreed to texts)
   if (p.notifyDriver !== false && contact.sms_consent && !contact.do_not_contact) {
     const body = inHours
-      ? `Got it${contact.first_name ? ` ${contact.first_name}` : ""}, Ken's calling you in a few minutes from ${company.phone.display}. Save the number so you pick up.`
-      : `Got it${contact.first_name ? ` ${contact.first_name}` : ""}. Ken's done for today, he'll call you first thing in the morning from ${company.phone.display}.`;
+      ? `Got it${contact.first_name ? ` ${contact.first_name}` : ""}, we're calling you in a few minutes from ${company.phone.vanity} (${company.phone.display}). Save the number so you pick up.`
+      : `Got it${contact.first_name ? ` ${contact.first_name}` : ""}. We're done for today, we'll call you first thing in the morning from ${company.phone.vanity} (${company.phone.display}).`;
     await db.from("outbox").insert({ contact_id: contact.id, channel: "sms", author: "workflow", body, status: "pending", send_after: new Date(Date.now() + 5000).toISOString(), is_reply: true });
   }
   const { emit } = await import("@/lib/automations/engine");

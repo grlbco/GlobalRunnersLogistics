@@ -20,7 +20,7 @@ function limited(key: string, max = 6, windowMs = 10 * 60_000) {
 export async function callMeNow(input: { token?: string | null; phone?: string | null; name?: string | null; source?: string }): Promise<{ ok: boolean; inHours?: boolean; kenPhone?: string; error?: string }> {
   const h = await headers();
   const ip = (h.get("x-forwarded-for") ?? "").split(",")[0].trim().slice(0, 64);
-  if (limited(`call:${ip}`, 4)) return { ok: false, error: "Already requested. Ken will call you shortly." };
+  if (limited(`call:${ip}`, 4)) return { ok: false, error: "Already requested. Our team will call you shortly." };
   const { requestCall } = await import("@/lib/crm/callme");
   const { normPhone } = await import("@/lib/formbuilder/schema");
   let contactId: string | null = null;

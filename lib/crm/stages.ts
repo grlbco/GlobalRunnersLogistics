@@ -13,7 +13,7 @@ export const STAGES: { key: Stage; label: string; tone: Tone }[] = [
   { key: "chasing", label: "Following up", tone: "warm" },
   { key: "applied", label: "Applied", tone: "hot" },
   { key: "qualified", label: "Qualified", tone: "hot" },
-  { key: "sent_to_ken", label: "With Ken", tone: "hot" },
+  { key: "sent_to_ken", label: "With the team", tone: "hot" },
   { key: "hired", label: "Hired", tone: "won" },
   { key: "nurture", label: "Nurture", tone: "cold" },
   { key: "not_fit", label: "Not a fit", tone: "lost" },

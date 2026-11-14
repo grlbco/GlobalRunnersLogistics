@@ -26,7 +26,7 @@ export function DesignSpecimen() {
     <div className="-m-0 flex">
       <Sidebar allowed={SECTIONS.map((s) => s.href)} me={{ name: "George Bodistean", role: "Admin" }} />
       <div className="min-w-0 flex-1">
-        <TopBar me={{ name: "George Bodistean" }} team={{ names: ["Ken Aman", "Marcus Reed"], total: 4, href: "#" }} unread={3} canSearch />
+        <TopBar me={{ name: "George Bodistean" }} team={{ names: ["Dana Ruiz", "Marcus Reed"], total: 4, href: "#" }} unread={3} canSearch />
         <PageHead greeting={<>👋 Evening, <span className="font-medium text-fg">George</span></>} title="Recruiting overview"
           right={<><Link href="#" className={btnGhostCls}>Open inbox</Link><Link href="#" className={btnCls}>Campaigns</Link></>} />
         <div className="space-y-3 px-5 md:px-6">
@@ -74,7 +74,7 @@ export function DesignSpecimen() {
                 </Panel>
                 <Panel title="Assistant" sub="How conversations ended, 30 days">
                   <p className="text-[2rem] font-semibold tracking-[-0.03em]">212 <span className="text-[0.9rem] font-normal text-faint">runs</span></p>
-                  <div className="mt-4"><Meter parts={[{ label: "Answered", value: 171, className: "bg-fg" }, { label: "Handed to Ken", value: 33, className: "bg-line-strong" }, { label: "Failed", value: 8, className: "bg-red-500" }]} /></div>
+                  <div className="mt-4"><Meter parts={[{ label: "Answered", value: 171, className: "bg-fg" }, { label: "Handed to team", value: 33, className: "bg-line-strong" }, { label: "Failed", value: 8, className: "bg-red-500" }]} /></div>
                 </Panel>
               </div>
             </div>
@@ -104,7 +104,7 @@ export function DesignSpecimen() {
               <Timeline oldestFirst items={([
                 { kind: "message", at: "2026-11-05T15:02:00Z", channel: "email", direction: "outbound", author: "campaign", subject: "Team driver spot, Henderson NV", body: "Hi Marcus, saw your authority went inactive. We're hiring CDL-A team drivers out of Henderson…", status: "sent" },
                 { kind: "message", at: "2026-11-05T15:40:00Z", channel: "email", direction: "inbound", author: "lead", subject: null, body: "What's the pay and how often am I home?", status: "received" },
-                { kind: "message", at: "2026-11-05T15:44:00Z", channel: "email", direction: "outbound", author: "agent", subject: null, body: "It's per mile, paid every Thursday, and you're home 4 days. Here's the 2-minute form so Ken can call you: globalrunnerslogistics.com/apply", status: "sent" },
+                { kind: "message", at: "2026-11-05T15:44:00Z", channel: "email", direction: "outbound", author: "agent", subject: null, body: "It's per mile, paid every Friday with a weekly guaranteed minimum. Here's the 2-minute form so our team can call you: globalrunnerslogistics.com/apply", status: "sent" },
                 { kind: "activity", at: "2026-11-05T15:45:00Z", type: "stage_changed", data: { from: "replied", to: "form_sent" }, actor: "agent" },
                 { kind: "note", at: "2026-11-05T16:10:00Z", body: "Has a partner already, both 5+ years.", author_kind: "human" },
               ] as Item[])} />

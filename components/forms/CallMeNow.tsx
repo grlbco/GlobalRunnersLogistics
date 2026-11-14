@@ -6,12 +6,12 @@ import { callMeNow } from "@/app/actions/publicForms";
 import { company } from "@/content/facts";
 
 /**
- * "Call me now": one tap and Ken gets an instant alert to call this driver.
+ * "Call me now": one tap and our team gets an instant alert to call this driver.
  * With a personal token (or a known contact) no typing is needed; otherwise asks for a phone number.
  */
 const T = {
-  en: { soon: "Ken's calling you in a few minutes.", morning: "Ken will call you first thing in the morning.", from: "He calls from", save: "Save it so you pick up.", callNow: "Or call Ken now", rather: "Rather talk to Ken?", tap: "Tap below and Ken gets an alert to call you right away.", cell: "Your cell number", btn: "Call me now", sending: "Sending…" },
-  es: { soon: "Ken te llama en unos minutos.", morning: "Ken te llama mañana temprano.", from: "Te llama desde el", save: "Guárdalo para contestar.", callNow: "O llama a Ken ahora", rather: "¿Prefieres hablar con Ken?", tap: "Toca abajo y Ken recibe un aviso para llamarte ya.", cell: "Tu número de celular", btn: "Llámame ahora", sending: "Enviando…" },
+  en: { soon: "We're calling you in a few minutes.", morning: "We'll call you first thing in the morning.", from: "We'll call from", save: "Save it so you pick up.", callNow: "Or call us now", rather: "Rather talk to someone?", tap: "Tap below and our team gets an alert to call you right away.", cell: "Your cell number", btn: "Call me now", sending: "Sending…" },
+  es: { soon: "Te llamamos en unos minutos.", morning: "Te llamamos mañana temprano.", from: "Te llamamos desde el", save: "Guárdalo para contestar.", callNow: "O llámanos ahora", rather: "¿Prefieres hablar con alguien?", tap: "Toca abajo y nuestro equipo recibe un aviso para llamarte ya.", cell: "Tu número de celular", btn: "Llámame ahora", sending: "Enviando…" },
 };
 
 export function CallMeNow({ token, phone: knownPhone, name, source, compact = false, locale = "en" }: { token?: string | null; phone?: string | null; name?: string | null; source: "form" | "application" | "call_page" | "form_success"; compact?: boolean; locale?: "en" | "es" }) {
@@ -34,7 +34,7 @@ export function CallMeNow({ token, phone: knownPhone, name, source, compact = fa
     return (
       <div className="rounded-[6px] border border-signal/40 bg-signal/[0.08] p-5">
         <p className="text-lg font-medium">{res.inHours ? t.soon : t.morning}</p>
-        <p className="mt-1 text-white/70">{t.from} <a href={`tel:${company.phone.e164}`} className="underline underline-offset-4">{company.phone.display}</a>. {t.save}</p>
+        <p className="mt-1 text-white/70">{t.from} <a href={`tel:${company.phone.e164}`} className="underline underline-offset-4">{company.phone.vanity} · {company.phone.display}</a>. {t.save}</p>
         <a href={`tel:${company.phone.e164}`} className="mt-4 inline-flex h-12 items-center rounded-[4px] border border-white/20 px-5 text-sm text-white/85 hover:border-white">{t.callNow}</a>
       </div>
     );

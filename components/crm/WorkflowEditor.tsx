@@ -178,7 +178,7 @@ function StepFields({ step, onChange, disabled }: { step: Step; onChange: (s: St
       return (
         <div className="space-y-2">
           <select value={step.to} onChange={(e) => set({ to: e.target.value })} disabled={disabled} className={clsx(inputCls, "w-48")}>
-            <option value="ken">Ken (text + email)</option>
+            <option value="ken">Team alert (text + email)</option>
             <option value="team">Team (email)</option>
           </select>
           <textarea value={step.body} onChange={(e) => set({ body: e.target.value })} rows={2} disabled={disabled} className={clsx(inputCls, "h-auto py-2")} />

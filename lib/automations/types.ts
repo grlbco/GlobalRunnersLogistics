@@ -39,7 +39,7 @@ export const STEP_LABELS: Record<Step["type"], string> = {
   add_tag: "Add tag",
   remove_tag: "Remove tag",
   create_task: "Create task",
-  notify: "Alert Ken / team",
+  notify: "Alert the team",
   hand_to_assistant: "Let the assistant follow up",
   stop_assistant: "Stop the assistant (manual)",
 };

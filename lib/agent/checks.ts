@@ -1,4 +1,10 @@
 import { allowedNumbers } from "./knowledge";
+import { pay } from "@/content/facts";
+
+/** Per-mile values the assistant may quote, in cents (from the published team/solo ranges). */
+const PUBLISHED_CENTS = new Set(
+  [pay.guarantee.team.cpm, pay.guarantee.solo.cpm].flatMap((r) => r.match(/\d*\.\d+/g) ?? []).map((x) => Math.round(Number(x) * 100)),
+);
 
 /** Code-level guardrails on every reply. Any failure → retry once, then hand to a person. */
 const BANNED = [
@@ -9,9 +15,9 @@ const BANNED = [
   /\b(it'?s|this is) not (just )?[^.,!?]{1,40}, (it'?s|but)\b/i, // "it's not X, it's Y"
   /\bnot just\b[^.!?]{1,40}\bbut\b/i,
   /\b(absolutely|certainly|rest assured|seamless|journey|reach out|i understand your concern|thrilled)\b/i,
-  /\bguarantee(d)?\b/i,
+  /\bguarantee(d)?\b(?!\s+(weekly\s+)?minimum)/i, // only the published guaranteed minimum
   /(^|\n)\s*-*\s*Ken(\s*(\/|from|at)[^\n]*)?\s*$/i, // signed as Ken: the assistant isn't Ken
-  /\b(i'?ll|i will|let me) (give you a (call|ring)|call you|ring you)\b/i, // only Ken calls
+  /\b(i'?ll|i will|let me) (give you a (call|ring)|call you|ring you)\b/i, // only the team calls
   /\b(green card|citizen(ship)?|immigration|visa status|undocumented)\b/i,
   /\b(leverage|synergy|opportunity awaits|exciting opportunity)\b/i,
   /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u, // emojis
@@ -35,8 +41,15 @@ export function checkReply(text: string, ctx: { channel: "email" | "sms"; formUr
     const raw = m[0].trim();
     const num = raw.replace(/[^\d.]/g, "").replace(/\.$/, "");
     if (!num) continue;
-    if (/¢|cent|cpm|per mile|\/mi|%/i.test(raw)) {
-      problems.push(`rate/percent not allowed: ${raw}`);
+    if (/%/.test(raw)) {
+      problems.push(`percent not allowed: ${raw}`);
+      continue;
+    }
+    if (/¢|cent|cpm|per mile|\/mi/i.test(raw)) {
+      // only the published per-mile ranges (team 80–90¢, solo 60–70¢)
+      const n = Number(num);
+      const cents = raw.includes("$") || n < 1 ? Math.round(n * 100) : n;
+      if (!PUBLISHED_CENTS.has(cents)) problems.push(`rate not allowed: ${raw}`);
       continue;
     }
     if (!allowed.has(num) && !allowed.has(num.replace(/\.0+$/, ""))) problems.push(`number not in facts: ${raw}`);

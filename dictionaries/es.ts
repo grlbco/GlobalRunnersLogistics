@@ -93,7 +93,7 @@ const es: Dictionary = {
       title: ["De la aplicación", "a tu primera carga."],
       items: [
         { t: "Aplica en 2 minutos", d: "Un formulario corto con respuestas de un toque. Sin SSN ni papeleo todavía." },
-        { t: "Ken te llama", d: "Nuestro reclutador te devuelve la llamada, normalmente en menos de una hora en horario de oficina." },
+        { t: "Te llamamos", d: "Alguien de nuestro equipo te devuelve la llamada, normalmente en menos de una hora en horario de oficina." },
         { t: "Aplicación completa", d: "Crea tu cuenta de chofer y termina tu aplicación DOT en línea, a tu ritmo." },
         { t: "Orientación en Henderson", d: "Un día en el patio. Pagamos el viaje si vives lejos. Tu primera carga sale al día siguiente." },
       ],

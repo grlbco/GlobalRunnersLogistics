@@ -277,7 +277,7 @@ export function FormEditor({ initial, siteUrl }: { initial: F; siteUrl: string }
               {f.on_submit.assistant === "reply" && (
                 <label className="ml-6 flex items-start gap-2 text-sm"><input type="checkbox" checked={!!f.on_submit.sendDriverForm} onChange={(e) => upd({ on_submit: { ...f.on_submit, sendDriverForm: e.target.checked } })} className="mt-1 accent-[#ff5a2c]" /> <span>…and sends the driver application, then follows up until it&apos;s done</span></label>
               )}
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!f.on_submit.telegram} onChange={(e) => upd({ on_submit: { ...f.on_submit, telegram: e.target.checked } })} className="accent-[#ff5a2c]" /> Alert Ken&apos;s Telegram group</label>
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!f.on_submit.telegram} onChange={(e) => upd({ on_submit: { ...f.on_submit, telegram: e.target.checked } })} className="accent-[#ff5a2c]" /> Alert Team Telegram group</label>
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!f.on_submit.task} onChange={(e) => upd({ on_submit: { ...f.on_submit, task: e.target.checked } })} className="accent-[#ff5a2c]" /> Create a task for the team</label>
               <p className="text-xs text-faint">Automations can also start on &quot;A form is submitted&quot; (filter by link name: {f.slug}).</p>
             </Card>

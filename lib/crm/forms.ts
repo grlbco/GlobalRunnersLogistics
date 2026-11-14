@@ -104,7 +104,7 @@ export async function completeForm(f: Completion): Promise<string | null> {
       await db.from("outbox").insert({ contact_id: contact.id, channel: "sms", author: "workflow", body: lines[Math.floor(Math.random() * lines.length)], status: "pending", send_after: new Date(Date.now() + 20_000).toISOString(), is_reply: true });
     }
   }
-  await db.from("agent_memory").upsert({ contact_id: contact.id, next_step: next === "applied" ? "Form completed. Waiting for Ken's call." : "Form completed, flagged as not a fit.", updated_at: now });
+  await db.from("agent_memory").upsert({ contact_id: contact.id, next_step: next === "applied" ? "Form completed. Waiting for our team's call." : "Form completed, flagged as not a fit.", updated_at: now });
 
   // Telegram alert to Ken's group
   try {

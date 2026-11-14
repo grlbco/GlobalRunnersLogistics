@@ -25,7 +25,7 @@ export function AuthShell({ title, sub, children, footer }: { title: string; sub
         <div className="absolute left-12 top-12 max-w-md">
           <Image src="/brand/mark-white.png" alt="" width={44} height={44} loading="eager" />
           <p className="mt-8 text-[2.25rem] font-medium leading-[1.1] tracking-[-0.03em] text-white">Every driver conversation, in one place.</p>
-          <p className="mt-4 text-[0.95rem] leading-relaxed text-white/55">Replies, forms, follow-ups and hand-offs to Ken for Global Runners Logistics.</p>
+          <p className="mt-4 text-[0.95rem] leading-relaxed text-white/55">Replies, forms, follow-ups and hand-offs to the team for Global Runners Logistics.</p>
         </div>
       </div>
     </div>

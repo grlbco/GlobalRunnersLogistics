@@ -9,6 +9,7 @@ export const company = {
   domain: "globalrunnerslogistics.com",
   url: "https://globalrunnerslogistics.com",
   foundedYear: 2015,
+  /** Used only in search-engine structured data (schema.org founder), never shown on the site. */
   owner: "Ken Aman",
   phone: { display: "(844) 456-7861", vanity: "844-GLORUN1", e164: "+18444567861" }, // 844-GLORUN1 toll-free (updated 2026-11-14)
   /** Quo line used only to SEND automated SMS (A2P). Not shown publicly. */
