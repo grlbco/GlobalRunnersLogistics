@@ -4,7 +4,7 @@ import { pageMeta } from "@/lib/seo";
 import { routes } from "@/content/navigation";
 import { jobs, requirements, whatYouGet } from "@/content/jobs";
 import { faqs } from "@/content/faq";
-import { company, fleet, pay } from "@/content/facts";
+import { company, fleet, guaranteeLine, pay } from "@/content/facts";
 import { PageHero } from "@/components/ui/PageHero";
 import { Section } from "@/components/ui/Section";
 import { FaqList } from "@/components/ui/Faq";
@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: PageProps<"/[lang]/drive">) {
     lang,
     routes.drive,
     "CDL-A Driving Jobs in Las Vegas & Henderson, NV",
-    "Company CDL-A jobs for solo and team drivers out of Henderson, NV. 53' dry van, automatic trucks, weekly pay every Thursday, $1,000 anniversary bonus, 24/7 dispatch.",
+    "Company CDL-A jobs for solo and team drivers out of Henderson, NV. 53' dry van, automatic trucks, weekly pay every Friday, guaranteed weekly minimum, $1,000 anniversary bonus, 24/7 dispatch.",
   );
 }
 
@@ -69,7 +69,7 @@ export default async function DrivePage({ params }: PageProps<"/[lang]/drive">) 
       </Section>
 
       <Section id="pay" index="02" label="Pay & home time" title={["What you get."]} tone="navy"
-        intro="Your per-mile rate is confirmed on your first call with our recruiter — before you commit to anything.">
+        intro={`${guaranteeLine}.`}>
         <ul className="mt-14 grid gap-px bg-white/10 sm:grid-cols-2">
           {whatYouGet.map((w, i) => (
             <Reveal as="li" key={w} delay={(i % 4) * 0.04} className="flex items-start gap-4 bg-navy p-6">

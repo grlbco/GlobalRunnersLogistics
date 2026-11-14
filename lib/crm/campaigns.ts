@@ -13,8 +13,8 @@ export const DEFAULT_SEQUENCE: SeqStep[] = [
   {
     delay_days: 0,
     variants: [
-      { subject: "CDL-A jobs out of Henderson", body: `Hi {{firstName}},\n\nKen here, owner of Global Runners Logistics in Las Vegas. We're hiring CDL-A drivers out of our Henderson yard: automatic Peterbilts and Cascadias, weekly pay every Thursday, and you take the truck home.\n\nWorth a quick call this week?\n\nKen Aman\nGlobal Runners Logistics${FOOTER}` },
-      { subject: "{{firstName}}, still driving?", body: `Hi {{firstName}},\n\nIf running your own authority is getting old, we're hiring company drivers in Las Vegas. Steady freight on our Nevada to Georgia lane, paid every Thursday, and a $1,000 bonus every work anniversary.\n\nWant the details?\n\nKen Aman\nGlobal Runners Logistics${FOOTER}` },
+      { subject: "CDL-A jobs out of Henderson", body: `Hi {{firstName}},\n\nKen here, owner of Global Runners Logistics in Las Vegas. We're hiring CDL-A drivers out of our Henderson yard: automatic Peterbilts and Cascadias, weekly pay every Friday, and you take the truck home.\n\nWorth a quick call this week?\n\nKen Aman\nGlobal Runners Logistics${FOOTER}` },
+      { subject: "{{firstName}}, still driving?", body: `Hi {{firstName}},\n\nIf running your own authority is getting old, we're hiring company drivers in Las Vegas. Steady freight on our Nevada to Georgia lane, paid every Friday, and a $1,000 bonus every work anniversary.\n\nWant the details?\n\nKen Aman\nGlobal Runners Logistics${FOOTER}` },
       { subject: "quick question", body: `Hi {{firstName}},\n\nWould you be open to a company driver seat with a dedicated dispatcher, 24/7 in English or Spanish, and no driver-facing camera?\n\nWe run 30 trucks out of Henderson, NV. Reply yes and I'll send the details.\n\nKen${FOOTER}` },
     ],
   },

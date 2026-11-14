@@ -1,4 +1,4 @@
-import { company, fleet, hiring, pay } from "./facts";
+import { company, fleet, guaranteeLine, hiring, pay } from "./facts";
 import type { Faq } from "./faq";
 
 /**
@@ -99,12 +99,12 @@ export const guides: Guide[] = [
       {
         h2: "How Global Runners Logistics handles it",
         p: [
-          `Our freight is ${fleet.trailer}, mostly ${fleet.freight.toLowerCase()}, with a mix of ${fleet.loading.join(" and ").toLowerCase()}. "No wait time" is one of the top reasons our drivers give for staying, because dispatch plans loads ahead. When a layover happens, it pays $${pay.layover}.`,
+          `Our freight is ${fleet.trailer}, mostly ${fleet.freight.toLowerCase()}, with a mix of ${fleet.loading.join(" and ").toLowerCase()}. "No wait time" is one of the top reasons our drivers give for staying, because dispatch plans loads ahead. And every week you earn at least your guaranteed minimum, even when a load runs late.`,
         ],
       },
     ],
     faq: [
-      { group: "Pay", q: "Does Global Runners Logistics pay layover?", a: `Yes. Layover pays $${pay.layover}.` },
+      { group: "Pay", q: "Is there a guaranteed minimum?", a: `Yes. ${guaranteeLine}.` },
       { group: "Equipment", q: "What freight does Global Runners Logistics haul?", a: "53-foot dry van freight, mostly electronics, with a mix of drop & hook and live loads." },
     ],
   },
@@ -112,7 +112,7 @@ export const guides: Guide[] = [
     slug: "orientation-what-to-expect",
     title: "Global Runners Logistics Orientation: What to Expect",
     description: "How long orientation takes, where it happens, what to bring and how fast you'll get your first load as a new CDL-A driver at Global Runners Logistics.",
-    answer: `Orientation at ${company.shortName} is ${hiring.orientationDays} day at our truck yard in ${company.yard.city}, Nevada, and most new drivers take their first load about two weeks after applying. If you live far away, we cover your travel to orientation.`,
+    answer: `Orientation at ${company.shortName} is ${hiring.orientationDays} day at our truck yard in ${company.yard.city}, Nevada, and you take your first load the next day. If you live far away, we cover your travel to orientation.`,
     published: "2026-11-03",
     updated: "2026-11-03",
     readMinutes: 3,
@@ -150,14 +150,14 @@ export const guides: Guide[] = [
     faq: [
       { group: "Hiring", q: "How long is orientation at Global Runners Logistics?", a: `${hiring.orientationDays} day, at the Henderson, NV yard.` },
       { group: "Hiring", q: "Do you pay for travel to orientation?", a: "Yes. If you live far from Henderson, we cover travel to orientation." },
-      { group: "Hiring", q: "How soon after applying will I get my first load?", a: "Most drivers go from application to first load in about two weeks." },
+      { group: "Hiring", q: "How soon after orientation will I get my first load?", a: "The next day. Orientation is one day, and your first load goes out the day after." },
     ],
   },
   {
     slug: "how-weekly-pay-works",
     title: "How Weekly Pay Works at Global Runners Logistics",
-    description: "Pay period, payday, layover pay and the yearly anniversary bonus for CDL-A drivers at Global Runners Logistics in Las Vegas, NV.",
-    answer: `${company.shortName} pays drivers every week: the pay period runs ${pay.payPeriod}, and pay lands every ${pay.payday}. Company drivers are paid per mile, layover pays $${pay.layover}, and every driver earns a $${pay.anniversaryBonus.toLocaleString()} bonus on each work anniversary.`,
+    description: "Pay period, Friday payday, the weekly guaranteed minimum and the yearly anniversary bonus for CDL-A drivers at Global Runners Logistics in Las Vegas, NV.",
+    answer: `${company.shortName} pays drivers every week: the pay period runs ${pay.payPeriod}, and pay lands every ${pay.payday}. Company drivers earn a weekly guaranteed minimum or their per-mile pay, whichever is greater, and every driver earns a $${pay.anniversaryBonus.toLocaleString()} bonus on each work anniversary.`,
     published: "2026-11-03",
     updated: "2026-11-03",
     readMinutes: 2,
@@ -167,12 +167,16 @@ export const guides: Guide[] = [
         list: [`Pay period: ${pay.payPeriod}.`, `Payday: every ${pay.payday}.`, `Pay type: ${pay.type.toLowerCase()}.`],
       },
       {
+        h2: "Guaranteed minimum",
+        list: [`Team: ${pay.guarantee.team.weekly} a week minimum, ${pay.guarantee.team.cpm} per mile.`, `Solo: ${pay.guarantee.solo.weekly} a week minimum, ${pay.guarantee.solo.cpm} per mile.`, "You get the guaranteed minimum or your per-mile pay, whichever is greater."],
+      },
+      {
         h2: "Extra pay",
-        list: [`Layover: $${pay.layover}.`, `Anniversary bonus: $${pay.anniversaryBonus.toLocaleString()} every year on your work anniversary.`],
+        list: [ `Anniversary bonus: $${pay.anniversaryBonus.toLocaleString()} every year on your work anniversary.`],
       },
       {
         h2: "Your rate",
-        p: ["Your exact per-mile rate depends on the position (team or solo) and is confirmed on your first call with our recruiter — before you commit to anything."],
+        p: ["Your exact rate inside the range depends on the position (team or solo) and the run, and is confirmed on your first call with our recruiter — before you commit to anything."],
       },
     ],
     faq: [

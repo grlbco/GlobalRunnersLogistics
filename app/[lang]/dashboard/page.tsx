@@ -102,7 +102,7 @@ async function Portal({ lang }: { lang: Locale }) {
         <div className="border border-white/10 p-7">
           <p className="label text-white/45">Questions?</p>
           <a href={`tel:${company.phone.e164}`} className="mt-4 block text-2xl font-semibold hover:text-signal">{company.phone.display}</a>
-          <p className="mt-2 text-white/55">{company.owner} · {company.timeZone}</p>
+          <p className="mt-2 text-white/55">{company.phone.vanity} · {company.timeZone}</p>
         </div>
       </aside>
     </div>

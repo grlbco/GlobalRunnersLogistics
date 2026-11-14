@@ -1,26 +1,27 @@
-import { company, hiring, pay } from "./facts";
+import { company, guaranteeLine, hiring, pay } from "./facts";
 
 export type Faq = { q: string; a: string; group: "Pay" | "Hiring" | "Equipment" | "Life on the road" | "Company" };
 
 /** Every answer starts with a direct one-sentence answer (good for Google and AI assistants). */
 export const faqs: Faq[] = [
   { group: "Pay", q: "How often do Global Runners Logistics drivers get paid?", a: `Drivers are paid weekly. The pay period runs ${pay.payPeriod}, and pay lands every ${pay.payday}.` },
-  { group: "Pay", q: "How are drivers paid — per mile or percentage?", a: "Company drivers are paid per mile. Your exact rate is confirmed on your first call with our recruiter, before you commit to anything." },
-  { group: "Pay", q: "Do you pay layover?", a: `Yes. Layover pays $${pay.layover}.` },
+  { group: "Pay", q: "How are drivers paid — per mile or percentage?", a: `Company drivers are paid per mile with a weekly guaranteed minimum, whichever is greater. Team: ${pay.guarantee.team.cpm} per mile; solo: ${pay.guarantee.solo.cpm} per mile. Your exact rate is confirmed on your first call with our recruiter, before you commit to anything.` },
+  { group: "Pay", q: "Is there a weekly guaranteed minimum?", a: `Yes. ${guaranteeLine}.` },
   { group: "Pay", q: "Is there a bonus?", a: `Yes. Every driver earns a $${pay.anniversaryBonus.toLocaleString()} bonus on each work anniversary, every year you stay with us.` },
-  { group: "Pay", q: "When do I get my first paycheck?", a: `Your first check comes on the ${pay.payday} after your first full pay period (${pay.payPeriod}).` },
-  { group: "Hiring", q: "What are the requirements to drive for Global Runners Logistics?", a: `You need a valid CDL-A, at least ${hiring.minAge} years of age, ${hiring.minExperience} experience, no more than 3 moving violations in the last 3 years, no DUI, a clean drug and alcohol history, and authorization to work in the U.S.` },
-  { group: "Hiring", q: "Do you hire new CDL school graduates?", a: "Not at this time. We require at least 1 year of CDL-A driving experience." },
+  { group: "Pay", q: "When do I get my first paycheck?", a: `Your first paycheck comes on a ${pay.payday}, like every check after it. The pay period runs ${pay.payPeriod}.` },
+  { group: "Hiring", q: "What are the requirements to drive for Global Runners Logistics?", a: `You need a valid CDL-A, at least ${hiring.minAge} years of age, ${hiring.minExperience}, no DOT recordable/preventable accidents in the past 12 months, no more than 3 moving violations in the past 3 years, no felony convictions in the past 7 years, no DUI, a clean drug and alcohol history, and authorization to work in the U.S.` },
+  { group: "Hiring", q: "Do you hire new CDL school graduates?", a: "Not at this time. We require 1 year of verifiable OTR/regional experience within the past 3 years, or 2 years of verifiable experience within the past 5 years." },
   { group: "Hiring", q: "Do you hire teams?", a: "Yes. We hire both solo drivers and teams. If you don't have a partner yet, tell us on the application." },
   { group: "Hiring", q: "Where do I pick up the truck?", a: `Trucks are picked up at our yard in ${company.yard.city}, Nevada.` },
   { group: "Hiring", q: "Which areas do you hire from?", a: "We currently hire CDL-A drivers who live in Nevada, mainly the Las Vegas and Henderson area." },
-  { group: "Hiring", q: "How long does it take to start?", a: `Most drivers go from application to first load in about two weeks. Orientation is ${hiring.orientationDays} day.` },
+  { group: "Hiring", q: "How long does it take to start?", a: `Orientation is ${hiring.orientationDays} day, and you take your first load the next day.` },
   { group: "Hiring", q: "Do you pay for travel to orientation?", a: "Yes. If you live far from Henderson, we cover travel to orientation." },
   { group: "Hiring", q: "How fast will someone call me after I apply?", a: "Our recruiter aims to call new applicants within 1 hour during office hours (Pacific Time)." },
   { group: "Hiring", q: "Do I need to speak perfect English?", a: "No. You need basic English for road signs, DOT and dispatch. Our dispatchers also speak Spanish." },
-  { group: "Equipment", q: "What trucks do you run?", a: "We run automatic Peterbilt 579s and Freightliner Cascadias with APU, inverter, fridge and microwave." },
+  { group: "Equipment", q: "What trucks do you run?", a: "We run automatic Peterbilt 579s, Freightliner Cascadias and Kenworth T680s with APU, inverter, fridge and microwave." },
   { group: "Equipment", q: "Are the trucks automatic?", a: "Yes. Every truck in the fleet has an automatic transmission." },
-  { group: "Equipment", q: "Is there a driver-facing camera?", a: "No. Our trucks have a road-facing dash cam only." },
+  { group: "Pay", q: "Do you offer workers' compensation?", a: "Yes. Workers' compensation insurance is available from your first day." },
+  { group: "Equipment", q: "Is there a driver-facing camera?", a: "No. Our trucks have road-facing and side cameras only." },
   { group: "Equipment", q: "What trailer and freight do you haul?", a: "53-foot dry van, mostly electronics, with a mix of drop & hook and live loads." },
   { group: "Life on the road", q: "Can I take the truck home?", a: "Yes. Drivers can take the truck home." },
   { group: "Life on the road", q: "Are riders and pets allowed?", a: "Yes. Riders and pets are allowed. Ask your recruiter about the details." },

@@ -1,8 +1,9 @@
-import { company, fleet, hiring, pay } from "@/content/facts";
+import { company, fleet, guaranteeLine, hiring, pay } from "@/content/facts";
 import { jobs, requirements, whatYouGet, getJob } from "@/content/jobs";
 import { faqs, type Faq } from "@/content/faq";
 import { places, getPlace } from "@/content/locations";
 import { guides, getGuide } from "@/content/guides";
+import { about } from "@/content/about";
 import { legalDocs, getLegal } from "@/content/legal";
 
 /**
@@ -21,7 +22,7 @@ const facts = `## Key facts\n\n${list([
   `Equipment: ${fleet.makes.join(", ")} (${fleet.transmission.toLowerCase()}), ${fleet.extras.join(", ")}`,
   `Trailer & freight: ${fleet.trailer}, mostly ${fleet.freight.toLowerCase()}, ${fleet.loading.join(" and ").toLowerCase()}`,
   `Runs: ${fleet.runTypes.join(", ")}; main lane ${fleet.mainLane.from} ↔ ${fleet.mainLane.to}`,
-  `Pay: ${pay.type.toLowerCase()}, weekly, every ${pay.payday} (pay period ${pay.payPeriod}); $${pay.layover} layover; $${pay.anniversaryBonus.toLocaleString()} anniversary bonus every year`,
+  `Pay: ${pay.type.toLowerCase()}, weekly, every ${pay.payday} (pay period ${pay.payPeriod}); ${guaranteeLine}; $${pay.anniversaryBonus.toLocaleString()} anniversary bonus every year`,
   `Take the truck home: yes · Riders & pets: yes · Dedicated dispatcher: yes (24/7, ${hiring.dispatchLanguages.join(" & ")})`,
 ])}`;
 
@@ -38,7 +39,7 @@ export function pageMarkdown(path: string): MdPage | null {
       title,
       markdown:
         front(title, "/", "Now hiring CDL-A solo and team drivers in Las Vegas and Henderson, NV.") +
-        `# ${title}\n\n${company.shortName} is a ${fleet.trucks}-truck CDL-A dry van carrier in ${company.office.city}, Nevada, hiring solo and team company drivers and owner-operators. Your road. Your future. Our family.\n\n${facts}\n\n## Why drivers stay\n\n${list(["Pay you can count on — per mile, every week, every Thursday", "Consistent runs", "No wait time", "Home on time, not late"])}\n\n## Open positions\n\n${jobs.map((j) => `- [${j.title}](${U}/drive/${j.slug}) — ${j.route}`).join("\n")}\n\n## How hiring works\n\n1. Apply in 2 minutes\n2. Our recruiter calls you back (usually within the hour, Pacific Time)\n3. Finish your full DOT application online\n4. ${hiring.orientationDays}-day orientation in Henderson, NV — first load in about 2 weeks\n\n## FAQ\n\n${faqMd(faqs.slice(0, 8))}\n\n${contact}\n`,
+        `# ${title}\n\n${company.shortName} is a ${fleet.trucks}-truck CDL-A dry van carrier in ${company.office.city}, Nevada, hiring solo and team company drivers and owner-operators. Your road. Your future. Our family.\n\n${facts}\n\n## Why drivers stay\n\n${list(["Pay you can count on — weekly guaranteed minimum or per mile, paid every Friday", "Consistent runs", "No wait time", "Home on time, not late"])}\n\n## Open positions\n\n${jobs.map((j) => `- [${j.title}](${U}/drive/${j.slug}) — ${j.route}`).join("\n")}\n\n## How hiring works\n\n1. Apply in 2 minutes\n2. Our recruiter calls you back (usually within the hour, Pacific Time)\n3. Finish your full DOT application online\n4. ${hiring.orientationDays}-day orientation in Henderson, NV — first load the next day\n\n## FAQ\n\n${faqMd(faqs.slice(0, 8))}\n\n${contact}\n`,
     };
   }
   if (clean === "/drive") {
@@ -48,7 +49,7 @@ export function pageMarkdown(path: string): MdPage | null {
       title,
       markdown:
         front(title, clean, "Company CDL-A jobs for solo and team drivers out of Henderson, NV.") +
-        `# ${title}\n\n${company.shortName} hires CDL-A solo and team drivers out of ${company.yard.city}, Nevada.\n\n## Open positions\n\n${jobs.map((j) => `- [${j.title}](${U}/drive/${j.slug}) — ${j.route}`).join("\n")}\n\n## What you get\n\n${list(whatYouGet)}\n\n## Requirements\n\n${list(requirements)}\n\nYour per-mile rate is confirmed on your first call with our recruiter.\n\n${contact}\n`,
+        `# ${title}\n\n${company.shortName} hires CDL-A solo and team drivers out of ${company.yard.city}, Nevada.\n\n## Open positions\n\n${jobs.map((j) => `- [${j.title}](${U}/drive/${j.slug}) — ${j.route}`).join("\n")}\n\n## What you get\n\n${list(whatYouGet)}\n\n## Requirements\n\n${list(requirements)}\n\n${guaranteeLine}.\n\n${contact}\n`,
     };
   }
   if (seg[0] === "drive" && seg[1]) {
@@ -68,7 +69,7 @@ export function pageMarkdown(path: string): MdPage | null {
   }
   if (clean === "/about") {
     const title = `About ${company.shortName}`;
-    return { path: clean, title, markdown: front(title, clean, `A ${fleet.trucks}-truck dry van carrier in Las Vegas, NV.`) + `# ${title}\n\n${company.legalName} has been hauling freight since ${company.foundedYear} and is led by owner ${company.owner}. We run ${fleet.trucks} trucks out of Las Vegas and Henderson, Nevada.\n\n${facts}\n\n${contact}\n` };
+    return { path: clean, title, markdown: front(title, clean, `A ${fleet.trucks}-truck dry van carrier in Las Vegas, NV.`) + `# ${title}\n\n${about.headline}\n\n${about.story.join("\n\n")}\n\n${about.closer}\n\n**${about.signoff}**\n\n${company.legalName} has been hauling freight since ${company.foundedYear}. We run ${fleet.trucks} trucks out of Las Vegas and Henderson, Nevada.\n\n${facts}\n\n${contact}\n` };
   }
   if (clean === "/locations") {
     const title = "Locations — Las Vegas Office & Henderson Truck Yard";

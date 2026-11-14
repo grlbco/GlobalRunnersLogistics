@@ -14,9 +14,9 @@ Legend: ✅ safe to publish · ⚠️ needs client confirmation before publishin
 | MC / USDOT (as submitted) | MC 161864 / USDOT 213969 | 🔒 not published until GRL confirms its own numbers |
 | Office | 732 S 6th St, Ste V, Las Vegas, NV 89101 | ✅ |
 | Truck yard | Henderson, NV (exact address not given) | ⚠️ need street address for Google Business Profile |
-| Hauling since | 2012 | ✅ |
+| Hauling since | 2015 | ✅ (updated 2026-11-14) |
 | Owner | Ken Aman | ✅ (name only) |
-| Public phone | (312) 975-3377 (Ken Aman) | ✅ shown everywhere — Ken answers all calls (George, 2026-11-03). Quo (725) 666-1558 only sends automated SMS |
+| Public phone | 844-GLORUN1 · (844) 456-7861 | ✅ shown everywhere (updated 2026-11-14). Quo (725) 666-1558 only sends automated SMS |
 | Owner email | lsbco@grlbco.com | 🔒 |
 | Time zone | Pacific | ✅ |
 | Logo | Silver globe + highway mark, navy background | ✅ (attached by George) |
@@ -34,9 +34,9 @@ Legend: ✅ safe to publish · ⚠️ needs client confirmation before publishin
 | Trucks | 30 | ✅ |
 | Trailers owned | 0 | ✅ (say "53' dry van", don't claim trailer fleet) |
 | Drivers today | 25 | ✅ |
-| Trucks | Peterbilt 579, Freightliner Cascadia | ✅ |
+| Trucks | Peterbilt 579, Freightliner Cascadia, Kenworth T680 | ✅ |
 | Transmission | Automatic | ✅ |
-| Truck extras | APU, inverter, fridge, microwave, road-facing dash cam only | ✅ |
+| Truck extras | APU, inverter, fridge, microwave, road-facing & side cameras only | ✅ |
 | Speed limiter | "80 / 85" | ⚠️ looks wrong (likely 65/68 or 70) — do not publish until confirmed |
 | Trailer | 53' dry van | ✅ |
 | Main freight | Electronics | ✅ |
@@ -60,7 +60,11 @@ Legend: ✅ safe to publish · ⚠️ needs client confirmation before publishin
 | Travel to orientation paid | Yes | ✅ |
 | Endorsements | "Hazmat, None" | ⚠️ ambiguous — Hazmat preferred or required? |
 | Minimum age | 21 | ✅ |
-| Experience | 1 year CDL-A | ✅ |
+| Experience | 1 yr verifiable OTR/regional in past 3 yrs, OR 2 yrs verifiable in past 5 yrs | ✅ (2026-11-14) |
+| Accidents | No DOT recordable/preventable accidents in past 12 months | ✅ |
+| Criminal | No felony convictions in past 7 years | ✅ |
+| Workers comp | Available first day | ✅ |
+| Orientation | 1 day, next-day load | ✅ |
 | New CDL grads | No | ✅ |
 | MVR | No more than 3 violations in last 3 years | ✅ |
 | Automatic disqualifier | DUI | ✅ (publish as "no DUI") |
@@ -80,8 +84,8 @@ Legend: ✅ safe to publish · ⚠️ needs client confirmation before publishin
 | Avg weekly miles | 6,000 | ⚠️ likely team figure — confirm |
 | Avg weekly gross | $2,600 | ⚠️ confirm solo vs team |
 | Guaranteed weekly min | $2,000 | ⚠️ confirm who qualifies |
-| Extra pay | $250 layover | ✅ |
-| Pay schedule | Weekly; pay period Mon–Mon, paid Thursday | ✅ |
+| Pay schedule | Weekly; pay period Mon–Mon, paid Friday | ✅ (updated 2026-11-14) |
+| Guaranteed minimum | Team $2,000–$2,300/wk, $0.80–$0.90/mi · Solo $1,500–$1,700/wk, $0.60–$0.70/mi (whichever is greater) — replaces layover pay | ✅ (2026-11-14) |
 | Bonus | $1,000 every year on work anniversary | ✅ (do not call it a "sign-on bonus") |
 | Home time | 4 days home | ⚠️ confirm "per how many weeks out" |
 | Benefits | None | ✅ (site must not imply health insurance/401k) |

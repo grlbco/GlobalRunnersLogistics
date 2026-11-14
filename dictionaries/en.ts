@@ -2,7 +2,7 @@ const en = {
   meta: {
     title: "Global Runners Logistics — CDL-A Truck Driving Jobs in Las Vegas, NV",
     description:
-      "Now hiring CDL-A solo and team drivers in Las Vegas and Henderson, NV. 53' dry van, consistent runs, weekly pay every Thursday, 24/7 dispatch in English and Spanish.",
+      "Now hiring CDL-A solo and team drivers in Las Vegas and Henderson, NV. 53' dry van, consistent runs, weekly pay every Friday, 24/7 dispatch in English and Spanish.",
   },
   nav: {
     drive: "Drive",
@@ -10,7 +10,7 @@ const en = {
       company: { label: "Company drivers", hint: "Solo and team CDL-A jobs" },
       team: { label: "Team drivers", hint: "OTR team runs, NV to GA" },
       solo: { label: "Solo drivers", hint: "Regional and dedicated" },
-      pay: { label: "Pay & home time", hint: "Weekly pay, Thursday payday" },
+      pay: { label: "Pay & home time", hint: "Weekly pay, Friday payday" },
       requirements: { label: "Requirements", hint: "What you need to apply" },
     },
     ownerOperators: "Owner-operators",
@@ -31,7 +31,7 @@ const en = {
     secondary: "See pay",
   },
   proof: [
-    { k: "Nationwide freight", v: "48 states" },
+    { k: "Nationwide dedicated freight", v: "48 states" },
     { k: "Consistent runs", v: "NV ↔ GA" },
     { k: "Experienced drivers", v: "1 yr+ CDL-A" },
     { k: "24/7 dispatch", v: "English & Español" },
@@ -42,7 +42,7 @@ const en = {
       title: ["Built around the things", "drivers actually care about."],
       intro: "We asked our drivers why they stay. These are their answers, not ours.",
       items: [
-        { t: "Pay you can count on", d: "Paid per mile, every week, every Thursday. No games with settlements." },
+        { t: "Pay you can count on", d: "Weekly guaranteed minimum or per-mile pay, whichever is greater — paid every Friday. No games with settlements." },
         { t: "Consistent runs", d: "Steady freight on lanes you get to know. Consistency is what we do better than the big carriers." },
         { t: "No wait time", d: "Planned loads and a dispatcher who stays ahead of the schedule, so you're rolling instead of sitting." },
         { t: "Home on time", d: "Get home straight and early — not late. Home time you can actually plan around." },
@@ -50,10 +50,10 @@ const en = {
     },
     pay: {
       label: "Pay & home time",
-      title: ["Weekly pay.", "Every Thursday."],
-      intro: "Your per-mile rate is confirmed on your first call with our recruiter — before you commit to anything.",
+      title: ["Weekly pay.", "Every Friday."],
+      intro: "Guaranteed minimum or rate per mile, whichever is greater. Team: $2,000–$2,300 a week, $0.80–$0.90 per mile. Solo: $1,500–$1,700 a week, $0.60–$0.70 per mile.",
       stats: [
-        { n: 250, prefix: "$", suffix: "", k: "Layover pay" },
+        { n: 1500, prefix: "$", suffix: "+", k: "Guaranteed weekly minimum (solo) · team $2,000+" },
         { n: 1000, prefix: "$", suffix: "", k: "Bonus on every work anniversary" },
         { n: 7, prefix: "", suffix: " days", k: "Pay period: Monday to Monday" },
         { n: 24, prefix: "", suffix: "/7", k: "Dispatch, English & Español" },
@@ -62,12 +62,12 @@ const en = {
     equipment: {
       label: "The equipment",
       title: ["Trucks you'll want", "to live in."],
-      intro: "Automatic Peterbilt 579s and Freightliner Cascadias, set up for real life on the road.",
+      intro: "Automatic Peterbilt 579s, Freightliner Cascadias and Kenworth T680s, set up for real life on the road.",
       specs: [
-        { k: "Tractors", v: "Peterbilt 579 · Freightliner Cascadia" },
+        { k: "Tractors", v: "Peterbilt 579 · Freightliner Cascadia · Kenworth T680" },
         { k: "Transmission", v: "Automatic" },
         { k: "Comfort", v: "APU · Inverter · Fridge · Microwave" },
-        { k: "Camera", v: "Road-facing only — no driver-facing cam" },
+        { k: "Cameras", v: "Road-facing & side only — no driver-facing cam" },
         { k: "Trailer", v: "53' dry van" },
         { k: "Freight", v: "Electronics · Drop & hook + live" },
       ],
@@ -87,12 +87,12 @@ const en = {
     },
     steps: {
       label: "How hiring works",
-      title: ["From application", "to first load in about two weeks."],
+      title: ["From application", "to your first load."],
       items: [
         { t: "Apply in 2 minutes", d: "A short form with tap-to-answer questions. No SSN, no paperwork yet." },
         { t: "Ken calls you", d: "Our recruiter calls you back — usually within the hour during office hours." },
         { t: "Full application", d: "Create your driver account and finish your DOT application online, at your pace." },
-        { t: "Orientation in Henderson", d: "One day at the yard. Travel covered if you live far away. Then your first load." },
+        { t: "Orientation in Henderson", d: "One day at the yard. Travel covered if you live far away. Your first load goes out the next day." },
       ],
     },
     owners: {
@@ -105,7 +105,7 @@ const en = {
     final: { title: ["Ready to roll?"], sub: "Two minutes to apply. A real person calls you back.", call: "Or call" },
   },
   footer: {
-    tagline: "CDL-A solo and team jobs out of Las Vegas, Nevada. Hauling since 2012.",
+    tagline: "CDL-A solo and team jobs out of Las Vegas, Nevada. Hauling since 2015.",
     columns: {
       drivers: "Drivers",
       company: "Company",

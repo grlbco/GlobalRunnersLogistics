@@ -1,7 +1,8 @@
 import { resolveLocale, localePath } from "@/lib/i18n";
 import { pageMeta } from "@/lib/seo";
 import { routes } from "@/content/navigation";
-import { company, fleet, hiring } from "@/content/facts";
+import { company, fleet } from "@/content/facts";
+import { about } from "@/content/about";
 import { PageHero } from "@/components/ui/PageHero";
 import { Section } from "@/components/ui/Section";
 import { Reveal, Counter } from "@/components/motion/Reveal";
@@ -37,7 +38,7 @@ export default async function AboutPage({ params }: PageProps<"/[lang]/about">) 
       <PageHero
         crumbs={[{ name: "Home", href: p("/") }, { name: "About", href: p(routes.about) }]}
         label="About us"
-        title={["A Las Vegas fleet,", "built on consistency."]}
+        title={["A Las Vegas-based fleet", "built on consistency,", "dedication, and opportunity."]}
         intro={`${company.legalName} has been hauling freight since ${company.foundedYear}. Today we run ${fleet.trucks} trucks out of Las Vegas and Henderson, Nevada — and we're growing.`}
       />
       <section className="border-b border-white/10">
@@ -50,19 +51,18 @@ export default async function AboutPage({ params }: PageProps<"/[lang]/about">) 
           ))}
         </div>
       </section>
-      <Section index="01" label="Our story" title={["Owner-run.", "Driver-first."]}>
+      <Section index="01" label="Our story" title={["Driven by family.", "Built on commitment."]}>
         <div className="mt-12 grid gap-10 md:ml-[25%] md:grid-cols-2">
-          <Reveal>
-            <p className="body-lg text-white/75">
-              Global Runners Logistics is led by owner {company.owner}. We started hauling in {company.foundedYear} and grew the fleet the slow, steady way: by keeping drivers moving on consistent runs and getting them home on time.
-            </p>
-          </Reveal>
-          <Reveal delay={0.1}>
-            <p className="body-lg text-white/75">
-              We&apos;re big enough to keep you loaded and small enough that you know who you&apos;re talking to. Every driver has a dedicated dispatcher, and our team speaks {hiring.dispatchLanguages.join(" and ")}.
-            </p>
-          </Reveal>
+          {about.story.map((t, i) => (
+            <Reveal key={i} delay={(i % 2) * 0.1} className={i === 0 ? "md:col-span-2" : undefined}>
+              <p className={i === 0 ? "text-2xl font-medium leading-snug md:text-3xl" : "body-lg text-white/75"}>{t}</p>
+            </Reveal>
+          ))}
         </div>
+        <Reveal className="mt-14 border-t border-white/10 pt-10 md:ml-[25%]">
+          <p className="h3 max-w-[28ch]">{about.closer}</p>
+          <p className="label mt-6 text-signal">{about.signoff}</p>
+        </Reveal>
       </Section>
       <Section index="02" label="What we haul" title={["53' dry van,", "coast to coast."]} tone="light">
         <dl className="mt-14 border-t border-ink/15 md:ml-[25%]">

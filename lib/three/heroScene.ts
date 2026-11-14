@@ -163,16 +163,30 @@ export function createHeroScene(canvas: HTMLCanvasElement, rig: RigGeometry, opt
     }
   }
 
-  // Company logo on both van sides (official artwork, untouched).
+  // Company logo on both van sides (official artwork, untouched), sized to fill the trailer panel.
   const logoTex = new THREE.TextureLoader().load("/brand/logo-navy.png");
   logoTex.colorSpace = THREE.SRGBColorSpace;
   logoTex.anisotropy = 8;
   const logoMat = new THREE.MeshStandardMaterial({ map: logoTex, transparent: true, roughness: 0.45, metalness: 0.05, clippingPlanes: clip, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
-  const logoH = 3.4;
+  const logoH = (T.top - T.floor) * 0.84; // ~7.8 ft of the 9.3 ft side wall
   const logoGeo = new THREE.PlaneGeometry(logoH * (1913 / 456), logoH);
   for (const side of [1, -1]) {
     const m = new THREE.Mesh(logoGeo, logoMat);
-    m.position.set(T.front - T.len * 0.45, T.floor + (T.top - T.floor) * 0.56, side * (T.halfW + 0.01));
+    m.position.set(T.front - T.len / 2, (T.top + T.floor) / 2, side * (T.halfW + 0.01));
+    if (side < 0) m.rotation.y = Math.PI;
+    rigGroup.add(m);
+  }
+  // Smaller emblem on both cab doors (below the door window, x ≈ -3.9…-1.2 ft on the W990).
+  const doorTex = new THREE.TextureLoader().load("/brand/mark-navy.png");
+  doorTex.colorSpace = THREE.SRGBColorSpace;
+  doorTex.anisotropy = 8;
+  // Not logoMat.clone(): clone() copies the clipping plane by value, so the scan reveal would never uncover it.
+  const doorMat = new THREE.MeshStandardMaterial({ map: doorTex, transparent: true, roughness: 0.45, metalness: 0.05, clippingPlanes: clip, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
+  const doorH = 1.45;
+  const doorGeo = new THREE.PlaneGeometry(doorH * (437 / 456), doorH);
+  for (const side of [1, -1]) {
+    const m = new THREE.Mesh(doorGeo, doorMat);
+    m.position.set(-2.55, 5.15, side * 3.38);
     if (side < 0) m.rotation.y = Math.PI;
     rigGroup.add(m);
   }
@@ -195,7 +209,7 @@ export function createHeroScene(canvas: HTMLCanvasElement, rig: RigGeometry, opt
   const shadow = new THREE.Mesh(new THREE.PlaneGeometry(84, 15).rotateX(-Math.PI / 2), shadowMat);
   shadow.position.set((rig.noseX + tRear) / 2, 0.03, 0);
   rigGroup.add(shadow);
-  const solidMats: THREE.Material[] = [...Object.values(surf), logoMat];
+  const solidMats: THREE.Material[] = [...Object.values(surf), logoMat, doorMat];
 
   // Lights: headlights, cab marker lamps, trailer clearance + tail lamps.
   const dot = makeDot();
@@ -335,7 +349,7 @@ export function createHeroScene(canvas: HTMLCanvasElement, rig: RigGeometry, opt
     if (intro.value !== lastIntro) {
       const fading = intro.value < 0.999;
       for (const m of solidMats) {
-        if (m !== logoMat && m.transparent !== fading) ((m.transparent = fading), (m.needsUpdate = true));
+        if (m !== logoMat && m !== doorMat && m.transparent !== fading) ((m.transparent = fading), (m.needsUpdate = true));
         m.opacity = intro.value;
       }
       mats.rim.opacity = 0.12 * intro.value;
@@ -371,6 +385,7 @@ export function createHeroScene(canvas: HTMLCanvasElement, rig: RigGeometry, opt
     Object.values(mats).forEach((m) => m.dispose());
     solidMats.forEach((m) => m.dispose());
     logoTex.dispose();
+    doorTex.dispose();
     shadowTex.dispose();
     shadowMat.dispose();
     envTex.dispose();

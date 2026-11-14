@@ -25,9 +25,9 @@ export default async function ContactPage({ params }: PageProps<"/[lang]/contact
             <div>
               <p className="label text-white/45">Call</p>
               <a href={`tel:${company.phone.e164}`} className="mt-3 block text-3xl font-semibold tracking-[-0.02em] hover:text-signal md:text-4xl">
-                {company.phone.display}
+                {company.phone.vanity}
               </a>
-              <p className="mt-2 text-white/55">{company.owner} · {company.timeZone}</p>
+              <p className="mt-2 text-white/55">{company.phone.display} · {company.timeZone}</p>
             </div>
             <div>
               <p className="label text-white/45">Office</p>

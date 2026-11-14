@@ -5,7 +5,7 @@ const es: Dictionary = {
   meta: {
     title: "Global Runners Logistics — Trabajos de chofer CDL-A en Las Vegas, NV",
     description:
-      "Contratamos choferes CDL-A solos y en equipo en Las Vegas y Henderson, NV. Dry van de 53', rutas constantes, pago semanal cada jueves y despacho 24/7 en inglés y español.",
+      "Contratamos choferes CDL-A solos y en equipo en Las Vegas y Henderson, NV. Dry van de 53', rutas constantes, pago semanal cada viernes y despacho 24/7 en inglés y español.",
   },
   nav: {
     drive: "Maneja",
@@ -13,7 +13,7 @@ const es: Dictionary = {
       company: { label: "Choferes de compañía", hint: "Trabajos CDL-A solo y en equipo" },
       team: { label: "Choferes en equipo", hint: "Rutas OTR en equipo, NV a GA" },
       solo: { label: "Choferes solos", hint: "Regional y dedicado" },
-      pay: { label: "Pago y tiempo en casa", hint: "Pago semanal, cada jueves" },
+      pay: { label: "Pago y tiempo en casa", hint: "Pago semanal, cada viernes" },
       requirements: { label: "Requisitos", hint: "Lo que necesitas para aplicar" },
     },
     ownerOperators: "Owner-operators",
@@ -34,7 +34,7 @@ const es: Dictionary = {
     secondary: "Ver pago",
   },
   proof: [
-    { k: "Carga nacional", v: "48 estados" },
+    { k: "Carga dedicada nacional", v: "48 estados" },
     { k: "Rutas constantes", v: "NV ↔ GA" },
     { k: "Choferes con experiencia", v: "1 año+ CDL-A" },
     { k: "Despacho 24/7", v: "Inglés y español" },
@@ -45,7 +45,7 @@ const es: Dictionary = {
       title: ["Pensado en lo que", "de verdad le importa al chofer."],
       intro: "Le preguntamos a nuestros choferes por qué se quedan. Estas son sus respuestas, no las nuestras.",
       items: [
-        { t: "Pago seguro", d: "Pago por milla, cada semana, cada jueves. Sin trucos en los pagos." },
+        { t: "Pago seguro", d: "Mínimo semanal garantizado o pago por milla, lo que sea mayor, cada viernes. Sin trucos en los pagos." },
         { t: "Rutas constantes", d: "Carga estable en rutas que llegas a conocer. La constancia es lo que hacemos mejor que las grandes compañías." },
         { t: "Sin tiempo de espera", d: "Cargas planeadas y un despachador que va adelantado, para que estés rodando y no esperando." },
         { t: "En casa a tiempo", d: "Llega a casa directo y temprano, no tarde. Tiempo en casa que puedes planear." },
@@ -53,10 +53,10 @@ const es: Dictionary = {
     },
     pay: {
       label: "Pago y tiempo en casa",
-      title: ["Pago semanal.", "Cada jueves."],
-      intro: "Tu tarifa por milla se confirma en tu primera llamada con el reclutador, antes de que te comprometas a nada.",
+      title: ["Pago semanal.", "Cada viernes."],
+      intro: "Mínimo garantizado o tarifa por milla, lo que sea mayor. Equipo: $2,000–$2,300 por semana, $0.80–$0.90 por milla. Solo: $1,500–$1,700 por semana, $0.60–$0.70 por milla.",
       stats: [
-        { n: 250, prefix: "$", suffix: "", k: "Pago por layover" },
+        { n: 1500, prefix: "$", suffix: "+", k: "Mínimo semanal garantizado (solo) · equipo $2,000+" },
         { n: 1000, prefix: "$", suffix: "", k: "Bono en cada aniversario de trabajo" },
         { n: 7, prefix: "", suffix: " días", k: "Periodo de pago: lunes a lunes" },
         { n: 24, prefix: "", suffix: "/7", k: "Despacho en inglés y español" },
@@ -65,12 +65,12 @@ const es: Dictionary = {
     equipment: {
       label: "El equipo",
       title: ["Camiones en los que", "da gusto vivir."],
-      intro: "Peterbilt 579 y Freightliner Cascadia automáticos, listos para la vida real en la carretera.",
+      intro: "Peterbilt 579, Freightliner Cascadia y Kenworth T680 automáticos, listos para la vida real en la carretera.",
       specs: [
-        { k: "Tractos", v: "Peterbilt 579 · Freightliner Cascadia" },
+        { k: "Tractos", v: "Peterbilt 579 · Freightliner Cascadia · Kenworth T680" },
         { k: "Transmisión", v: "Automática" },
         { k: "Comodidad", v: "APU · Inversor · Refrigerador · Microondas" },
-        { k: "Cámara", v: "Solo hacia el camino, sin cámara al chofer" },
+        { k: "Cámaras", v: "Solo hacia el camino y laterales, sin cámara al chofer" },
         { k: "Tráiler", v: "Dry van de 53'" },
         { k: "Carga", v: "Electrónicos · Drop & hook + carga en vivo" },
       ],
@@ -90,12 +90,12 @@ const es: Dictionary = {
     },
     steps: {
       label: "Cómo contratamos",
-      title: ["De la aplicación", "a tu primera carga en unas dos semanas."],
+      title: ["De la aplicación", "a tu primera carga."],
       items: [
         { t: "Aplica en 2 minutos", d: "Un formulario corto con respuestas de un toque. Sin SSN ni papeleo todavía." },
         { t: "Ken te llama", d: "Nuestro reclutador te devuelve la llamada, normalmente en menos de una hora en horario de oficina." },
         { t: "Aplicación completa", d: "Crea tu cuenta de chofer y termina tu aplicación DOT en línea, a tu ritmo." },
-        { t: "Orientación en Henderson", d: "Un día en el patio. Pagamos el viaje si vives lejos. Luego, tu primera carga." },
+        { t: "Orientación en Henderson", d: "Un día en el patio. Pagamos el viaje si vives lejos. Tu primera carga sale al día siguiente." },
       ],
     },
     owners: {
@@ -108,7 +108,7 @@ const es: Dictionary = {
     final: { title: ["¿Listo para rodar?"], sub: "Dos minutos para aplicar. Una persona real te llama.", call: "O llama al" },
   },
   footer: {
-    tagline: "Trabajos CDL-A solo y en equipo desde Las Vegas, Nevada. Transportando desde 2012.",
+    tagline: "Trabajos CDL-A solo y en equipo desde Las Vegas, Nevada. Transportando desde 2015.",
     columns: { drivers: "Choferes", company: "Compañía", legal: "Legal" },
     links: {
       jobs: "Puestos abiertos",

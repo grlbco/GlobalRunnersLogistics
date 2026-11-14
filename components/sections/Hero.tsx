@@ -255,7 +255,7 @@ export function Hero({
         {[
           { key: "cab", k: "Tractor", v: `${fleet.transmission} · APU · Inverter` },
           { key: "trailer", k: "Trailer", v: `${fleet.trailer} · ${fleet.freight}` },
-          { key: "wheels", k: "Camera", v: "Road-facing only" },
+          { key: "wheels", k: "Cameras", v: "Road-facing & side only" },
         ].map((c) => (
           <div key={c.key} data-callout={c.key} className="invisible pointer-events-none absolute left-0 top-0 z-10 hidden opacity-0 will-change-transform md:block">
             <span className="absolute -left-1.5 -top-1.5 h-3 w-3 rounded-full border border-signal bg-ink" />

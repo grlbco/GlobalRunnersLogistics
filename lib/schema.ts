@@ -99,7 +99,7 @@ export function jobPostingSchema(job: Job, descriptionHtml: string) {
     qualifications: "Valid CDL-A license, minimum age 21, 1 year CDL-A experience.",
     educationRequirements: { "@type": "EducationalOccupationalCredential", credentialCategory: "no requirements" },
     experienceInPlaceOfEducation: true,
-    jobBenefits: "Weekly pay every Thursday; $1,000 anniversary bonus every year; paid layover; take the truck home; riders and pets allowed; automatic trucks with APU and inverter; dedicated 24/7 dispatcher in English and Spanish; paid travel to orientation.",
+    jobBenefits: "Weekly pay every Friday; weekly guaranteed minimum or rate per mile, whichever is greater; workers' compensation insurance from day one; $1,000 anniversary bonus every year; take the truck home; riders and pets allowed; automatic trucks with APU and inverter; dedicated 24/7 dispatcher in English and Spanish; paid travel to orientation.",
     image: `${company.url}/opengraph-image`,
     industry: "Trucking",
     occupationalCategory: "53-3032.00 Heavy and Tractor-Trailer Truck Drivers",

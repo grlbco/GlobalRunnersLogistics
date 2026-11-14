@@ -31,7 +31,7 @@ export default async function OwnerOperatorsPage({ params }: PageProps<"/[lang]/
         crumbs={[{ name: "Home", href: p("/") }, { name: "Owner-operators", href: p(routes.ownerOperators) }]}
         label="Owner-operators"
         title={["Your truck.", "Our freight."]}
-        intro="Run consistent dry van freight with a Las Vegas fleet that's been hauling since 2012. Tell us about your truck and we'll call you with the details of the program."
+        intro={`Run consistent dry van freight with a Las Vegas fleet that's been hauling since ${company.foundedYear}. Tell us about your truck and we'll call you with the details of the program.`}
       />
       <Section index="01" label="Why run with us" title={["Built for owner-operators", "who want consistency."]}>
         <div className="mt-14 grid gap-px bg-white/10 md:grid-cols-2">

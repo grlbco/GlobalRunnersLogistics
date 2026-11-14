@@ -54,8 +54,8 @@ export default function DesignPage() {
         <div className="mt-8 space-y-8">
           <p className="display-xl">Your road.</p>
           <p className="display">Built for the long haul.</p>
-          <p className="h2">Weekly pay, every Thursday.</p>
-          <p className="h3">Peterbilt 579 · Freightliner Cascadia · Automatic</p>
+          <p className="h2">Weekly pay, every Friday.</p>
+          <p className="h3">Peterbilt 579 · Freightliner Cascadia · Kenworth T680 · Automatic</p>
           <p className="body-lg max-w-2xl text-white/70">
             Drive for a Las Vegas fleet that keeps you moving: consistent runs, weekly pay, 24/7 dispatch, and home time you can plan
             around. Aa Bb Cc 0123456789 ñ á é í ó ú ¿ ¡

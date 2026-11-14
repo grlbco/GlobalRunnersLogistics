@@ -8,9 +8,9 @@ export const company = {
   shortName: "Global Runners Logistics",
   domain: "globalrunnerslogistics.com",
   url: "https://globalrunnerslogistics.com",
-  foundedYear: 2012,
+  foundedYear: 2015,
   owner: "Ken Aman",
-  phone: { display: "(312) 975-3377", e164: "+13129753377" }, // Ken Aman — answers all calls (George, 2026-11-03)
+  phone: { display: "(844) 456-7861", vanity: "844-GLORUN1", e164: "+18444567861" }, // 844-GLORUN1 toll-free (updated 2026-11-14)
   /** Quo line used only to SEND automated SMS (A2P). Not shown publicly. */
   smsSender: "+17256661558",
   email: "dev@grlbco.com", // TODO: switch to a public inbox (e.g. drive@globalrunnerslogistics.com) once Resend domain verifies
@@ -28,9 +28,9 @@ export const company = {
 export const fleet = {
   trucks: 30,
   drivers: 25,
-  makes: ["Peterbilt 579", "Freightliner Cascadia"],
+  makes: ["Peterbilt 579", "Freightliner Cascadia", "Kenworth T680"],
   transmission: "Automatic",
-  extras: ["APU", "Inverter", "Fridge", "Microwave", "Road-facing dash cam only"],
+  extras: ["APU", "Inverter", "Fridge", "Microwave", "Road-facing & side cameras only"],
   trailer: "53' dry van",
   freight: "Electronics",
   loading: ["Drop & hook", "Live load / unload"],
@@ -46,17 +46,18 @@ export const hiring = {
   takeTruckHome: true,
   orientationTravelPaid: true,
   minAge: 21,
-  minExperience: "1 year CDL-A",
+  minExperience: "1 year verifiable OTR/regional experience within the past 3 years, or 2 years verifiable experience within the past 5 years",
   newGrads: false,
   mvr: "No more than 3 moving violations in the last 3 years",
   disqualifiers: ["DUI", "Failed or refused drug test / SAP program"],
-  backgroundCheck: "7-year background check",
+  backgroundCheck: "No felony convictions in the past 7 years",
+  accidents: "No DOT recordable/preventable accidents in the past 12 months",
   english: "Basic English (road signs, DOT, dispatch)",
   dispatchLanguages: ["English", "Español"],
   workAuthorization: "Authorized to work in the U.S.",
   ridersAndPets: true,
   orientationDays: 1,
-  timeToFirstLoad: "About 2 weeks",
+  timeToFirstLoad: "Next day after orientation",
   dedicatedDispatcher: true,
   callbackPromise: "Within 1 hour",
 } as const;
@@ -64,16 +65,19 @@ export const hiring = {
 export const pay = {
   type: "Per mile",
   schedule: "Weekly",
-  payday: "Thursday",
+  payday: "Friday",
   payPeriod: "Monday to Monday",
-  layover: 250,
+  /** Weekly guaranteed minimum or rate per mile, whichever is greater. */
+  guarantee: {
+    team: { weekly: "$2,000–$2,300", cpm: "$0.80–$0.90" },
+    solo: { weekly: "$1,500–$1,700", cpm: "$0.60–$0.70" },
+  },
+  workersComp: "Workers' compensation insurance available from day one",
   anniversaryBonus: 1000,
 } as const;
 
 /** Waiting on Ken. Never render these. */
 export const pending = {
-  teamCpm: "$0.80–$0.90 per mile? (form said '08 to 90 CPM')",
-  weeklyMinimum: 2000,
   avgWeeklyMiles: 6000,
   avgWeeklyGross: 2600,
   homeTime: "4 days home (per how many weeks?)",
@@ -82,3 +86,6 @@ export const pending = {
   mcNumber: null,
   usdotNumber: null,
 } as const;
+
+/** One-line pay summary used across pages, schema, llms.txt and the assistant. */
+export const guaranteeLine = `Weekly guaranteed minimum or rate per mile, whichever is greater — Team: ${pay.guarantee.team.weekly}/week, ${pay.guarantee.team.cpm}/mile; Solo: ${pay.guarantee.solo.weekly}/week, ${pay.guarantee.solo.cpm}/mile`;

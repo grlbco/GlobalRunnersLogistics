@@ -19,7 +19,7 @@ const common = [
   { k: "Equipment", v: `${fleet.makes.join(" / ")} · ${fleet.transmission}` },
   { k: "Trailer", v: fleet.trailer },
   { k: "Pay", v: `${pay.type}, paid ${pay.schedule.toLowerCase()} every ${pay.payday}` },
-  { k: "Layover pay", v: `$${pay.layover}` },
+  { k: "Workers' comp", v: "Available from day one" },
   { k: "Anniversary bonus", v: `$${pay.anniversaryBonus.toLocaleString()} every year` },
   { k: "Truck home", v: hiring.takeTruckHome ? "Yes" : "No" },
 ];
@@ -43,7 +43,7 @@ export const jobs: Job[] = [
     short: "Solo CDL-A · Regional",
     driverType: "Solo",
     runType: "Regional",
-    summary: `Drive solo on regional dry van runs out of ${company.yard.city}, NV. Automatic Peterbilt 579s and Freightliner Cascadias with APU, inverter, fridge and microwave, weekly pay every Thursday, and dispatch in English and Spanish around the clock.`,
+    summary: `Drive solo on regional dry van runs out of ${company.yard.city}, NV. Automatic Peterbilt 579s, Freightliner Cascadias and Kenworth T680s with APU, inverter, fridge and microwave, weekly pay every Friday, and dispatch in English and Spanish around the clock.`,
     highlights: [{ k: "Run type", v: "Regional" }, { k: "Start point", v: hiring.pickup }, ...common],
     route: "Regional lanes from Henderson, NV",
     datePosted: "2026-11-03",
@@ -66,26 +66,28 @@ export const jobs: Job[] = [
 export const requirements = [
   `Valid ${hiring.license} license`,
   `At least ${hiring.minAge} years old`,
-  `${hiring.minExperience} experience (no new CDL school graduates)`,
+  "1 year verifiable OTR/regional experience within the past 3 years, OR 2 years verifiable experience within the past 5 years (no new CDL school graduates)",
+  hiring.accidents,
   hiring.mvr,
+  hiring.backgroundCheck,
   "No DUI",
   "Clean drug and alcohol history (no failed or refused tests, no SAP program)",
-  hiring.backgroundCheck,
   hiring.english,
   hiring.workAuthorization,
 ];
 
 export const whatYouGet = [
-  "Weekly pay — pay period Monday to Monday, paid every Thursday",
-  `$${pay.layover} layover pay`,
+  `Weekly pay — pay period ${pay.payPeriod}, paid every ${pay.payday}`,
+  `Guaranteed minimum pay — Team: ${pay.guarantee.team.weekly}/week, ${pay.guarantee.team.cpm}/mile · Solo: ${pay.guarantee.solo.weekly}/week, ${pay.guarantee.solo.cpm}/mile (whichever is greater)`,
+  "Workers' compensation insurance available from day one",
   `$${pay.anniversaryBonus.toLocaleString()} bonus on every work anniversary`,
   "Dedicated dispatcher, 24/7, English and Spanish",
   "Automatic trucks with APU, inverter, fridge and microwave",
-  "Road-facing dash cam only — no driver-facing camera",
+  "Road-facing & side cameras only — no driver-facing camera",
   "Take the truck home",
   "Riders and pets allowed",
   "Travel to orientation paid for drivers who live far away",
-  `${hiring.orientationDays}-day orientation, first load in about 2 weeks`,
+  `${hiring.orientationDays}-day orientation — next-day load`,
 ];
 
 export const getJob = (slug: string) => jobs.find((j) => j.slug === slug);

@@ -55,7 +55,7 @@ export default async function PlacePage({ params }: PageProps<"/[lang]/locations
     {
       group: "Pay",
       q: `How do drivers from ${pl.city} get paid?`,
-      a: `Weekly, every ${pay.payday}. The pay period runs ${pay.payPeriod}. Layover pays $${pay.layover}, and every driver earns a $${pay.anniversaryBonus.toLocaleString()} anniversary bonus each year.`,
+      a: `Weekly, every ${pay.payday}. The pay period runs ${pay.payPeriod}. You get a weekly guaranteed minimum or your per-mile pay, whichever is greater, and every driver earns a $${pay.anniversaryBonus.toLocaleString()} anniversary bonus each year.`,
     },
   ];
 
