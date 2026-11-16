@@ -180,7 +180,7 @@ async function Body() {
                               <span className="block truncate text-[0.875rem]">{t.title}</span>
                               {c && <Link href={`/crm/contacts/${c.id}`} className="block truncate text-[0.78rem] text-muted hover:text-fg">{fullName(c)}</Link>}
                             </span>
-                            {t.due_at && <span className={late ? "shrink-0 text-[0.72rem] font-medium text-red-600" : "shrink-0 text-[0.72rem] text-faint"}>{new Date(t.due_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>}
+                            {t.due_at && <span className={late ? "shrink-0 text-[0.72rem] font-medium text-red-600" : "shrink-0 text-[0.72rem] text-faint"}>{new Date(t.due_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles" })}</span>}
                           </li>
                         );
                       })}

@@ -284,7 +284,7 @@ function Activity({ log }: { log: TeamAudit[] }) {
                 {roleAction && a.role && <> <span className="font-mono text-muted">{a.role}</span></>}
                 {a.action === "member_added" && a.role && <> as <span className="font-mono text-muted">{a.role}</span></>}
               </span>
-              <span className="ml-auto text-xs text-faint">{new Date(a.at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
+              <span className="ml-auto text-xs text-faint">{new Date(a.at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles" })}</span>
             </li>
           );
         })}
