@@ -106,9 +106,11 @@ export async function createCampaign(p: CampaignPayload): Promise<{ id: string }
       campaign_schedule: { schedules: [{ name: "Business hours", timing: { from: p.schedule.from, to: p.schedule.to }, days, timezone: p.schedule.timezone }] },
       sequences: [
         {
-          steps: p.steps.map((s) => ({
+          // Instantly's `delay` is the wait AFTER a step before the NEXT one; ours is the wait BEFORE a step.
+          // So step i carries step i+1's delay (the last step gets 1; it never fires anything).
+          steps: p.steps.map((s, i) => ({
             type: "email",
-            delay: s.delay_days,
+            delay: Math.max(1, p.steps[i + 1]?.delay_days ?? 1),
             variants: s.variants.map((v) => ({ subject: v.subject, body: toHtml(v.body) })),
           })),
         },
