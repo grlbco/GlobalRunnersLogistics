@@ -5,11 +5,14 @@ export const SMS_CONSENT_TEXT = {
   es: "Acepto recibir llamadas y mensajes de texto de Global Runners Logistics LLC sobre mi aplicación y oportunidades de trabajo al número que proporcioné, incluyendo mensajes automatizados. El consentimiento no es condición de empleo. La frecuencia de mensajes varía. Pueden aplicar tarifas de mensajes y datos. Responde STOP para cancelar, HELP para ayuda.",
 } as const;
 
+/** A real US number: 10 digits, area code and exchange can't start with 0 or 1 (North American numbering). */
+export const US_PHONE = /^(\+?1)?[2-9]\d{2}[2-9]\d{6}$/;
+
 const phone = z
   .string()
   .trim()
   .transform((v) => v.replace(/[^\d+]/g, ""))
-  .refine((v) => /^\+?1?\d{10}$/.test(v), "Enter a valid US phone number");
+  .refine((v) => US_PHONE.test(v), "Enter a valid US phone number");
 
 const optionalEmail = z
   .string()
@@ -86,7 +89,7 @@ export const contactSchema = z.object({
     .trim()
     .optional()
     .transform((v) => (v ? v.replace(/[^\d+]/g, "") : undefined))
-    .refine((v) => !v || /^\+?1?\d{10}$/.test(v), "Enter a valid US phone number"),
+    .refine((v) => !v || US_PHONE.test(v), "Enter a valid US phone number"),
   topic: z.enum(["driving", "owner_operator", "shipper", "other"]),
   message: z.string().trim().min(1, "Required").max(4000),
   locale,

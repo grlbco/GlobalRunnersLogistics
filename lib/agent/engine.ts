@@ -46,16 +46,17 @@ const MAX_TEXT_FOLLOWUPS = 3;
  * stops the second they fill it or reply. Then monthly nurture emails.
  */
 type ChaseStep = { gapH: number; ch: "both" | "sms" | "email" };
-const CHASE: ChaseStep[] = [
-  { gapH: 2, ch: "both" },   // 2h after the link: text + email
-  { gapH: 20, ch: "sms" },   // next day
-  { gapH: 24, ch: "email" }, // day 2
-  { gapH: 24, ch: "sms" },   // day 3
-  { gapH: 48, ch: "email" }, // day 5
-  { gapH: 48, ch: "sms" },   // day 7
-  { gapH: 72, ch: "email" }, // day 10
-  { gapH: 96, ch: "both" },  // day 14: last one
+export const CHASE: ChaseStep[] = [
+  { gapH: 2, ch: "both" },   // 1: 2h after the link: text + email
+  { gapH: 20, ch: "sms" },   // 2: next day
+  { gapH: 24, ch: "email" }, // 3: day 2
+  { gapH: 24, ch: "sms" },   // 4: day 3
+  { gapH: 48, ch: "email" }, // 5: day 5
+  { gapH: 48, ch: "sms" },   // 6: day 7
+  { gapH: 72, ch: "email" }, // 7: day 10, last one, then Nurture
 ];
+/** Any form of yes, in any language, counts as interest (the model classifies; these intents are positive). */
+export const POSITIVE_INTENTS = ["interested", "ready", "call_request"];
 const NURTURE_GAP_H = 30 * 24;
 const NURTURE_MAX = 3;
 export type FollowupKind = "nudge" | "chase" | "chase_extra" | "nurture";
@@ -184,11 +185,16 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
     if (channel === "email" && !(c.email && (dry || (await canEmailContact(c.id))))) channel = "sms";
     // First chase touch: the card moves to "Following up".
     if (!dry && input.followupKind === "chase" && (input.followupAttempt ?? 1) === 1) await moveStage(c as Contact, "chasing", "agent");
-    // Driver answered an email and we may text them: send a short text too (multi-channel, like a recruiter would).
+    // Driver answered an email: text them too (multi-channel, like a recruiter would). Texting turns on when the
+    // email reply is positive (owner's decision 2026-11-15); the first text carries the STOP line.
     let alsoText = false;
-    if (!dry && input.trigger === "email_received" && c.sms_consent && (c.cell_phone || c.phone)) {
-      const { count: recentSms } = await db.from("messages").select("*", { count: "exact", head: true }).eq("contact_id", c.id).eq("channel", "sms").eq("direction", "outbound").gte("created_at", new Date(Date.now() - 12 * 3600_000).toISOString());
-      alsoText = !recentSms;
+    let mayTextNew = false; // texting not on yet, but turns on if this reply is a yes
+    if (!dry && input.trigger === "email_received" && (c.cell_phone || c.phone) && !c.do_not_contact) {
+      mayTextNew = !c.sms_consent && !(await smsSuppressed(c.cell_phone || c.phone));
+      if (c.sms_consent || mayTextNew) {
+        const { count: recentSms } = await db.from("messages").select("*", { count: "exact", head: true }).eq("contact_id", c.id).eq("channel", "sms").eq("direction", "outbound").gte("created_at", new Date(Date.now() - 12 * 3600_000).toISOString());
+        alsoText = !recentSms;
+      }
     }
     // "Reply now" from staff: answer the driver if they wrote last, otherwise a fresh nudge.
     const promptTrigger = input.trigger === "manual" ? (turns.at(-1)?.direction === "inbound" ? "text_received" : "followup") : input.trigger === "test" ? "text_received" : input.trigger;
@@ -283,6 +289,21 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
       await moveStage(c as Contact, "not_fit", "agent");
     }
     if (decision.stage) await moveStage(c as Contact, decision.stage, "agent");
+    // A yes (any wording, any language): Interested in the CRM and in Instantly, texting on, one alert to the team.
+    const positive = (input.trigger === "email_received" || input.trigger === "text_received") && (POSITIVE_INTENTS.includes(decision.intent) || decision.stage === "interested");
+    if (positive) {
+      if (["new", "contacted", "replied"].includes(c.stage)) await moveStage(c as Contact, "interested", "agent");
+      if (mayTextNew) {
+        await db.from("contacts").update({ sms_consent: true, sms_consent_source: "positive email reply" }).eq("id", c.id);
+        await activity(c.id, "sms_consent", { source: "positive email reply" }, "agent");
+        c.sms_consent = true;
+      }
+      if (c.email && input.trigger === "email_received") {
+        const { setInterest } = await import("@/lib/integrations/instantly");
+        await setInterest(c.email, 1).catch((e) => console.error("instantly interest", e));
+      }
+      await replyAlert(c, lastInboundTurn?.body ?? "");
+    }
 
     if (decision.handoff) {
       await handoff(c, decision.handoff);
@@ -299,7 +320,8 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
       const live = !!lastOut && Date.now() - new Date(lastOut.at).getTime() < 20 * 60_000;
       const replying = input.trigger === "text_received" || input.trigger === "email_received" || input.trigger === "form_submitted";
       // Human cadence (GoHighLevel uses ~60-90s for SMS): live chat 30-75s, reply after a silence 60-150s, plus "typing" time.
-      const base = manual ? 5 : replying ? (live ? 30 + Math.random() * 45 : 60 + Math.random() * 90) + parts[0].length * 0.25 : settings.delay_min_s + Math.random() * Math.max(0, settings.delay_max_s - settings.delay_min_s);
+      // First answer to a fresh reply lands about a minute after the driver wrote (40s debounce + 20-45s here).
+      const base = manual ? 5 : replying ? (live ? 30 + Math.random() * 45 : 20 + Math.random() * 25) : settings.delay_min_s + Math.random() * Math.max(0, settings.delay_max_s - settings.delay_min_s);
       let at = Date.now() + 1000 * base;
       if (input.followupKind !== "chase_extra")
         await db.from("outbox").update({ status: "cancelled", error: "replaced by a newer reply" }).eq("contact_id", c.id).eq("author", "agent").in("status", ["draft", "pending"]);
@@ -312,8 +334,14 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
         });
       }
       // The extra text that goes with an email reply.
-      const texts = alsoText ? decision.sms_replies.map(clean).filter((t) => t && checkReply(t, { channel: "sms", formUrl: link.url }).ok).slice(0, 2) : [];
-      let tAt = Date.now() + 1000 * (90 + Math.random() * 60);
+      const textOk = alsoText && (c.sms_consent || (mayTextNew && positive));
+      const texts = textOk ? decision.sms_replies.map(clean).filter((t) => t && checkReply(t, { channel: "sms", formUrl: link.url }).ok).slice(0, 2) : [];
+      // First text ever to this driver: add the opt-out line.
+      if (texts.length && !/\bstop\b/i.test(texts.join(" "))) {
+        const { count: everTexted } = await db.from("messages").select("*", { count: "exact", head: true }).eq("contact_id", c.id).eq("channel", "sms").eq("direction", "outbound");
+        if (!everTexted) texts[texts.length - 1] = `${texts[texts.length - 1]} Reply STOP to opt out.`;
+      }
+      let tAt = at + 1000 * (15 + Math.random() * 20);
       for (const t of texts) {
         await db.from("outbox").insert({ contact_id: c.id, channel: "sms", author: "agent", body: t, status: settings.draft_mode ? "draft" : "pending", send_after: new Date(tAt).toISOString(), is_reply: false });
         tAt += 1000 * (10 + Math.random() * 15);
@@ -404,6 +432,33 @@ export async function scheduleNext(
   const ch: "email" | "sms" = canText && n <= MAX_TEXT_FOLLOWUPS ? "sms" : canEmail ? "email" : "sms";
   if (ch === "sms" && !canText) return;
   await add(n, "nudge", ch, inGoodWindow(new Date(Date.now() + FOLLOWUP_LADDER_H[n - 1] * 3600_000), c.timezone), `Follow-up #${n} (${ch === "sms" ? "text" : "email"})`);
+}
+
+/** Is this phone on the SMS opt-out list? */
+async function smsSuppressed(phone: string | null) {
+  if (!phone) return true;
+  const { count } = await adminDb().from("suppressions").select("*", { count: "exact", head: true }).eq("channel", "sms").eq("value", phone);
+  return (count ?? 0) > 0;
+}
+
+/** Telegram "Lead replied", once per driver: everything the team needs to know at a glance. */
+async function replyAlert(c: Record<string, unknown> & { id: string }, said: string) {
+  const db = adminDb();
+  const { count } = await db.from("activities").select("*", { count: "exact", head: true }).eq("contact_id", c.id).eq("type", "reply_alert");
+  if (count) return;
+  await activity(c.id, "reply_alert", {}, "agent");
+  const s = (k: string) => (c[k] == null || c[k] === "" ? null : String(c[k]));
+  const name = [s("first_name"), s("last_name")].filter(Boolean).join(" ") || "Unknown";
+  const phone = s("cell_phone") ?? s("phone");
+  const fmt = (p: string) => p.replace(/^\+1(\d{3})(\d{3})(\d{4})$/, "($1) $2-$3");
+  const lines = [
+    `🟢 <b>Lead replied: ${esc(name)}</b>`,
+    [s("company_name"), [s("city"), s("state")].filter(Boolean).join(", "), s("tier_label")].filter(Boolean).map((x) => esc(x!)).join(" · "),
+    s("usdot") ? `USDOT ${esc(s("usdot")!)}` : null,
+    [phone ? `📞 <a href="tel:${esc(phone)}">${esc(fmt(phone))}</a>` : null, s("email") ? `✉️ ${esc(s("email")!)}` : null].filter(Boolean).join(" · "),
+    said ? `They wrote: "${esc(said.replace(/\s+/g, " ").slice(0, 300))}"` : null,
+  ].filter(Boolean) as string[];
+  await sendTelegram(`${lines.join("\n")}\n\nClaudia is answering with the form link.\n<a href="${siteUrl()}/crm/contacts/${c.id}">Open in GRL Command</a>`);
 }
 
 async function handoff(c: { id: string; first_name: string | null; last_name: string | null }, reason: string) {

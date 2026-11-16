@@ -49,8 +49,8 @@ export const toneDot: Record<Tone, string> = {
 };
 
 export const TIERS: Record<number, string> = {
-  1: "Inactive / OOS",
-  2: "New authority",
+  1: "West core",
+  2: "Other states",
   3: "Suspension pending",
   4: "Authority 3–18 mo",
   5: "Active solo",

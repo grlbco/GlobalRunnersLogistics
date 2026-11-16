@@ -110,12 +110,14 @@ export async function completeForm(f: Completion): Promise<string | null> {
   try {
     const { sendTelegram, esc } = await import("@/lib/integrations/telegram");
     const { siteUrl } = await import("@/lib/site");
-    const { data: full } = await db.from("contacts").select("state, city, tags").eq("id", contact.id).single();
+    const { data: full } = await db.from("contacts").select("state, city, company_name, usdot, tier_label, sms_consent").eq("id", contact.id).single();
+    const shown = f.phone.replace(/^\+?1?(\d{3})(\d{3})(\d{4})$/, "($1) $2-$3");
     await sendTelegram(
-      `${next === "applied" ? "✅ <b>New driver form submitted</b>" : "⚠️ <b>Form submitted, not a fit</b>"}\n` +
-        `<b>${esc(f.first_name)} ${esc(f.last_name)}</b>${full?.state ? ` · ${esc([full.city, full.state].filter(Boolean).join(", "))}` : ""}\n` +
-        `📞 ${esc(f.phone)}${f.email ? `\n✉️ ${esc(f.email)}` : ""}\n\n${esc(f.summary)}` +
-        `${f.flags.length ? `\n\nFlags: ${esc(f.flags.join(", "))}` : ""}\n\n<a href="${siteUrl()}/crm/contacts/${contact.id}">Open in GRL Command</a>`,
+      `${next === "applied" ? "✅ <b>Form filled: " : "⚠️ <b>Form filled, not a fit: "}${esc(f.first_name)} ${esc(f.last_name)}</b>\n` +
+        [full?.company_name, [full?.city, full?.state].filter(Boolean).join(", "), full?.tier_label].filter(Boolean).map((x) => esc(String(x))).join(" · ") +
+        `${full?.usdot ? `\nUSDOT ${esc(String(full.usdot))}` : ""}\n` +
+        `📞 <a href="tel:${esc(f.phone)}">${esc(shown)}</a> (confirmed on the form)${f.email ? `\n✉️ ${esc(f.email)}` : ""}\n\n${esc(f.summary)}\nTexts OK: ${f.sms_consent || full?.sms_consent ? "yes" : "no"}` +
+        `${f.flags.length ? `\n\nFlags: ${esc(f.flags.join(", "))}` : ""}\n\n${next === "applied" ? "Now in Applied. Over to Ken.\n" : ""}<a href="${siteUrl()}/crm/contacts/${contact.id}">Open in GRL Command</a>`,
     );
   } catch (e) {
     console.error("telegram alert", e);

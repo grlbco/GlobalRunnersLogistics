@@ -6,7 +6,7 @@ import { trackFormStep } from "@/app/actions/forms";
 import { AnimatePresence, motion } from "motion/react";
 import { clsx } from "clsx";
 import { submitDriverLead } from "@/app/actions/leads";
-import { SMS_CONSENT_TEXT, type DriverLeadInput } from "@/lib/forms";
+import { SMS_CONSENT_TEXT, US_PHONE, type DriverLeadInput } from "@/lib/forms";
 import { Checkbox, Chips, ErrorText, Honeypot, TextField, useAttribution } from "./fields";
 import { Arrow } from "@/components/ui/Button";
 import { company } from "@/content/facts";
@@ -171,7 +171,7 @@ export function DriverApplyForm({
   const validate = (s: number) => {
     const missing: Record<string, string> = {};
     for (const k of requiredByStep[s]) if (!data[k]) missing[k as string] = L.required;
-    if (s === 0 && data.phone && !/^\+?1?\d{10}$/.test(data.phone.replace(/[^\d+]/g, ""))) missing.phone = locale === "es" ? "Número de EE. UU. válido" : "Enter a valid US phone number";
+    if (s === 0 && data.phone && !US_PHONE.test(data.phone.replace(/[^\d+]/g, ""))) missing.phone = locale === "es" ? "Número de EE. UU. válido" : "Enter a valid US phone number";
     if (s === 0 && data.zip && !/^\d{5}$/.test(data.zip)) missing.zip = "5-digit ZIP";
     setErrors(missing);
     return Object.keys(missing).length === 0;

@@ -46,29 +46,55 @@ export async function pushToInstantly(campaignId: string) {
   return created.id;
 }
 
+/** "MANTECA" → "Manteca"; short all-consonant words (JDF, TRK) stay upper case. */
+export function titleCase(v: string) {
+  return v.trim().split(/\s+/).filter(Boolean).map((w, i) => {
+    if (i > 0 && ["and", "of", "the", "de", "la", "del", "y"].includes(w.toLowerCase())) return w.toLowerCase();
+    if (w.length <= 3 && /^[A-Z0-9&'.-]+$/.test(w) && !/[AEIOU]/.test(w) && w !== "&") return w;
+    return w.toLowerCase().replace(/[a-z]+('[a-z]+)?/g, (m) => m[0].toUpperCase() + m.slice(1));
+  }).join(" ");
+}
+/** "ATI CARRIERS INC" → "Ati Carriers": the company as a driver would say it, for {{companyShort}}. */
+export function shortCompany(v: string | null) {
+  if (!v) return "";
+  const bare = v.trim().replace(/(,?\s+(LLC|L\s?L\s?C|INC|INCORPORATED|CORP|CORPORATION|CO|COMPANY|LTD|LP|L\.L\.C\.|INC\.|CORP\.))+\.?$/i, "").replace(/[\s,.&]+$/, "");
+  return titleCase(bare || v);
+}
+
 /** Adds the next wave of contacts (by tier/state) that aren't in any campaign yet. */
 export async function addWave(campaignId: string, opts: { tiers: number[]; states?: string[]; count: number }) {
   const db = adminDb();
   const { data: c } = await db.from("campaigns").select("instantly_id, leads_added").eq("id", campaignId).single();
   if (!c?.instantly_id) throw new Error("Create the campaign in Instantly first");
-  const { data: taken } = await db.from("campaign_members").select("contact_id");
-  const takenSet = new Set((taken ?? []).map((t) => t.contact_id as string));
-  let q = db
-    .from("contacts")
-    .select("id, email, first_name, last_name, company_name, phone, city, state, tier, usdot")
-    .in("tier", opts.tiers.length ? opts.tiers : [1, 2, 3, 4, 5])
-    .eq("do_not_contact", false)
-    .eq("email_consent", true)
-    .eq("stage", "new")
-    .not("email", "is", null)
-    .order("tier")
-    .order("usdot")
-    .limit(Math.min(opts.count * 2 + 500, 6000));
-  if (opts.states?.length) q = q.in("state", opts.states);
-  const { data: rows } = await q;
+  // Page through candidates (the API returns at most 1,000 rows a call) until the wave is full,
+  // skipping anyone already in a campaign or suppressed.
+  const taken = new Set<string>();
+  for (let from = 0; ; from += 1000) {
+    const { data } = await db.from("campaign_members").select("contact_id").range(from, from + 999);
+    for (const t of data ?? []) taken.add(t.contact_id as string);
+    if (!data || data.length < 1000) break;
+  }
   const { data: suppressed } = await db.from("suppressions").select("value").eq("channel", "email");
   const sup = new Set((suppressed ?? []).map((s) => s.value as string));
-  const pick = (rows ?? []).filter((r) => !takenSet.has(r.id) && !sup.has(r.email!)).slice(0, opts.count);
+  type Row = { id: string; email: string | null; first_name: string | null; last_name: string | null; company_name: string | null; phone: string | null; city: string | null; state: string | null; tier: number | null; usdot: number | null };
+  const pick: Row[] = [];
+  for (let from = 0; pick.length < opts.count; from += 1000) {
+    let q = db
+      .from("contacts")
+      .select("id, email, first_name, last_name, company_name, phone, city, state, tier, usdot")
+      .in("tier", opts.tiers.length ? opts.tiers : [1, 2, 3, 4, 5])
+      .eq("do_not_contact", false)
+      .eq("email_consent", true)
+      .eq("stage", "new")
+      .not("email", "is", null)
+      .order("tier")
+      .order("usdot")
+      .range(from, from + 999);
+    if (opts.states?.length) q = q.in("state", opts.states);
+    const { data: rows } = await q;
+    for (const r of (rows ?? []) as Row[]) if (!taken.has(r.id) && !sup.has(r.email!) && pick.length < opts.count) pick.push(r);
+    if (!rows || rows.length < 1000) break;
+  }
   if (!pick.length) return 0;
   await instantly.addLeads(
     c.instantly_id,
@@ -78,7 +104,7 @@ export async function addWave(campaignId: string, opts: { tiers: number[]; state
       last_name: r.last_name ?? undefined,
       company_name: r.company_name ?? undefined,
       phone: r.phone ?? undefined,
-      custom_variables: { city: r.city ?? "", state: r.state ?? "", tier: String(r.tier ?? ""), usdot: String(r.usdot ?? "") },
+      custom_variables: { city: r.city ?? "", state: r.state ?? "", tier: String(r.tier ?? ""), usdot: String(r.usdot ?? ""), companyShort: shortCompany(r.company_name), cityName: titleCase(r.city ?? "") },
     })),
   );
   for (let i = 0; i < pick.length; i += 1000) {
