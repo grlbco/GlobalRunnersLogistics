@@ -16,7 +16,7 @@ export const faqs: Faq[] = [
   { group: "Hiring", q: "Which areas do you hire from?", a: "We currently hire CDL-A drivers who live in Nevada, mainly the Las Vegas and Henderson area." },
   { group: "Hiring", q: "How long does it take to start?", a: `Orientation is ${hiring.orientationDays} day, and you take your first load the next day.` },
   { group: "Hiring", q: "Do you pay for travel to orientation?", a: "Yes. If you live far from Henderson, we cover travel to orientation." },
-  { group: "Hiring", q: "How fast will someone call me after I apply?", a: "Our recruiter aims to call new applicants within 1 hour during office hours (Pacific Time)." },
+  { group: "Hiring", q: "How fast will someone call me after I apply?", a: "Our recruiter aims to call new applicants within 1 hour during office hours (Central Time)." },
   { group: "Hiring", q: "Do I need to speak perfect English?", a: "No. You need basic English for road signs, DOT and dispatch. Our dispatchers also speak Spanish." },
   { group: "Equipment", q: "What trucks do you run?", a: "We run automatic Peterbilt 579s, Freightliner Cascadias and Kenworth T680s with APU, inverter, fridge and microwave." },
   { group: "Equipment", q: "Are the trucks automatic?", a: "Yes. Every truck in the fleet has an automatic transmission." },

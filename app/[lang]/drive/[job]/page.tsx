@@ -107,7 +107,7 @@ export default async function JobPage({ params }: PageProps<"/[lang]/drive/[job]
             <Reveal>
               <h2 className="h2">How to apply</h2>
               <p className="body-lg mt-6 text-white/70">
-                Fill out the 2-minute application. Our team will call you back — usually within the hour during office hours (Pacific Time). After that you finish your full DOT application online,
+                Fill out the 2-minute application. Our team will call you back — usually within the hour during office hours (Central Time). After that you finish your full DOT application online,
                 come to a {hiring.orientationDays}-day orientation in Henderson, and take your first load the next day.
               </p>
               <Link href={p(routes.applyDriver)} className="mt-8 inline-flex items-center gap-2 text-lg font-medium text-signal hover:text-white">

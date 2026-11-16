@@ -65,7 +65,7 @@ async function List() {
       })}
       <Card className="p-5 lg:col-span-2">
         <p className="font-medium">Daily digest</p>
-        <p className="mt-1 text-sm text-faint">Every morning at 8:00 Pacific, an email to the alert address with replies, completed forms, new applications and open tasks.</p>
+        <p className="mt-1 text-sm text-faint">Every morning at 8:00 Central (Chicago), an email to the alert address with replies, completed forms, new applications and open tasks.</p>
       </Card>
     </div>
   );

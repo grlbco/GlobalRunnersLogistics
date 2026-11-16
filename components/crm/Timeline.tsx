@@ -28,7 +28,7 @@ export function Timeline({ items, oldestFirst = false }: { items: Item[]; oldest
 }
 
 export function TimelineItem({ it }: { it: Item }) {
-  const time = <time className="text-[0.7rem] text-faint">{new Date(it.at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles" })}</time>;
+  const time = <time className="text-[0.7rem] text-faint">{new Date(it.at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Chicago" })}</time>;
   if (it.kind === "message") {
     const inbound = it.direction === "inbound";
     const who = inbound ? "Driver" : it.author === "agent" ? "Assistant" : it.author === "campaign" ? "Campaign" : it.author === "human" ? "You" : "System";

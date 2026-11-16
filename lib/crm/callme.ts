@@ -8,7 +8,7 @@ import { phoneDisplay } from "./format";
 
 /** The team's call window (Settings → Calls). Outside it, "Call me now" becomes "first thing tomorrow". */
 export type CallHours = { start: string; end: string; tz: string; days: number[] };
-const DEFAULT_HOURS: CallHours = { start: "07:00", end: "19:00", tz: "America/Los_Angeles", days: [1, 2, 3, 4, 5, 6] };
+const DEFAULT_HOURS: CallHours = { start: "07:00", end: "19:00", tz: "America/Chicago", days: [1, 2, 3, 4, 5, 6] };
 
 export async function getCallHours(): Promise<CallHours> {
   const { data } = await adminDb().from("app_settings").select("value").eq("key", "calls").maybeSingle();

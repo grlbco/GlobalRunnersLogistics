@@ -12,7 +12,7 @@ const ExternalIcon = () => (
 );
 
 export const when = (iso: string) =>
-  new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles" }) + " PT";
+  new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Chicago" }) + " CT";
 
 /** "Open application" button: always a new window so the profile or board stays where it was. */
 export function OpenApplication({ code, className, label = "Open application" }: { code: string; className?: string; label?: string }) {

@@ -23,7 +23,7 @@ export const company = {
     country: "US",
   },
   yard: { city: "Henderson", region: "NV" },
-  timeZone: "Pacific Time",
+  timeZone: "Central Time",
 } as const;
 
 export const fleet = {

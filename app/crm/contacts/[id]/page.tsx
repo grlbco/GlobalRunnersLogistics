@@ -172,7 +172,7 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
                     <input type="hidden" name="contact_id" value={c.id} />
                     <button aria-label={t.done_at ? "Mark not done" : "Mark done"} className={clsx("mt-0.5 h-4 w-4 shrink-0 rounded-[3px] border", t.done_at ? "border-emerald-400 bg-emerald-50" : "border-line-strong hover:border-fg")} />
                     <span className={clsx("flex-1", t.done_at && "text-ghost line-through")}>{t.title}</span>
-                    {t.due_at && !t.done_at && <span className={clsx("text-xs", new Date(t.due_at) < new Date() ? "text-red-600" : "text-faint")}>{new Date(t.due_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles" })}</span>}
+                    {t.due_at && !t.done_at && <span className={clsx("text-xs", new Date(t.due_at) < new Date() ? "text-red-600" : "text-faint")}>{new Date(t.due_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Chicago" })}</span>}
                   </form>
                 </li>
               ))}
@@ -232,7 +232,7 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
         <Card className="p-4">
           <Label>Upcoming follow-ups</Label>
           {followups.data?.length ? (
-            <ul className="mt-3 space-y-2 text-sm">{followups.data.map((f, i) => <li key={i} className="flex justify-between gap-3"><span className="text-fg-2">{f.reason ?? `Follow-up #${f.attempt}`}</span><span className="text-faint">{new Date(f.due_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles" })}</span></li>)}</ul>
+            <ul className="mt-3 space-y-2 text-sm">{followups.data.map((f, i) => <li key={i} className="flex justify-between gap-3"><span className="text-fg-2">{f.reason ?? `Follow-up #${f.attempt}`}</span><span className="text-faint">{new Date(f.due_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Chicago" })}</span></li>)}</ul>
           ) : <p className="mt-3 text-sm text-faint">None scheduled.</p>}
         </Card>
 

@@ -3,11 +3,11 @@ import { adminDb } from "@/lib/crm/admin";
 import { notifyTeam } from "@/lib/crm/notify";
 import { company } from "@/content/facts";
 
-/** Daily digest at 8:00 Pacific: replies, forms, who needs a call. Sent once per day. */
+/** Daily digest at 8:00 Central (Chicago): replies, forms, who needs a call. Sent once per day. */
 export async function maybeSendDigest() {
   const db = adminDb();
   const now = new Date();
-  const pt = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hour12: false }).formatToParts(now);
+  const pt = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hour12: false }).formatToParts(now);
   const day = `${pt.find((p) => p.type === "year")?.value}-${pt.find((p) => p.type === "month")?.value}-${pt.find((p) => p.type === "day")?.value}`;
   const hour = Number(pt.find((p) => p.type === "hour")?.value);
   const { data: s } = await db.from("app_settings").select("value").eq("key", "digest").maybeSingle();

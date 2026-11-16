@@ -19,7 +19,7 @@ export async function Drafts({ supabase, contactId }: { supabase: SupabaseClient
           <input type="hidden" name="contact_id" value={contactId} />
           <div className="mb-2 flex items-center justify-between text-xs">
             <span className="font-medium text-amber-800">
-              Assistant {d.channel === "sms" ? "text" : "email"} · {d.status === "draft" ? "waiting for your OK" : d.error?.includes("8am") ? "held until 8am in the driver's time zone (texting rules)" : `sends ${new Date(d.send_after).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles" })} PT`}
+              Assistant {d.channel === "sms" ? "text" : "email"} · {d.status === "draft" ? "waiting for your OK" : d.error?.includes("8am") ? "held until 8am in the driver's time zone (texting rules)" : `sends ${new Date(d.send_after).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Chicago" })} CT`}
             </span>
             {d.error && !d.error.includes("8am") && <span className="text-faint">{d.error}</span>}
           </div>

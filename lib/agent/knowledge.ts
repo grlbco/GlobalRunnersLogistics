@@ -19,7 +19,7 @@ export const OFFER_FACTS = [
   `Orientation: ${hiring.orientationDays} day in Henderson, NV; first load the next day. Travel to orientation paid for drivers who live far away.`,
   `Dispatch: dedicated dispatcher, 24/7, in ${hiring.dispatchLanguages.join(" and ")}.`,
   `Home time: drivers can take the truck home. The exact home-time schedule is not confirmed in writing, our team goes over it on the call.`,
-  `Someone from our team calls drivers, usually within the hour during the day (Pacific time). Company phone: ${company.phone.vanity} (${company.phone.display}).`,
+  `Someone from our team calls drivers, usually within the hour during the day (Central time). Company phone: ${company.phone.vanity} (${company.phone.display}).`,
 ].join("\n");
 
 /** Numbers the assistant may write (from the facts above), plus small everyday numbers. */

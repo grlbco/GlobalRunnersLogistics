@@ -121,7 +121,7 @@ export const guides: Guide[] = [
         h2: "From application to orientation",
         list: [
           "Apply online in about 2 minutes.",
-          "Our recruiter calls you back — usually within the hour during office hours (Pacific Time).",
+          "Our recruiter calls you back — usually within the hour during office hours (Central Time).",
           "Finish your full DOT employment application in your driver account.",
           "Complete the standard pre-hire steps (such as background check, driving record review and drug test).",
           "Come to orientation in Henderson, NV.",
