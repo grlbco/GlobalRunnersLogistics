@@ -35,6 +35,13 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url, 308);
   }
 
+  // Personal form links (/a/<code>) live outside the locale tree: no rewrite, never indexed.
+  if (pathname.startsWith("/a/")) {
+    const response = NextResponse.next({ request });
+    response.headers.set("X-Robots-Tag", "noindex, nofollow");
+    return response;
+  }
+
   // Staff CRM lives outside the locale tree: no rewrite, fresh session, must be signed in.
   if (pathname === "/crm" || pathname.startsWith("/crm/")) {
     const response = NextResponse.next({ request });

@@ -29,6 +29,20 @@ export function inQuietHours(tz: string | null, at = new Date()) {
   return hour < 8 || hour >= 21;
 }
 
+/** "Re: x" for any subject, never "Re: Re: x". */
+export const reSubject = (s: string) => `Re: ${s.replace(/^\s*((re|fwd?)\s*:\s*)+/i, "").trim()}`;
+
+/** Subject of the first email in this driver's conversation (the campaign's opener), without "Re:". */
+async function threadSubject(contactId: string): Promise<string | null> {
+  const { data } = await adminDb()
+    .from("messages")
+    .select("subject")
+    .eq("contact_id", contactId).eq("channel", "email").not("subject", "is", null).neq("subject", "")
+    .order("created_at", { ascending: true }).limit(1).maybeSingle();
+  const s = (data?.subject ?? "").replace(/^\s*((re|fwd?)\s*:\s*)+/i, "").trim();
+  return s || null;
+}
+
 export type SendOutcome = { ok: true; messageId: string | null } | { ok: false; reason: string; retry?: boolean };
 
 async function sendOne(row: Row): Promise<SendOutcome> {
@@ -51,6 +65,9 @@ async function sendOne(row: Row): Promise<SendOutcome> {
 
   if (!c.email_consent) return { ok: false, reason: "Email is off for this contact (unsubscribed)" };
   if (await isSuppressed("email", c.email)) return { ok: false, reason: "Email is on the opt-out list" };
+  // Gmail and Outlook split a conversation when the subject changes, so every email
+  // we send to a driver reuses the subject of the first email in the conversation.
+  const rootSubject = await threadSubject(c.id);
   // Replies go in the existing Instantly thread from the inbox that's talking to the driver.
   const { data: last } = await db
     .from("messages")
@@ -68,13 +85,14 @@ async function sendOne(row: Row): Promise<SendOutcome> {
     const { data: src } = await db.from("contacts").select("source").eq("id", c.id).single();
     if (!engaged && (!src?.source || src.source === "toss_import" || src.source === "manual")) return { ok: false, reason: "Never wrote to us: cold leads get email only through an Instantly campaign" };
     const { data: prev } = await db.from("messages").select("subject").eq("contact_id", c.id).eq("channel", "email").not("subject", "is", null).order("created_at", { ascending: false }).limit(1).maybeSingle();
-    const subject = row.subject ?? (prev?.subject ? (/^re:/i.test(prev.subject) ? prev.subject : `Re: ${prev.subject}`) : "Driving with Global Runners");
+    const subject = rootSubject ? reSubject(rootSubject) : row.subject ?? (prev?.subject ? reSubject(prev.subject) : "Driving with Global Runners");
     const r = await sendDirectEmail({ to: c.email, subject, text: row.body });
     const messageId = await recordMessage({ contactId: c.id, channel: "email", direction: "outbound", author: row.author === "workflow" ? "system" : row.author, authorId: row.author_id, subject, body: row.body, externalId: r.id ? `resend:${r.id}` : null, meta: { via: "resend" }, status: "sent" });
     return { ok: true, messageId };
   }
-  const r = await instantly.replyToEmail({ eaccount, replyToUuid: last.external_id, subject: row.subject ?? last.subject ?? "Driving with Global Runners", text: row.body });
-  const messageId = await recordMessage({ contactId: c.id, channel: "email", direction: "outbound", author: row.author === "workflow" ? "system" : row.author, authorId: row.author_id, subject: row.subject ?? last.subject, body: row.body, externalId: r.id ?? null, meta: { eaccount }, status: "sent" });
+  const subject = reSubject(rootSubject ?? last.subject ?? row.subject ?? "Driving with Global Runners");
+  const r = await instantly.replyToEmail({ eaccount, replyToUuid: last.external_id, subject, text: row.body });
+  const messageId = await recordMessage({ contactId: c.id, channel: "email", direction: "outbound", author: row.author === "workflow" ? "system" : row.author, authorId: row.author_id, subject, body: row.body, externalId: r.id ?? null, meta: { eaccount }, status: "sent" });
   return { ok: true, messageId };
 }
 

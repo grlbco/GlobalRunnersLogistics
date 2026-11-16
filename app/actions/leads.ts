@@ -35,6 +35,8 @@ async function requestMeta() {
   };
 }
 
+const cap = (v: string) => v.charAt(0).toUpperCase() + v.slice(1);
+const yn = (v?: string) => (v === "yes" ? "Yes" : v === "no" ? "No" : "—");
 const yes = (v?: string) => (v === undefined ? null : v === "yes");
 
 export async function submitDriverLead(input: DriverLeadInput): Promise<ActionResult> {
@@ -119,6 +121,26 @@ export async function submitDriverLead(input: DriverLeadInput): Promise<ActionRe
       sms_consent: d.sms_consent,
       driverLeadId: lead?.id ?? null,
       flags,
+      answers: [
+        { label: "Name", value: name },
+        { label: "Mobile phone", value: phone },
+        { label: "Email", value: d.email || "—" },
+        { label: "ZIP", value: d.zip || "—" },
+        { label: "How they want to drive", value: cap(d.driver_type) },
+        { label: "Runs", value: d.run_types.length ? d.run_types.map((r) => (r === "otr" ? "OTR" : cap(r))).join(", ") : "—" },
+        ...(d.driver_type !== "solo" ? [{ label: "Has a team partner", value: yn(d.has_team_partner) }] : []),
+        { label: "Valid CDL-A", value: yn(d.has_cdl_a) },
+        { label: "CDL-A experience", value: exp },
+        { label: "Endorsements", value: d.endorsements.filter((e) => e !== "none").map((e) => (e === "twic" ? "TWIC" : cap(e))).join(", ") || "None" },
+        { label: "Moving violations (3 yrs)", value: d.moving_violations === "4plus" ? "4+" : d.moving_violations },
+        { label: "Accidents (3 yrs)", value: d.accidents === "2plus" ? "2+" : d.accidents },
+        { label: "Ever had a DUI", value: yn(d.dui) },
+        { label: "Failed/refused drug test or SAP", value: yn(d.drug_test_issue) },
+        { label: "21 or older", value: yn(d.over_21) },
+        { label: "Authorized to work in the U.S.", value: yn(d.work_authorized) },
+        { label: "OK to text", value: d.sms_consent ? "Yes" : "No" },
+        { label: "Language", value: d.locale === "es" ? "Spanish" : "English" },
+      ],
       summary: [
         `Type: ${d.driver_type}${d.run_types.length ? ` (${d.run_types.join(", ")})` : ""}`,
         `CDL-A: ${d.has_cdl_a} · Experience: ${exp}`,
@@ -171,13 +193,11 @@ export async function submitDriverLead(input: DriverLeadInput): Promise<ActionRe
     d.email
       ? sendEmail(
           d.email,
-          d.locale === "es" ? "Recibimos tu aplicación — Global Runners Logistics" : "We got your application — Global Runners Logistics",
-          `<p style="font:15px system-ui">${d.locale === "es" ? "Hola" : "Hi"} ${d.first_name},</p><p style="font:15px system-ui">${
-            d.locale === "es"
-              ? `Gracias por aplicar. Te llamaremos pronto desde ${company.phone.display}. Mientras tanto, puedes crear tu cuenta en globalrunnerslogistics.com/es/register para terminar tu aplicación completa.`
-              : `Thanks for applying. We'll call you shortly from ${company.phone.display}. In the meantime you can create your account at globalrunnerslogistics.com/register to finish your full application.`
-          }</p><p style="font:15px system-ui">— Global Runners Logistics</p>`,
-          d.locale === "es" ? "Gracias por aplicar. Te llamaremos pronto." : "Thanks for applying. We'll call you shortly.",
+          d.locale === "es" ? "Recibimos tu aplicación, Global Runners Logistics" : "We got your application, Global Runners Logistics",
+          confirmationHtml(d.locale, d.first_name),
+          d.locale === "es"
+            ? `Hola ${d.first_name}, recibimos tu aplicación. Nuestro equipo te llamará pronto desde ${company.phone.display}.`
+            : `Hi ${d.first_name}, we got your application. Our hiring team will call you shortly from ${company.phone.display}.`,
         )
       : Promise.resolve(),
   ]);
@@ -295,4 +315,23 @@ export async function submitContact(input: ContactInput): Promise<ActionResult> 
     ],
   });
   return { ok: true };
+}
+
+/** Confirmation email after a driver applies: what happens next, nothing else to do. */
+function confirmationHtml(locale: "en" | "es", firstName: string) {
+  const es = locale === "es";
+  const f = "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+  const steps = es
+    ? ["Revisamos tu aplicación.", `Te llamamos desde ${company.phone.display} para hablar de la ruta y el pago.`, "Orientación de 1 día en Henderson, NV, con tu viaje pagado."]
+    : ["We review your application.", `We call you from ${company.phone.display} to talk lanes and pay.`, "1-day orientation in Henderson, NV, with your travel covered."];
+  const li = steps
+    .map((t, i) => `<tr><td style="${f};padding:6px 12px 6px 0;vertical-align:top;color:#e8401c;font-weight:700;font-size:15px">${i + 1}</td><td style="${f};padding:6px 0;font-size:15px;color:#1a1a1a">${t}</td></tr>`)
+    .join("");
+  return `<div style="background:#f4f5f7;padding:24px 12px"><table role="presentation" width="100%" style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:10px" cellpadding="0" cellspacing="0"><tr><td style="padding:28px 28px 8px">
+<p style="${f};margin:0 0 4px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:#6b7280">Global Runners Logistics</p>
+<p style="${f};margin:0 0 16px;font-size:22px;font-weight:700;color:#0a1220">${es ? `¡Listo, ${firstName}!` : `You're all set, ${firstName}.`}</p>
+<p style="${f};margin:0 0 16px;font-size:15px;line-height:1.5;color:#1a1a1a">${es ? "Recibimos tu aplicación. No tienes que hacer nada más. Esto es lo que sigue:" : "We got your application. There's nothing else you need to do. Here's what happens next:"}</p>
+<table role="presentation" cellpadding="0" cellspacing="0">${li}</table>
+<p style="${f};margin:20px 0 0;font-size:15px;line-height:1.5;color:#1a1a1a">${es ? "¿Prefieres llamar tú? Llámanos o escríbenos al" : "Rather call us first? Call or text"} <a href="tel:${company.phone.e164}" style="color:#e8401c;font-weight:600;text-decoration:none">${company.phone.display}</a>.</p>
+</td></tr><tr><td style="padding:20px 28px 28px"><p style="${f};margin:0;font-size:13px;color:#6b7280">${es ? "Equipo de contratación" : "Hiring team"}, Global Runners Logistics<br/>732 S 6th St, Ste V, Las Vegas, NV 89101</p></td></tr></table></div>`;
 }

@@ -60,7 +60,7 @@ async function run() {
   const runs = await processAgentQueue(5);
   const { data: out } = await db.from("outbox").select("channel, body, status, send_after").eq("contact_id", c0.id).eq("author", "agent").in("status", ["pending", "sent"]).order("created_at", { ascending: false }).limit(3);
   check("assistant replied", runs.some((x) => x.contactId === c0.id && x.action === "replied"), runs);
-  check("reply includes the driver application link", (out ?? []).some((o) => o.body.includes("/apply/driver?t=")), out);
+  check("reply includes the driver application link", (out ?? []).some((o) => /\/a\/[A-Za-z0-9]{6}/.test(o.body)), out);
   const { data: f } = await db.from("followups").select("kind, attempt, due_at").eq("contact_id", c0.id).eq("status", "pending");
   check("application chase planned", (f ?? []).some((x) => x.kind === "chase"), f);
   check("Telegram alert", !!process.env.TELEGRAM_BOT_TOKEN && !!process.env.TELEGRAM_CHAT_ID, process.env.TELEGRAM_BOT_TOKEN ? "configured" : "not configured yet");

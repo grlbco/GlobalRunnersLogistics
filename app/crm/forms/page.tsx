@@ -4,8 +4,10 @@ import { clsx } from "clsx";
 import { requireStaff } from "@/lib/crm/auth";
 import { ago, n } from "@/lib/crm/format";
 import { TEMPLATES } from "@/lib/formbuilder/schema";
-import { Card, Label, PageHead, Skeleton, btnCls, btnGhostCls } from "@/components/crm/ui";
+import { Card, Label, PageHead, Skeleton, StageBadge, btnCls, btnGhostCls } from "@/components/crm/ui";
 import { createForm } from "./actions";
+import { recentApplications } from "@/lib/crm/applications";
+import { ApplicationRow } from "@/components/crm/Application";
 
 export const metadata = { title: "Forms" };
 
@@ -33,11 +35,15 @@ const STATUS: Record<string, string> = { draft: "bg-hover text-muted", published
 
 async function List() {
   const { supabase } = await requireStaff("/crm/forms", "forms.view");
-  const [{ data: forms }, { data: subs }, { data: links }] = await Promise.all([
+  const [{ data: forms }, { data: subs }, { data: links }, apps] = await Promise.all([
     supabase.from("crm_forms").select("id, name, slug, status, updated_at").order("created_at", { ascending: false }),
     supabase.from("crm_form_submissions").select("form_id, created_at").order("created_at", { ascending: false }).limit(5000),
     supabase.from("form_links").select("sent_at, opened_at, completed_at").limit(20000),
+    recentApplications(supabase, 50),
   ]);
+  const ids = [...new Set(apps.map((a) => a.contactId))];
+  const { data: stages } = ids.length ? await supabase.from("contacts").select("id, stage").in("id", ids) : { data: [] };
+  const stageOf = new Map((stages ?? []).map((x) => [x.id, x.stage as string]));
   const count = (id: string) => (subs ?? []).filter((s) => s.form_id === id).length;
   const lastAt = (id: string) => (subs ?? []).find((s) => s.form_id === id)?.created_at;
   const sent = (links ?? []).filter((l) => l.sent_at).length;
@@ -49,7 +55,7 @@ async function List() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="font-medium">Driver application <span className="ml-2 rounded-full bg-hover px-2 py-0.5 text-[0.7rem] text-muted">built in</span></p>
-            <p className="mt-1 text-sm text-faint">The 2-minute application at /apply/driver. The assistant sends each driver a personal link and chases it until it&apos;s done.</p>
+            <p className="mt-1 text-sm text-faint">The 2-minute application. The assistant sends each driver a short personal link (globalrunnerslogistics.com/a/…) and chases it until it&apos;s done.</p>
           </div>
           <div className="flex gap-6 text-sm tabular-nums">
             <span><span className="text-faint">Sent</span> {n(sent)}</span>
@@ -58,6 +64,22 @@ async function List() {
           </div>
         </div>
       </Card>
+
+      <div>
+        <div className="flex items-baseline justify-between gap-3">
+          <Label>Submitted forms</Label>
+          <span className="text-xs text-faint">Latest {apps.length} driver applications · opens in a new window</span>
+        </div>
+        {apps.length ? (
+          <Card className="mt-3 divide-y divide-line">
+            {apps.map((a) => (
+              <ApplicationRow key={a.code} app={a} stage={stageOf.get(a.contactId) ? <StageBadge stage={stageOf.get(a.contactId)!} /> : null} />
+            ))}
+          </Card>
+        ) : (
+          <p className="mt-3 text-sm text-faint">No applications yet. They show up here the moment a driver submits.</p>
+        )}
+      </div>
 
       <div>
         <Label>Your forms</Label>

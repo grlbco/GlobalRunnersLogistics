@@ -22,6 +22,17 @@ export async function prefillForToken(token?: string | null): Promise<Prefill | 
   };
 }
 
+const CODE = /^[A-Za-z0-9]{6,10}$/;
+
+/** Short link /a/<code> → the personal token behind it, plus prefill. Null if unknown. */
+export async function linkForCode(code?: string | null): Promise<{ token: string; prefill: Prefill; completed: boolean } | null> {
+  if (!code || !CODE.test(code)) return null;
+  const { data } = await adminDb().from("form_links").select("token, completed_at").eq("code", code).maybeSingle();
+  if (!data) return null;
+  const prefill = await prefillForToken(data.token);
+  return prefill ? { token: data.token, prefill, completed: !!data.completed_at } : null;
+}
+
 export async function trackStep(token: string, step: number) {
   if (!TOKEN.test(token)) return;
   const db = adminDb();
@@ -43,6 +54,8 @@ export type Completion = {
   token?: string | null;
   first_name: string; last_name: string; phone: string; email?: string | null; zip?: string | null;
   sms_consent: boolean; driverLeadId?: string | null; summary: string; flags: string[];
+  /** Every answer as label → value, in form order. Shown in the CRM as the submitted form. */
+  answers?: { label: string; value: string }[];
 };
 
 /** A submitted driver form: link to (or create) the contact, move to Applied, stop follow-ups, task for Ken. */
@@ -81,8 +94,11 @@ export async function completeForm(f: Completion): Promise<string | null> {
   await moveStage(contact, next, "website", patch);
 
   const now = new Date().toISOString();
-  if (token) await db.from("form_links").update({ completed_at: now, step_reached: 5 }).eq("token", token);
-  else await db.from("form_links").insert({ contact_id: contact.id, opened_at: now, completed_at: now, step_reached: 5 });
+  const answers = f.answers ?? null;
+  const { data: linkRow } = token
+    ? await db.from("form_links").update({ completed_at: now, step_reached: 5, answers }).eq("token", token).select("code").maybeSingle()
+    : await db.from("form_links").insert({ contact_id: contact.id, opened_at: now, completed_at: now, step_reached: 5, answers }).select("code").single();
+  const appCode = (linkRow?.code as string | undefined) ?? null;
 
   await db.from("followups").update({ status: "cancelled" }).eq("contact_id", contact.id).eq("status", "pending");
   await db.from("outbox").update({ status: "cancelled", error: "form completed" }).eq("contact_id", contact.id).eq("author", "agent").in("status", ["draft", "pending"]);
@@ -106,19 +122,50 @@ export async function completeForm(f: Completion): Promise<string | null> {
   }
   await db.from("agent_memory").upsert({ contact_id: contact.id, next_step: next === "applied" ? "Form completed. Waiting for our team's call." : "Form completed, flagged as not a fit.", updated_at: now });
 
-  // Telegram alert to Ken's group
+  // Telegram alert to Ken's group: a card he can act on from his phone.
   try {
-    const { sendTelegram, esc } = await import("@/lib/integrations/telegram");
+    const { sendTelegram, esc, DIVIDER } = await import("@/lib/integrations/telegram");
     const { siteUrl } = await import("@/lib/site");
+    const { isConcern } = await import("@/lib/crm/applications");
     const { data: full } = await db.from("contacts").select("state, city, company_name, usdot, tier_label, sms_consent").eq("id", contact.id).single();
     const shown = f.phone.replace(/^\+?1?(\d{3})(\d{3})(\d{4})$/, "($1) $2-$3");
-    await sendTelegram(
-      `${next === "applied" ? "✅ <b>Form filled: " : "⚠️ <b>Form filled, not a fit: "}${esc(f.first_name)} ${esc(f.last_name)}</b>\n` +
-        [full?.company_name, [full?.city, full?.state].filter(Boolean).join(", "), full?.tier_label].filter(Boolean).map((x) => esc(String(x))).join(" · ") +
-        `${full?.usdot ? `\nUSDOT ${esc(String(full.usdot))}` : ""}\n` +
-        `📞 <a href="tel:${esc(f.phone)}">${esc(shown)}</a> (confirmed on the form)${f.email ? `\n✉️ ${esc(f.email)}` : ""}\n\n${esc(f.summary)}\nTexts OK: ${f.sms_consent || full?.sms_consent ? "yes" : "no"}` +
-        `${f.flags.length ? `\n\nFlags: ${esc(f.flags.join(", "))}` : ""}\n\n${next === "applied" ? "Now in Applied. Over to Ken.\n" : ""}<a href="${siteUrl()}/crm/contacts/${contact.id}">Open in GRL Command</a>`,
-    );
+    const A = new Map((f.answers ?? []).map((x) => [x.label, x.value]));
+    const v = (k: string) => A.get(k) ?? "—";
+    const concerns = (f.answers ?? []).filter(isConcern).map((x) => `${x.label}: ${x.value}`);
+    const place = [full?.city, full?.state].filter(Boolean).join(", ");
+    const row = (label: string, value: string) => `<b>${esc(label)}</b>  ${esc(value)}`;
+    const ok = next === "applied" && concerns.length === 0;
+    const lines = [
+      next === "applied" ? `✅ <b>APPLICATION IN</b> · ${ok ? "ready for a call" : "check before calling"}` : "⛔ <b>APPLICATION IN</b> · not a fit",
+      DIVIDER,
+      `👤 <b>${esc(f.first_name)} ${esc(f.last_name)}</b>`,
+      `📞 <a href="tel:${esc(f.phone)}">${esc(shown)}</a>  <i>confirmed on the form</i>`,
+      f.email ? `✉️ ${esc(f.email)}` : null,
+      full?.company_name ? `🚛 ${esc(full.company_name)}${full.usdot ? ` · USDOT ${esc(String(full.usdot))}` : ""}` : null,
+      place || full?.tier_label ? `📍 ${esc([place, full?.tier_label ? `Tier ${full.tier_label}` : null].filter(Boolean).join(" · "))}` : null,
+      "",
+      A.size
+        ? [
+            row("Drives", [v("How they want to drive"), v("Runs")].filter((x) => x !== "—").join(" · ")),
+            row("CDL-A", `${v("Valid CDL-A")} · ${v("CDL-A experience")}`),
+            row("Endorsements", v("Endorsements")),
+            row("Record", `${v("Moving violations (3 yrs)")} violations · ${v("Accidents (3 yrs)")} accidents · DUI ${v("Ever had a DUI").toLowerCase()}`),
+            row("Drug test issue", v("Failed/refused drug test or SAP")),
+            row("21+ / US work auth", `${v("21 or older")} / ${v("Authorized to work in the U.S.")}`),
+            row("Texts OK", f.sms_consent || full?.sms_consent ? "Yes" : "No"),
+          ].join("\n")
+        : esc(f.summary),
+      concerns.length ? `\n⚠️ <b>Check:</b> ${esc(concerns.join(" · "))}` : null,
+      "",
+      next === "applied" ? "➡️ Moved to <b>Applied</b>. Over to Ken: call task due in 1 hour." : "➡️ Moved to <b>Not a fit</b>.",
+    ].filter((x) => x !== null) as string[];
+    const buttons = [
+      [
+        ...(appCode ? [{ text: "📄 Application", url: `${siteUrl()}/crm/applications/${appCode}` }] : []),
+        { text: "👤 Profile", url: `${siteUrl()}/crm/contacts/${contact.id}` },
+      ],
+    ];
+    await sendTelegram(lines.join("\n"), buttons);
   } catch (e) {
     console.error("telegram alert", e);
   }

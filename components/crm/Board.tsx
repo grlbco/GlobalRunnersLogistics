@@ -9,11 +9,13 @@ import { stageTone, toneDot } from "@/lib/crm/stages";
 import { Avatar } from "./ui";
 import { EASE } from "./motion";
 
-type Card = { id: string; name: string; company: string | null; place: string; when: string; email: string | null; phone: string | null; tier: number | null };
+type Card = { id: string; name: string; company: string | null; place: string; when: string; email: string | null; phone: string | null; tier: number | null; application?: string | null };
 type Col = { stage: string; label: string; count: number; items: Card[] };
 
 const MailIcon = () => <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M4 6h16v12H4zM4 7l8 6 8-6" /></svg>;
 const PhoneIcon = () => <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M6.5 4h3l1.5 4-2 1.2a10 10 0 0 0 5.8 5.8L16 13l4 1.5v3A2 2 0 0 1 18 19.5 15.5 15.5 0 0 1 4.5 6 2 2 0 0 1 6.5 4z" /></svg>;
+
+const FormIcon = () => <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M7 3h7l4 4v14H7zM14 3v4h4M10 12h5M10 16h5" /></svg>;
 
 /** Kanban with native drag and drop; moves are optimistic and saved as stage changes. */
 export function Board({ columns }: { columns: Col[] }) {
@@ -80,9 +82,9 @@ export function Board({ columns }: { columns: Col[] }) {
                       setDragging(c.id);
                     }}
                     onDragEnd={() => setDragging(null)}
-                    className="cursor-grab active:cursor-grabbing"
+                    className="relative cursor-grab active:cursor-grabbing"
                   >
-                  <Link href={`/crm/contacts/${c.id}`} draggable={false} className="group block rounded-[12px] border border-line bg-subtle p-3 transition-[border-color,transform,background-color] duration-150 hover:-translate-y-px hover:border-line-strong hover:bg-surface">
+                  <Link href={`/crm/contacts/${c.id}`} draggable={false} className={clsx("group block rounded-[12px] border border-line bg-subtle p-3 transition-[border-color,transform,background-color] duration-150 hover:-translate-y-px hover:border-line-strong hover:bg-surface", c.application && "pb-12")}>
                     <div className="flex items-start gap-2.5">
                       <Avatar name={c.name} className="h-7 w-7 text-[0.65rem]" />
                       <div className="min-w-0 flex-1">
@@ -99,6 +101,19 @@ export function Board({ columns }: { columns: Col[] }) {
                       </div>
                     )}
                   </Link>
+                  {c.application && (
+                    <a
+                      href={`/crm/applications/${c.application}`}
+                      target="_blank"
+                      rel="noopener"
+                      draggable={false}
+                      title="Open the submitted application in a new window"
+                      className="absolute inset-x-3 bottom-2.5 flex h-7 items-center justify-center gap-1.5 rounded-[8px] border border-line bg-surface text-[0.75rem] font-medium text-fg-2 transition-colors hover:border-fg hover:text-fg"
+                    >
+                      <FormIcon /> Application
+                      <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><path d="M14 4h6v6M20 4l-9 9" /></svg>
+                    </a>
+                  )}
                   </div>
                 </motion.li>
               ))}

@@ -28,6 +28,12 @@ async function Data() {
         .eq("stage", stage)
         .order("stage_changed_at", { ascending: false })
         .limit(50);
+      const ids = (data ?? []).map((c) => c.id);
+      const { data: apps } = ids.length
+        ? await supabase.from("form_links").select("contact_id, code, completed_at").in("contact_id", ids).not("completed_at", "is", null).order("completed_at", { ascending: false })
+        : { data: [] };
+      const appOf = new Map<string, string>();
+      for (const a of apps ?? []) if (!appOf.has(a.contact_id)) appOf.set(a.contact_id, a.code);
       return {
         stage,
         label: stageLabel(stage),
@@ -41,6 +47,7 @@ async function Data() {
           email: c.email,
           phone: c.phone ? phoneDisplay(c.phone) : null,
           tier: c.tier,
+          application: appOf.get(c.id) ?? null,
         })),
       };
     }),

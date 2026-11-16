@@ -108,7 +108,7 @@ export function buildMessages(p: PromptCtx): ChatMsg[] {
   const card = `ABOUT THIS DRIVER
 Name: ${p.name}${p.city || p.state ? ` · ${[p.city, p.state].filter(Boolean).join(", ")}` : ""}${p.localTime ? ` · their local time ${p.localTime}` : ""}
 Stage: ${p.stage} · Text consent: ${p.smsConsent ? "yes" : "no"}
-Form link: ${p.formUrl}
+Form link: ${p.formUrl} (paste it exactly like this, on its own, don't add https:// or change it)
 Form status: ${p.form.completed ? "COMPLETED" : p.form.opened ? `opened, stopped at step ${p.form.step}` : p.form.sent ? "link sent, not opened" : "not sent yet"}
 What we know: ${JSON.stringify(p.memory.facts)}
 Summary so far: ${p.memory.summary ?? "(first conversation)"}

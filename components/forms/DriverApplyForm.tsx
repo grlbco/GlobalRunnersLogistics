@@ -13,6 +13,7 @@ import { company } from "@/content/facts";
 import { CallMeNow } from "./CallMeNow";
 import type { Locale } from "@/lib/i18n";
 
+type StepId = "you" | "job" | "exp" | "rec" | "rec1" | "rec2" | "send";
 type State = Partial<DriverLeadInput> & { endorsements: NonNullable<DriverLeadInput["endorsements"]>; run_types: NonNullable<DriverLeadInput["run_types"]> };
 
 const t = {
@@ -66,6 +67,8 @@ const t = {
     doneTitle: "Application received.",
     doneSub: (name: string) => `Thanks, ${name}. Our team will call you from ${company.phone.vanity} (${company.phone.display}) — usually within the hour during office hours (Pacific Time).`,
     doneNext: "Want to speed things up? Create your driver account and start your full application.",
+    doneNothing: "That's it. There's nothing else you need to do.",
+    stepOf: (a: number, b: number) => `Step ${a} of ${b}`,
     register: "Create my account",
     home: "Back to home",
   },
@@ -119,6 +122,8 @@ const t = {
     doneTitle: "Aplicación recibida.",
     doneSub: (name: string) => `Gracias, ${name}. Nuestro equipo te llamará desde el ${company.phone.vanity} (${company.phone.display}), normalmente en menos de una hora en horario de oficina (hora del Pacífico).`,
     doneNext: "¿Quieres avanzar más rápido? Crea tu cuenta de chofer y empieza tu aplicación completa.",
+    doneNothing: "Eso es todo. No tienes que hacer nada más.",
+    stepOf: (a: number, b: number) => `Paso ${a} de ${b}`,
     register: "Crear mi cuenta",
     home: "Volver al inicio",
   },
@@ -129,13 +134,20 @@ export function DriverApplyForm({
   paths,
   token,
   prefill,
+  compact = false,
 }: {
   locale: Locale;
   paths: { register: string; home: string; privacy: string; sms: string };
   token?: string;
   prefill?: { first_name?: string; last_name?: string; phone?: string; email?: string } | null;
+  /** Personal short link (/a/<code>): full-screen, every step fits the screen, no site chrome. */
+  compact?: boolean;
 }) {
   const L = t[locale];
+  // compact splits the 6 record questions over two screens so each one fits a phone without scrolling
+  const ids = (compact ? ["you", "job", "exp", "rec1", "rec2", "send"] : ["you", "job", "exp", "rec", "send"]) as StepId[];
+  const last = ids.length - 1;
+  const stepLabels = compact ? [L.steps[0], L.steps[1], L.steps[2], L.steps[3], L.steps[3], L.steps[4]] : [...L.steps];
   const getAttr = useAttribution();
   const [step, setStep] = useState(0);
   const [data, setData] = useState<State>({ endorsements: [], run_types: [], sms_consent: false, locale, ...(prefill ?? {}) });
@@ -160,13 +172,17 @@ export function DriverApplyForm({
     { value: "no", label: L.no },
   ] as const;
 
-  const requiredByStep: (keyof State)[][] = [
-    ["first_name", "last_name", "phone"],
-    ["driver_type"],
-    ["has_cdl_a", "experience"],
-    ["moving_violations", "accidents", "dui", "drug_test_issue", "work_authorized", "over_21"],
-    [],
-  ];
+  const requiredById: Record<StepId, (keyof State)[]> = {
+    you: ["first_name", "last_name", "phone"],
+    job: ["driver_type"],
+    exp: ["has_cdl_a", "experience"],
+    rec: ["moving_violations", "accidents", "dui", "drug_test_issue", "work_authorized", "over_21"],
+    rec1: ["moving_violations", "accidents", "dui"],
+    rec2: ["over_21", "drug_test_issue", "work_authorized"],
+    send: [],
+  };
+  const requiredByStep = ids.map((id) => requiredById[id]);
+  const id = ids[step];
 
   const validate = (s: number) => {
     const missing: Record<string, string> = {};
@@ -177,7 +193,7 @@ export function DriverApplyForm({
     return Object.keys(missing).length === 0;
   };
 
-  const next = () => validate(step) && setStep((s) => Math.min(s + 1, 4));
+  const next = () => validate(step) && setStep((s) => Math.min(s + 1, last));
   const back = () => setStep((s) => Math.max(s - 1, 0));
 
   const softFlag =
@@ -195,7 +211,7 @@ export function DriverApplyForm({
       const res = await submitDriverLead({ ...(data as DriverLeadInput), ...(token ? { t: token } : {}), company_website: hp, ...getAttr() });
       if (res.ok) {
         setDone(true);
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        if (!compact) window.scrollTo({ top: 0, behavior: "smooth" });
       } else {
         setServerError(res.error);
         if (res.fieldErrors) {
@@ -206,6 +222,22 @@ export function DriverApplyForm({
       }
     });
   };
+
+  if (done && compact) {
+    return (
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="flex h-full flex-col items-center justify-center text-center">
+        <span className="flex h-16 w-16 items-center justify-center rounded-full bg-signal">
+          <svg viewBox="0 0 24 24" className="h-8 w-8" fill="none">
+            <path d="M5 12.5l4.5 4.5L19 7.5" stroke="white" strokeWidth="2" />
+          </svg>
+        </span>
+        <h2 className="mt-6 text-[1.75rem] font-semibold tracking-[-0.02em]">{L.doneTitle}</h2>
+        <p className="mt-3 max-w-sm text-white/70">{L.doneSub(data.first_name ?? "")}</p>
+        <p className="mt-6 max-w-sm text-sm text-white/50">{L.doneNothing}</p>
+        <div className="mt-6 w-full max-w-sm"><CallMeNow token={token ?? null} phone={data.phone ?? null} name={[data.first_name, data.last_name].filter(Boolean).join(" ")} source="application" locale={locale === "es" ? "es" : "en"} /></div>
+      </motion.div>
+    );
+  }
 
   if (done) {
     return (
@@ -232,20 +264,32 @@ export function DriverApplyForm({
   }
 
   return (
-    <div className="relative">
+    <div className={clsx("relative", compact && "flex h-full flex-col")}>
       <Honeypot value={hp} onChange={setHp} />
       {/* progress */}
-      <ol className="mb-10 grid grid-cols-5 gap-2" aria-label="Progress">
-        {L.steps.map((s, i) => (
-          <li key={s} className="flex flex-col gap-2">
-            <span className={clsx("h-[3px] w-full transition-colors duration-500", i <= step ? "bg-signal" : "bg-white/15")} />
-            <span className={clsx("label hidden sm:block", i === step ? "text-white" : "text-white/40")}>
-              0{i + 1} {s}
-            </span>
-          </li>
-        ))}
-      </ol>
+      {compact ? (
+        <div className="shrink-0">
+          <div className="flex gap-1.5" aria-hidden>
+            {ids.map((x, i) => (
+              <span key={x} className={clsx("h-[3px] flex-1 rounded-full transition-colors duration-500", i <= step ? "bg-signal" : "bg-white/15")} />
+            ))}
+          </div>
+          <p className="label mt-2 text-white/50" aria-live="polite">{L.stepOf(step + 1, ids.length)} · {stepLabels[step]}</p>
+        </div>
+      ) : (
+        <ol className="mb-10 grid grid-cols-5 gap-2" aria-label="Progress">
+          {L.steps.map((s, i) => (
+            <li key={s} className="flex flex-col gap-2">
+              <span className={clsx("h-[3px] w-full transition-colors duration-500", i <= step ? "bg-signal" : "bg-white/15")} />
+              <span className={clsx("label hidden sm:block", i === step ? "text-white" : "text-white/40")}>
+                0{i + 1} {s}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
 
+      <div className={clsx(compact && "flex min-h-0 flex-1 flex-col justify-center overflow-y-auto py-4")}>
       <AnimatePresence mode="wait">
         <motion.div
           key={step}
@@ -253,15 +297,15 @@ export function DriverApplyForm({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -24 }}
           transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-          className="space-y-8"
+          className={compact ? "space-y-5" : "space-y-8"}
         >
-          {step === 0 && !editing && (
+          {id === "you" && !editing && (
             <div className="space-y-6">
               <div>
                 <p className="h3">{L.hi(data.first_name ?? "")}</p>
                 <p className="body-lg mt-2 text-white/70">{L.confirmQ}</p>
               </div>
-              <p className="rounded-[6px] border border-white/15 bg-white/[0.03] px-5 py-5 text-center text-[1.75rem] font-semibold tracking-[-0.02em] tabular-nums sm:text-[2rem]">{data.phone}</p>
+              <p className="rounded-[6px] border border-white/15 bg-white/[0.03] px-5 py-4 text-center text-[1.75rem] font-semibold tracking-[-0.02em] tabular-nums sm:text-[2rem]">{data.phone}</p>
               <div className="grid gap-3">
                 <button type="button" onClick={() => (validate(0) ? setStep(1) : setEditing(true))} className="flex h-14 items-center justify-center gap-2 rounded-[4px] bg-signal text-base font-medium text-white transition-colors hover:bg-signal-ink">
                   {L.yesMine} <Arrow />
@@ -278,9 +322,9 @@ export function DriverApplyForm({
               )}
             </div>
           )}
-          {step === 0 && editing && (
+          {id === "you" && editing && (
             <>
-              <div className="grid gap-6 sm:grid-cols-2">
+              <div className={clsx("grid sm:grid-cols-2", compact ? "grid-cols-2 gap-3" : "gap-6")}>
                 <TextField label={L.first} name="first_name" autoComplete="given-name" value={data.first_name ?? ""} onChange={(e) => set("first_name", e.target.value)} error={errors.first_name} />
                 <TextField label={L.last} name="last_name" autoComplete="family-name" value={data.last_name ?? ""} onChange={(e) => set("last_name", e.target.value)} error={errors.last_name} />
               </div>
@@ -294,44 +338,58 @@ export function DriverApplyForm({
             </>
           )}
 
-          {step === 1 && (
+          {id === "job" && (
             <>
-              <Chips legend={L.driverType} columns={3} value={data.driver_type} onChange={(v) => set("driver_type", v as State["driver_type"])} error={errors.driver_type}
+              <Chips dense={compact} legend={L.driverType} columns={3} value={data.driver_type} onChange={(v) => set("driver_type", v as State["driver_type"])} error={errors.driver_type}
                 options={[{ value: "solo", label: L.solo }, { value: "team", label: L.team }, { value: "either", label: L.either }]} />
-              <Chips legend={L.runs} multiple columns={3} value={data.run_types} onChange={(v) => set("run_types", v as State["run_types"])}
+              <Chips dense={compact} legend={L.runs} multiple columns={3} value={data.run_types} onChange={(v) => set("run_types", v as State["run_types"])}
                 options={[{ value: "otr", label: L.otr }, { value: "regional", label: L.regional }, { value: "dedicated", label: L.dedicated }]} />
               {(data.driver_type === "team" || data.driver_type === "either") && (
-                <Chips legend={L.partner} value={data.has_team_partner} onChange={(v) => set("has_team_partner", v as "yes" | "no")} options={yn} />
+                <Chips dense={compact} legend={L.partner} value={data.has_team_partner} onChange={(v) => set("has_team_partner", v as "yes" | "no")} options={yn} />
               )}
             </>
           )}
 
-          {step === 2 && (
+          {id === "exp" && (
             <>
-              <Chips legend={L.cdl} value={data.has_cdl_a} onChange={(v) => set("has_cdl_a", v as "yes" | "no")} options={yn} error={errors.has_cdl_a} />
-              <Chips legend={L.exp} columns={4} value={data.experience} onChange={(v) => set("experience", v as State["experience"])} error={errors.experience}
+              <Chips dense={compact} legend={L.cdl} value={data.has_cdl_a} onChange={(v) => set("has_cdl_a", v as "yes" | "no")} options={yn} error={errors.has_cdl_a} />
+              <Chips dense={compact} legend={L.exp} columns={4} value={data.experience} onChange={(v) => set("experience", v as State["experience"])} error={errors.experience}
                 options={[{ value: "lt1", label: "< 1 yr" }, { value: "1-2", label: "1–2 yrs" }, { value: "3-5", label: "3–5 yrs" }, { value: "5plus", label: "5+ yrs" }]} />
-              <Chips legend={L.endorse} multiple columns={5} value={data.endorsements} onChange={(v) => set("endorsements", v as State["endorsements"])}
+              <Chips dense={compact} legend={L.endorse} multiple columns={compact ? 3 : 5} value={data.endorsements} onChange={(v) => set("endorsements", v as State["endorsements"])}
                 options={[{ value: "hazmat", label: "Hazmat" }, { value: "tanker", label: "Tanker" }, { value: "doubles", label: "Doubles" }, { value: "twic", label: "TWIC" }, { value: "none", label: L.none }]} />
             </>
           )}
 
-          {step === 3 && (
+          {(id === "rec" || id === "rec1") && (
             <>
-              <Chips legend={L.violations} columns={5} value={data.moving_violations} onChange={(v) => set("moving_violations", v as State["moving_violations"])} error={errors.moving_violations}
+              <Chips dense={compact} legend={L.violations} columns={5} value={data.moving_violations} onChange={(v) => set("moving_violations", v as State["moving_violations"])} error={errors.moving_violations}
                 options={[{ value: "0", label: "0" }, { value: "1", label: "1" }, { value: "2", label: "2" }, { value: "3", label: "3" }, { value: "4plus", label: "4+" }]} />
-              <Chips legend={L.accidents} columns={3} value={data.accidents} onChange={(v) => set("accidents", v as State["accidents"])} error={errors.accidents}
+              <Chips dense={compact} legend={L.accidents} columns={3} value={data.accidents} onChange={(v) => set("accidents", v as State["accidents"])} error={errors.accidents}
                 options={[{ value: "0", label: "0" }, { value: "1", label: "1" }, { value: "2plus", label: "2+" }]} />
-              <div className="grid gap-8 sm:grid-cols-2">
-                <Chips legend={L.dui} value={data.dui} onChange={(v) => set("dui", v as "yes" | "no")} options={yn} error={errors.dui} />
-                <Chips legend={L.age} value={data.over_21} onChange={(v) => set("over_21", v as "yes" | "no")} options={yn} error={errors.over_21} />
-              </div>
-              <Chips legend={L.drug} value={data.drug_test_issue} onChange={(v) => set("drug_test_issue", v as "yes" | "no")} options={yn} error={errors.drug_test_issue} />
-              <Chips legend={L.auth} value={data.work_authorized} onChange={(v) => set("work_authorized", v as "yes" | "no")} options={yn} error={errors.work_authorized} />
+              {id === "rec" ? (
+                <>
+                  <div className="grid gap-8 sm:grid-cols-2">
+                    <Chips legend={L.dui} value={data.dui} onChange={(v) => set("dui", v as "yes" | "no")} options={yn} error={errors.dui} />
+                    <Chips legend={L.age} value={data.over_21} onChange={(v) => set("over_21", v as "yes" | "no")} options={yn} error={errors.over_21} />
+                  </div>
+                  <Chips legend={L.drug} value={data.drug_test_issue} onChange={(v) => set("drug_test_issue", v as "yes" | "no")} options={yn} error={errors.drug_test_issue} />
+                  <Chips legend={L.auth} value={data.work_authorized} onChange={(v) => set("work_authorized", v as "yes" | "no")} options={yn} error={errors.work_authorized} />
+                </>
+              ) : (
+                <Chips dense legend={L.dui} value={data.dui} onChange={(v) => set("dui", v as "yes" | "no")} options={yn} error={errors.dui} />
+              )}
             </>
           )}
 
-          {step === 4 && (
+          {id === "rec2" && (
+            <>
+              <Chips dense legend={L.age} value={data.over_21} onChange={(v) => set("over_21", v as "yes" | "no")} options={yn} error={errors.over_21} />
+              <Chips dense legend={L.drug} value={data.drug_test_issue} onChange={(v) => set("drug_test_issue", v as "yes" | "no")} options={yn} error={errors.drug_test_issue} />
+              <Chips dense legend={L.auth} value={data.work_authorized} onChange={(v) => set("work_authorized", v as "yes" | "no")} options={yn} error={errors.work_authorized} />
+            </>
+          )}
+
+          {id === "send" && (
             <>
               <div>
                 <h2 className="h3">{L.reviewTitle}</h2>
@@ -358,14 +416,15 @@ export function DriverApplyForm({
           )}
         </motion.div>
       </AnimatePresence>
+      </div>
 
       <ErrorText>{serverError}</ErrorText>
 
-      <div className={clsx("mt-10 flex items-center justify-between gap-3 border-t border-white/10 pt-6", step === 0 && !editing && "hidden")}>
+      <div className={clsx("flex shrink-0 items-center justify-between gap-3 border-t border-white/10", compact ? "pt-4" : "mt-10 pt-6", id === "you" && !editing && "hidden")}>
         <button type="button" onClick={back} className={clsx("h-12 px-2 text-white/70 hover:text-white", step === 0 && "hidden")}>
           ← {L.back}
         </button>
-        {step < 4 ? (
+        {step < last ? (
           <button type="button" onClick={next} className="inline-flex h-14 flex-1 items-center justify-center gap-2 rounded bg-signal px-8 font-medium transition-colors hover:bg-signal-ink sm:flex-none">
             {L.next} <Arrow />
           </button>

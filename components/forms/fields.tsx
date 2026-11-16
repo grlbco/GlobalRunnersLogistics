@@ -84,7 +84,9 @@ export function Chips<V extends string>({
   multiple,
   error,
   columns = 2,
+  dense,
 }: {
+  dense?: boolean;
   legend: string;
   options: readonly Option<V>[];
   value: V | V[] | undefined;
@@ -101,17 +103,22 @@ export function Chips<V extends string>({
   };
   return (
     <fieldset>
-      <legend className="mb-3 text-[0.95rem] font-medium">
+      <legend className={clsx("text-[0.95rem] font-medium", dense ? "mb-2" : "mb-3")}>
         {legend}
         {multiple && <span className="label ml-3 text-white/40">Pick all that apply</span>}
       </legend>
       <div
         className={clsx(
           "grid gap-2",
-          columns === 2 && "grid-cols-2",
-          columns === 3 && "grid-cols-2 sm:grid-cols-3",
-          columns === 4 && "grid-cols-2 sm:grid-cols-4",
-          columns === 5 && "grid-cols-3 sm:grid-cols-5",
+          // dense: every option on one row, phones included (short labels only)
+          dense
+            ? { 2: "grid-cols-2", 3: "grid-cols-3", 4: "grid-cols-4", 5: "grid-cols-5" }[columns]
+            : [
+                columns === 2 && "grid-cols-2",
+                columns === 3 && "grid-cols-2 sm:grid-cols-3",
+                columns === 4 && "grid-cols-2 sm:grid-cols-4",
+                columns === 5 && "grid-cols-3 sm:grid-cols-5",
+              ],
         )}
         role={multiple ? "group" : "radiogroup"}
       >
@@ -125,7 +132,8 @@ export function Chips<V extends string>({
               aria-checked={on}
               onClick={() => toggle(o.value)}
               className={clsx(
-                "flex min-h-14 items-center justify-center rounded-[4px] border px-3 py-3 text-center text-[0.98rem] transition-all duration-200",
+                "flex items-center justify-center rounded-[4px] border text-center transition-all duration-200",
+                dense ? "min-h-12 px-1.5 py-2 text-[0.95rem]" : "min-h-14 px-3 py-3 text-[0.98rem]",
                 on ? "border-signal bg-signal/15 text-white" : "border-white/15 bg-white/[0.03] text-white/80 hover:border-white/40",
               )}
             >

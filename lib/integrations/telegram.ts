@@ -4,7 +4,9 @@ import "server-only";
  * Team alerts to a Telegram group (Bot API). Needs TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID.
  * Silent no-op when not configured, never throws.
  */
-export async function sendTelegram(html: string): Promise<boolean> {
+export type TgButton = { text: string; url: string };
+
+export async function sendTelegram(html: string, buttons?: TgButton[][]): Promise<boolean> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chat = process.env.TELEGRAM_CHAT_ID;
   if (!token || !chat) return false;
@@ -12,7 +14,14 @@ export async function sendTelegram(html: string): Promise<boolean> {
     const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chat, text: html.slice(0, 4000), parse_mode: "HTML", disable_web_page_preview: true }),
+      body: JSON.stringify({
+        chat_id: chat,
+        text: html.slice(0, 4000),
+        parse_mode: "HTML",
+        link_preview_options: { is_disabled: true },
+        // Telegram only accepts https links on buttons, so local/dev URLs fall back to text-only.
+        ...(buttons?.length && buttons.flat().every((b) => b.url.startsWith("https://")) ? { reply_markup: { inline_keyboard: buttons } } : {}),
+      }),
       signal: AbortSignal.timeout(10000),
     });
     if (!res.ok) console.error("telegram", res.status, await res.text());
@@ -22,6 +31,15 @@ export async function sendTelegram(html: string): Promise<boolean> {
     return false;
   }
 }
+
+/** The driver's own words from an email reply: drops the quoted thread and signature noise. */
+export function ownWords(said: string, max = 280) {
+  const cut = said.split(/\n\s*On [\s\S]{4,200}?wrote:|\n-{2,}\s*Original Message|\n\s*From: /i)[0];
+  const text = cut.split("\n").filter((l) => !l.trim().startsWith(">")).join(" ").replace(/\s+/g, " ").trim();
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
+export const DIVIDER = "─────────────";
 
 export const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 

@@ -1,4 +1,5 @@
 import "server-only";
+import { formUrl } from "@/lib/site";
 import { adminDb } from "@/lib/crm/admin";
 import { activity } from "@/lib/crm/ingest";
 import { notifyTeam } from "@/lib/crm/notify";
@@ -32,9 +33,9 @@ type C = { id: string; first_name: string | null; last_name: string | null; comp
 
 async function formLink(contactId: string) {
   const db = adminDb();
-  const { data } = await db.from("form_links").select("token, completed_at").eq("contact_id", contactId).order("created_at", { ascending: false }).limit(1).maybeSingle();
-  const row = data ?? (await db.from("form_links").insert({ contact_id: contactId }).select("token, completed_at").single()).data!;
-  return { url: `${site()}/apply/driver?t=${row.token}`, completed: !!row.completed_at };
+  const { data } = await db.from("form_links").select("token, code, completed_at").eq("contact_id", contactId).order("created_at", { ascending: false }).limit(1).maybeSingle();
+  const row = data ?? (await db.from("form_links").insert({ contact_id: contactId }).select("token, code, completed_at").single()).data!;
+  return { url: formUrl(row.code as string), completed: !!row.completed_at };
 }
 
 async function render(tpl: string, c: C) {

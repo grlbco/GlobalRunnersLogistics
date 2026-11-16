@@ -1,10 +1,11 @@
 import "server-only";
+import { formUrl } from "@/lib/site";
 import { z } from "zod";
 import { adminDb } from "@/lib/crm/admin";
 import { activity, moveStage, suppress, type Contact } from "@/lib/crm/ingest";
 import { getAssistantSettings } from "@/lib/crm/settings";
 import { notifyTeam } from "@/lib/crm/notify";
-import { sendTelegram, esc } from "@/lib/integrations/telegram";
+import { sendTelegram, esc, ownWords, DIVIDER } from "@/lib/integrations/telegram";
 import { localTime } from "@/lib/crm/timezones";
 import { company } from "@/content/facts";
 import { chatJson, chatText, extractJson, type ChatMsg } from "@/lib/integrations/deepseek";
@@ -85,9 +86,9 @@ const siteUrl = () => process.env.NEXT_PUBLIC_SITE_URL || company.url;
 
 export async function formLinkFor(contactId: string) {
   const db = adminDb();
-  const { data: existing } = await db.from("form_links").select("token, sent_at, opened_at, step_reached, completed_at").eq("contact_id", contactId).order("created_at", { ascending: false }).limit(1).maybeSingle();
-  const row = existing ?? (await db.from("form_links").insert({ contact_id: contactId }).select("token, sent_at, opened_at, step_reached, completed_at").single()).data!;
-  return { url: `${siteUrl()}/apply/driver?t=${row.token}`, token: row.token as string, form: { sent: !!row.sent_at, opened: !!row.opened_at, step: row.step_reached ?? 0, completed: !!row.completed_at } };
+  const { data: existing } = await db.from("form_links").select("token, code, sent_at, opened_at, step_reached, completed_at").eq("contact_id", contactId).order("created_at", { ascending: false }).limit(1).maybeSingle();
+  const row = existing ?? (await db.from("form_links").insert({ contact_id: contactId }).select("token, code, sent_at, opened_at, step_reached, completed_at").single()).data!;
+  return { url: formUrl(row.code as string), token: row.token as string, form: { sent: !!row.sent_at, opened: !!row.opened_at, step: row.step_reached ?? 0, completed: !!row.completed_at } };
 }
 
 type RunInput = { simTurns?: Turn[]; contactId: string; trigger: "text_received" | "email_received" | "followup" | "form_abandoned" | "form_submitted" | "manual" | "test"; formSubmitted?: { form: string; sendDriverForm?: boolean }; inputMessageId?: string | null; followupAttempt?: number; followupKind?: FollowupKind; followupChannel?: "email" | "sms" | null; runId?: string; dryRunMessage?: { channel: "email" | "sms"; body: string } };
@@ -451,14 +452,20 @@ async function replyAlert(c: Record<string, unknown> & { id: string }, said: str
   const name = [s("first_name"), s("last_name")].filter(Boolean).join(" ") || "Unknown";
   const phone = s("cell_phone") ?? s("phone");
   const fmt = (p: string) => p.replace(/^\+1(\d{3})(\d{3})(\d{4})$/, "($1) $2-$3");
+  const place = [s("city"), s("state")].filter(Boolean).join(", ");
+  const words = said ? ownWords(said) : "";
   const lines = [
-    `🟢 <b>Lead replied: ${esc(name)}</b>`,
-    [s("company_name"), [s("city"), s("state")].filter(Boolean).join(", "), s("tier_label")].filter(Boolean).map((x) => esc(x!)).join(" · "),
-    s("usdot") ? `USDOT ${esc(s("usdot")!)}` : null,
-    [phone ? `📞 <a href="tel:${esc(phone)}">${esc(fmt(phone))}</a>` : null, s("email") ? `✉️ ${esc(s("email")!)}` : null].filter(Boolean).join(" · "),
-    said ? `They wrote: "${esc(said.replace(/\s+/g, " ").slice(0, 300))}"` : null,
+    `🟢 <b>LEAD REPLIED</b> · interested`,
+    DIVIDER,
+    `👤 <b>${esc(name)}</b>`,
+    s("company_name") ? `🚛 ${esc(s("company_name"))}${s("usdot") ? ` · USDOT ${esc(s("usdot"))}` : ""}` : null,
+    place || s("tier_label") ? `📍 ${esc([place, s("tier_label") ? `Tier ${s("tier_label")}` : null].filter(Boolean).join(" · "))}` : null,
+    phone ? `📞 <a href="tel:${esc(phone)}">${esc(fmt(phone))}</a>` : null,
+    s("email") ? `✉️ ${esc(s("email"))}` : null,
+    words ? `\n💬 <b>They wrote</b>\n<blockquote>${esc(words)}</blockquote>` : null,
+    `🤖 Claudia is sending the form link by email${phone ? " and text" : ""}.`,
   ].filter(Boolean) as string[];
-  await sendTelegram(`${lines.join("\n")}\n\nClaudia is answering with the form link.\n<a href="${siteUrl()}/crm/contacts/${c.id}">Open in GRL Command</a>`);
+  await sendTelegram(lines.join("\n"), [[{ text: "👤 Open in GRL Command", url: `${siteUrl()}/crm/contacts/${c.id}` }]]);
 }
 
 async function handoff(c: { id: string; first_name: string | null; last_name: string | null }, reason: string) {
@@ -467,7 +474,10 @@ async function handoff(c: { id: string; first_name: string | null; last_name: st
   await db.from("tasks").insert({ contact_id: c.id, title: `Reply to driver: ${reason}`.slice(0, 300), created_by: "agent", due_at: new Date(Date.now() + 3600_000).toISOString() });
   await activity(c.id, "handed_to_person", { reason }, "agent");
   await notifyTeam(`Driver needs a person: ${[c.first_name, c.last_name].filter(Boolean).join(" ") || "unknown"}`, `${reason}\n\nOpen: ${siteUrl()}/crm/contacts/${c.id}`);
-  await sendTelegram(`🙋 <b>Driver needs a person</b>\n<b>${esc([c.first_name, c.last_name].filter(Boolean).join(" ") || "Unknown")}</b>\n${esc(reason)}\n\n<a href="${siteUrl()}/crm/contacts/${c.id}">Open in GRL Command</a>`);
+  await sendTelegram(
+    `🙋 <b>NEEDS A PERSON</b>\n${DIVIDER}\n👤 <b>${esc([c.first_name, c.last_name].filter(Boolean).join(" ") || "Unknown")}</b>\n\n<blockquote>${esc(reason)}</blockquote>\nClaudia paused for this driver. Reply from the CRM.`,
+    [[{ text: "👤 Open in GRL Command", url: `${siteUrl()}/crm/contacts/${c.id}` }]],
+  );
 }
 
 /** Worker: queued runs (new inbound messages) + due follow-ups. */

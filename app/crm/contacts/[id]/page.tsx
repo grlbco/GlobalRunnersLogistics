@@ -14,6 +14,8 @@ import { Stagger, StaggerItem } from "@/components/crm/motion";
 import { Composer } from "@/components/crm/Composer";
 import { Drafts } from "@/components/crm/Drafts";
 import { Timeline, loadTimeline } from "@/components/crm/Timeline";
+import { ApplicationCard, OpenApplication } from "@/components/crm/Application";
+import { latestApplicationFor } from "@/lib/crm/applications";
 
 export default function ContactPage({ params }: { params: Promise<{ id: string }> }) {
   return (
@@ -28,7 +30,7 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
   const { supabase } = await requireStaff(`/crm/contacts/${id}`, "contacts.view");
 
-  const [{ data: c }, items, memory, runs, followups, forms, tasks, assistant] = await Promise.all([
+  const [{ data: c }, items, memory, runs, followups, forms, tasks, assistant, application] = await Promise.all([
     supabase.from("contacts").select("*").eq("id", id).maybeSingle(),
     loadTimeline(supabase, id),
     supabase.from("agent_memory").select("*").eq("contact_id", id).maybeSingle(),
@@ -37,6 +39,7 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
     supabase.from("form_links").select("sent_at, opened_at, step_reached, completed_at").eq("contact_id", id).order("created_at", { ascending: false }).limit(1),
     supabase.from("tasks").select("id, title, due_at, done_at").eq("contact_id", id).order("done_at", { nullsFirst: true }).order("due_at", { nullsFirst: false }).limit(20),
     getAssistantSettings(),
+    latestApplicationFor(supabase, id),
   ]);
   if (!c) notFound();
 
@@ -67,6 +70,7 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
         <StaggerItem><Stat label="Driver form" value={form?.completed_at ? "Done" : form?.opened_at ? "Opened" : form?.sent_at ? "Sent" : "Not sent"} hint={form && !form.completed_at && form.step_reached > 0 ? `Stopped at step ${form.step_reached}` : followups.data?.length ? `${followups.data.length} follow-ups scheduled` : "No follow-ups scheduled"} /></StaggerItem>
         <StaggerItem><Stat label="Open tasks" value={(tasks.data ?? []).filter((t) => !t.done_at).length} hint={`In this stage for ${ago(c.stage_changed_at)}`} /></StaggerItem>
       </Stagger>
+      {application && <ApplicationCard app={application} />}
       <div className="grid items-start gap-3 lg:grid-cols-[18rem_minmax(0,1fr)] xl:grid-cols-[18rem_minmax(0,1fr)_20rem]">
       {/* Left: identity */}
       <aside className="space-y-6 rounded-[16px] border border-line bg-surface p-5 shadow-card">
@@ -222,6 +226,7 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
             ))}
           </ol>
           {form && !form.completed_at && form.step_reached > 0 && <p className="mt-3 text-xs font-medium text-amber-800">Stopped at step {form.step_reached}</p>}
+          {application && <OpenApplication code={application.code} className="mt-3 w-full justify-center" />}
         </Card>
 
         <Card className="p-4">

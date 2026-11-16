@@ -33,7 +33,8 @@ export function checkReply(text: string, ctx: { channel: "email" | "sms"; formUr
   for (const re of BANNED) if (re.test(text)) problems.push(`banned wording: ${re.source.slice(0, 40)}`);
 
   const urls = text.match(/https?:\/\/\S+|www\.\S+/gi) ?? [];
-  for (const u of urls) if (!u.replace(/[).,!?]+$/, "").startsWith(ctx.formUrl)) problems.push(`link not allowed: ${u}`);
+  const bare = (x: string) => x.replace(/^https?:\/\//i, "").replace(/^www\./i, "").replace(/[).,!?]+$/, "");
+  for (const u of urls) if (!bare(u).startsWith(bare(ctx.formUrl))) problems.push(`link not allowed: ${u}`);
 
   const allowed = allowedNumbers([ctx.formUrl, ...(ctx.extraAllowed ?? [])]);
   const withoutUrls = text.replace(/https?:\/\/\S+/g, "");
