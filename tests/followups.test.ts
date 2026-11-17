@@ -123,3 +123,12 @@ describe("hand-off only when they ask for a person (or legal words)", () => {
     for (const t of ["What's the pay?", "how much home time", "who is this?", "is this a scam?", "are you a bot?", "I only have a permit", "call me after 5", "I was a fleet manager", "what trucks do you run", "yes interested"]) expect(HUMAN_WORDS.test(t), t).toBe(false);
   });
 });
+
+describe("unclear reply rule is in Claudia's instructions", () => {
+  it("tells her not to guess and to send the form with 'our team will reach out'", async () => {
+    const { systemPrompt } = await import("@/lib/agent/prompt");
+    const p = systemPrompt();
+    expect(p).toMatch(/unclear/);
+    expect(p).toMatch(/someone from our team will reach out shortly/);
+  });
+});
