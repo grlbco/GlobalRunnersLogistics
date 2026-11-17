@@ -57,6 +57,17 @@ export const CHASE: ChaseStep[] = [
   { gapH: 72, ch: "email" }, // 7: day 10, last one, then Nurture
 ];
 /** Any form of yes, in any language, counts as interest (the model classifies; these intents are positive). */
+/** Puts the form link into a reply that lacks it: drops any "want me to send the form?" and keeps the signature last. */
+export function withFormLink(text: string, url: string, channel: "sms" | "email") {
+  const lines = text.split("\n");
+  const sig = lines.findIndex((l, i) => i > 0 && /^\s*claudia\b/i.test(l));
+  const ask = /(do you )?want me to send (you )?(over )?the (short )?(form|application)[^\n?]*\?\s*/gi;
+  const add = channel === "sms" ? `here's the short form, takes about 2 min: ${url}` : `Here's the short form, it takes about 2 minutes and our team calls you once it's in: ${url}`;
+  const body = (sig > 0 ? lines.slice(0, sig) : lines).join("\n").replace(ask, "").trimEnd();
+  const signature = sig > 0 ? lines.slice(sig).join("\n") : "";
+  return channel === "sms" ? `${body} ${add}`.trim() : [body, add, signature].filter(Boolean).join("\n\n");
+}
+
 export const POSITIVE_INTENTS = ["interested", "ready", "call_request"];
 const NURTURE_GAP_H = 30 * 24;
 const NURTURE_MAX = 3;
@@ -238,6 +249,11 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
       const parts = partsOf(parsed);
       if (!parts.length || parsed.handoff) { decision = parsed; problems = []; break; }
       const bad = parts.flatMap((t) => checkReply(t, { channel, formUrl: link.url }).problems);
+      const saidYes = (input.trigger === "email_received" || input.trigger === "text_received") && (POSITIVE_INTENTS.includes(parsed.intent) || parsed.stage === "interested");
+      if (saidYes && !link.form.completed) {
+        if (!parts.some((t) => t.includes(link.url))) bad.push(`the driver said yes, so this reply must include the form link ${link.url} (don't ask whether to send it, send it)`);
+        if (alsoText && !parsed.sms_replies.some((t) => t.includes(link.url))) bad.push(`the driver said yes and has a phone: "sms_replies" needs 1-2 short texts, the last one with the form link ${link.url}`);
+      }
       if (!bad.length) { decision = { ...parsed, replies: parts }; problems = []; break; }
       problems = bad;
       messages.push({ role: "assistant", content: r.content.slice(0, 2000) }, { role: "user", content: `[INSTRUCTION] Your texts broke these rules: ${bad.join("; ")}. Rewrite them so every rule is followed. Return the full JSON again.` });
@@ -313,6 +329,15 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
     }
 
     let action = "no_reply";
+    // A yes always gets the form: if the reply still lacks the link, add it ourselves (before the signature).
+    if (positive && !link.form.completed && decision.replies.length && !decision.replies.some((t) => t.includes(link.url))) {
+      decision.replies[decision.replies.length - 1] = withFormLink(decision.replies[decision.replies.length - 1], link.url, channel);
+      problems = [...problems, "form link added by code"];
+    }
+    if (positive && !link.form.completed && alsoText && !decision.sms_replies.some((t) => t.includes(link.url))) {
+      const first = (c.first_name ?? "").trim().split(/\s+/)[0];
+      decision.sms_replies = [`hi${first ? ` ${first}` : ""}, it's Claudia from Global Runners about the CDL-A job you replied to`, `here's the short form, takes about 2 min: ${link.url}`];
+    }
     const parts = decision.replies;
     if (parts.length) {
       const manual = input.trigger === "manual";

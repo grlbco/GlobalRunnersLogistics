@@ -53,3 +53,16 @@ describe("submitted application", () => {
     expect(a.filter(isConcern).map((x) => x.label)).toEqual(["Valid CDL-A", "CDL-A experience", "Moving violations (3 yrs)", "Ever had a DUI"]);
   });
 });
+
+describe("a yes always gets the form", () => {
+  it("adds the link to Shuai's reply, drops the question, keeps the signature last", async () => {
+    const { withFormLink } = await import("@/lib/agent/engine");
+    const shuai = "Hi Shuai,\n\nYeah, here are the numbers. Solo is 60 to 70 cents a mile.\n\nWant me to send the short form so they can call you?\n\nClaudia\nGlobal Runners Logistics";
+    const out = withFormLink(shuai, "globalrunnerslogistics.com/a/zxjJc2", "email");
+    expect(out).toContain("globalrunnerslogistics.com/a/zxjJc2");
+    expect(out).not.toMatch(/want me to send/i);
+    expect(out.endsWith("Claudia\nGlobal Runners Logistics")).toBe(true);
+    expect(out).not.toMatch(/\n{3,}/);
+    expect(withFormLink("ok cool", "x.com/a/abc123", "sms")).toBe("ok cool here's the short form, takes about 2 min: x.com/a/abc123");
+  });
+});
