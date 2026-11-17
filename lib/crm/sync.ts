@@ -6,6 +6,7 @@ import {
 import * as quo from "@/lib/integrations/quo";
 import { emit } from "@/lib/automations/engine";
 import * as instantly from "@/lib/integrations/instantly";
+import { ownReply } from "@/lib/agent/engine";
 
 /**
  * Pull-based sync (works locally with no public URL) + the handlers webhooks call.
@@ -111,7 +112,7 @@ export async function ingestInstantlyEmail(e: instantly.InstantlyEmail): Promise
     await activity(contact.id, "auto_reply", { subject: e.subject ?? null }, "instantly");
     return id;
   }
-  if (isOptOut(body)) {
+  if (isOptOut(ownWords(body))) {
     await suppress(contact, "email", "unsubscribe");
     await moveStage(contact, "unsubscribed", "instantly");
     return id;
@@ -172,7 +173,9 @@ export async function handleInstantlyStatus(event: { event_type: string; lead_em
       await moveStage(contact, "interested", "instantly");
       break;
     case "lead_not_interested":
-      await moveStage(contact, "not_interested", "instantly");
+      // Instantly's AI guesses from the whole thread and gets short replies wrong ("yes" next to a quoted
+      // "Not interested? Reply stop"). Our assistant reads the reply itself and sets the stage; just note it.
+      await activity(contact.id, "instantly_label", { label: "not_interested" }, "instantly");
       break;
     case "lead_wrong_person":
       await suppress(contact, "email", "wrong_person");
@@ -210,13 +213,7 @@ export async function ingestDirectEmail(e: { id: string; from: string; subject: 
 
 /** The driver's own text of an email reply, without the quoted thread below it. */
 export function ownWords(body: string) {
-  const lines = body.split(/\r?\n/);
-  const out: string[] = [];
-  for (const l of lines) {
-    if (/^\s*>/.test(l) || /^On .+wrote:\s*$/i.test(l.trim()) || /^-{2,}\s*Original Message/i.test(l.trim()) || /^From:\s/i.test(l.trim())) break;
-    out.push(l);
-  }
-  return out.join("\n");
+  return ownReply(body);
 }
 
 // ---------------- assistant hook ----------------

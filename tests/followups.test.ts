@@ -66,3 +66,25 @@ describe("a yes always gets the form", () => {
     expect(withFormLink("ok cool", "x.com/a/abc123", "sms")).toBe("ok cool here's the short form, takes about 2 min: x.com/a/abc123");
   });
 });
+
+describe("yes detector (code-level, can't be talked out of it)", () => {
+  const quoteEN = "\n\nOn Mon, 16 Nov 2026 at 13:56, Adrian Hall <adrian@x.com>\nwrote:\n\n> Want the pay numbers? Just reply \"yes\"\n> Not interested? Reply \"stop\" and I won't email again.";
+  const quoteZH = "\n\nAdrian Hall <adrian@corvooriginscharge.com>于2026年11月17日 周二03:28写道：\n\n> Hi Shuai,\n> Not interested? Reply \"stop\"";
+  it("catches every common yes, even with the quoted email below it", async () => {
+    const { looksLikeYes } = await import("@/lib/agent/engine");
+    for (const y of ["Yes", "yes!", "Yeah", "yep", "Sure", "ok", "Okay send it", "Interested", "I'm interested", "I am very interested", "tell me more", "Yes, what's the pay?", "yes please send details", "Sí", "si claro", "me interesa", "How do I apply?", "sounds good", "Yes I am interested."])
+      for (const q of ["", quoteEN, quoteZH]) expect(looksLikeYes(y + q), y).toBe(true);
+  });
+  it("never treats a no, a stop or a plain question as yes", async () => {
+    const { looksLikeYes } = await import("@/lib/agent/engine");
+    for (const n of ["No", "not interested", "I'm not interested", "No thanks", "stop", "unsubscribe", "remove me", "what's the home time?", "who is this?", "I have my own truck", "nah"])
+      expect(looksLikeYes(n + quoteEN), n).toBe(false);
+  });
+  it("keeps only the driver's own words", async () => {
+    const { ownReply } = await import("@/lib/agent/engine");
+    expect(ownReply("Yes" + quoteEN)).toBe("Yes");
+    expect(ownReply("Yes" + quoteZH)).toBe("Yes");
+    expect(ownReply("Sí\n\nEl lun, 16 nov 2026 a las 13:56, Adrian escribió:\n> hola")).toBe("Sí");
+    expect(ownReply("ok\n\nFrom: Adrian Hall\nSent: Monday")).toBe("ok");
+  });
+});

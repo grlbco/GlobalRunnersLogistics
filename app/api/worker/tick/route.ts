@@ -5,6 +5,7 @@ import { queueAbandonedNudges } from "@/lib/crm/forms";
 import { processWorkflows } from "@/lib/automations/engine";
 import { maybeSendDigest } from "@/lib/automations/digest";
 import { syncCampaignStats } from "@/lib/crm/campaigns";
+import { watchdog } from "@/lib/agent/watchdog";
 
 export const maxDuration = 60;
 
@@ -24,12 +25,14 @@ async function run(req: Request) {
   const sent = await processDue();
   const digest = await maybeSendDigest().catch(() => false);
   const campaigns = await syncCampaignStats().catch(() => 0);
+  // safety net: nobody who wrote to us is left unanswered, every yes gets the form
+  const guard = await watchdog().catch((e) => ({ error: e instanceof Error ? e.message : String(e) }));
   // heartbeat for the go-live checklist (production worker only)
   if (!devLocal) {
     const { adminDb } = await import("@/lib/crm/admin");
     await adminDb().from("app_settings").upsert({ key: "worker", value: { last_tick: new Date().toISOString(), ms: Date.now() - started }, updated_at: new Date().toISOString() }).then(() => {}, () => {});
   }
-  return Response.json({ ok: true, ms: Date.now() - started, sync, nudges, workflows, agent, sent, digest, campaigns }, { headers: { "Cache-Control": "no-store" } });
+  return Response.json({ ok: true, ms: Date.now() - started, sync, nudges, workflows, agent, sent, digest, campaigns, guard }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export const GET = run;

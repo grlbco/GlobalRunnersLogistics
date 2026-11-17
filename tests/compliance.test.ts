@@ -33,7 +33,7 @@ describe("pipeline stages only move forward automatically", () => {
 describe("email reply parsing (consent from email)", () => {
   it("drops the quoted thread", () => {
     const body = "yes text me at 702 555 0199\n\nOn Tue, Nov 3, 2026 at 9:00 AM Ken <ken@x.com> wrote:\n> are you still driving? call 312 975 3377";
-    expect(ownWords(body)).toBe("yes text me at 702 555 0199\n");
+    expect(ownWords(body)).toBe("yes text me at 702 555 0199");
   });
   it("drops > quoted lines", () => expect(ownWords("ok\n> old stuff")).toBe("ok"));
 });

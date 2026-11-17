@@ -69,6 +69,34 @@ export function withFormLink(text: string, url: string, channel: "sms" | "email"
 }
 
 export const POSITIVE_INTENTS = ["interested", "ready", "call_request"];
+/** Intents after which we never push the form again. */
+export const NEGATIVE_INTENTS = ["not_interested", "not_fit", "stop", "wrong_person"];
+
+/** Just the driver's own words from a reply: drops the quoted thread (English, Spanish, Chinese, Outlook headers). */
+export function ownReply(body: string) {
+  const out: string[] = [];
+  for (const l of body.split(/\r?\n/)) {
+    const t = l.trim();
+    if (/^>/.test(t) || /\b(wrote|escribi[oó]|a écrit|schrieb)\s*:\s*$/i.test(t) || /^On .{6,}(wrote:)?$/i.test(t) && /\d{4}/.test(t) || /写道[:：]?\s*$/.test(t) || /^-{2,}\s*Original Message/i.test(t) || /^(From|De):\s/i.test(t) || /^_{5,}$/.test(t)) break;
+    out.push(l);
+  }
+  return out.join("\n").trim();
+}
+
+/**
+ * A plain "yes" in the driver's own words, any common wording or language. Code-level safety net:
+ * the model can mislabel "yes" as a question ("yes, what's the pay?"); this can't.
+ */
+export function looksLikeYes(body: string | null | undefined) {
+  const t = ownReply(body ?? "").toLowerCase().replace(/[^\p{L}\p{N}\s']/gu, " ").replace(/\s+/g, " ").trim();
+  if (!t || t.split(" ").length > 25) return false;
+  if (/\b(not|no longer|don't|dont|stop|unsubscribe|remove|no thanks|nah|not interested)\b/.test(t) && !/\b(why not|no problem)\b/.test(t)) return false;
+  return /^(yes|yeah|yea|yep|yup|ya|ye|sure|ok|okay|k|absolutely|definitely|of course|interested|i'?m interested|i am interested|sounds good|send( it| me| the| info| details)?|tell me more|more info|info please|details|i'?m in|count me in|let'?s do it|how do i apply|apply|si|sí|claro|me interesa|por favor|dale|go ahead|please)(?=\s|$)/u.test(t)
+    || /\b(i'?m|i am|very|definitely|yes,? i'?m) interested\b/.test(t) || /\bhow (do|can) i (apply|sign up|get started)\b/.test(t);
+}
+
+/** Last link-bearing message check: was the form link in one of our last 2 messages? */
+const linkRecentlySent = (turns: Turn[], url: string) => turns.filter((t) => t.direction === "outbound").slice(-2).some((t) => t.body.includes(url));
 const NURTURE_GAP_H = 30 * 24;
 const NURTURE_MAX = 3;
 export type FollowupKind = "nudge" | "chase" | "chase_extra" | "nurture";
@@ -249,11 +277,16 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
       const parts = partsOf(parsed);
       if (!parts.length || parsed.handoff) { decision = parsed; problems = []; break; }
       const bad = parts.flatMap((t) => checkReply(t, { channel, formUrl: link.url }).problems);
-      const saidYes = (input.trigger === "email_received" || input.trigger === "text_received") && (POSITIVE_INTENTS.includes(parsed.intent) || parsed.stage === "interested");
-      if (saidYes && !link.form.completed) {
-        if (!parts.some((t) => t.includes(link.url))) bad.push(`the driver said yes, so this reply must include the form link ${link.url} (don't ask whether to send it, send it)`);
-        if (alsoText && !parsed.sms_replies.some((t) => t.includes(link.url))) bad.push(`the driver said yes and has a phone: "sms_replies" needs 1-2 short texts, the last one with the form link ${link.url}`);
+      const replyTrig = input.trigger === "email_received" || input.trigger === "text_received";
+      const saidYes = replyTrig && !NEGATIVE_INTENTS.includes(parsed.intent) && (POSITIVE_INTENTS.includes(parsed.intent) || parsed.stage === "interested" || looksLikeYes(lastInboundTurn?.body));
+      const chasing = input.trigger === "followup" && (input.followupKind === "chase" || input.followupKind === "chase_extra");
+      const engaged = replyTrig && !NEGATIVE_INTENTS.includes(parsed.intent) && !linkRecentlySent(turns, link.url);
+      if (!link.form.completed && !parts.some((t) => t.includes(link.url))) {
+        if (saidYes) bad.push(`the driver said yes, so this reply must include the form link ${link.url} (don't ask whether to send it, send it)`);
+        else if (chasing) bad.push(`this is a form follow-up, it must include the form link ${link.url}`);
+        else if (engaged) bad.push(`end this reply with the form link ${link.url} (answer them first, then the link)`);
       }
+      if (saidYes && !link.form.completed && alsoText && !parsed.sms_replies.some((t) => t.includes(link.url))) bad.push(`the driver said yes and has a phone: "sms_replies" needs 1-2 short texts, the last one with the form link ${link.url}`);
       if (!bad.length) { decision = { ...parsed, replies: parts }; problems = []; break; }
       problems = bad;
       messages.push({ role: "assistant", content: r.content.slice(0, 2000) }, { role: "user", content: `[INSTRUCTION] Your texts broke these rules: ${bad.join("; ")}. Rewrite them so every rule is followed. Return the full JSON again.` });
@@ -307,7 +340,8 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
     }
     if (decision.stage) await moveStage(c as Contact, decision.stage, "agent");
     // A yes (any wording, any language): Interested in the CRM and in Instantly, texting on, one alert to the team.
-    const positive = (input.trigger === "email_received" || input.trigger === "text_received") && (POSITIVE_INTENTS.includes(decision.intent) || decision.stage === "interested");
+    const replyTrigger = input.trigger === "email_received" || input.trigger === "text_received";
+    const positive = replyTrigger && !NEGATIVE_INTENTS.includes(decision.intent) && (POSITIVE_INTENTS.includes(decision.intent) || decision.stage === "interested" || looksLikeYes(lastInboundTurn?.body));
     if (positive) {
       if (["new", "contacted", "replied"].includes(c.stage)) await moveStage(c as Contact, "interested", "agent");
       if (mayTextNew) {
@@ -330,7 +364,10 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
 
     let action = "no_reply";
     // A yes always gets the form: if the reply still lacks the link, add it ourselves (before the signature).
-    if (positive && !link.form.completed && decision.replies.length && !decision.replies.some((t) => t.includes(link.url))) {
+    const mustLink = positive
+      || (input.trigger === "followup" && (input.followupKind === "chase" || input.followupKind === "chase_extra"))
+      || (replyTrigger && !NEGATIVE_INTENTS.includes(decision.intent) && !linkRecentlySent(turns, link.url));
+    if (mustLink && !decision.handoff && !link.form.completed && decision.replies.length && !decision.replies.some((t) => t.includes(link.url))) {
       decision.replies[decision.replies.length - 1] = withFormLink(decision.replies[decision.replies.length - 1], link.url, channel);
       problems = [...problems, "form link added by code"];
     }
@@ -536,10 +573,14 @@ export async function processAgentQueue(limit = 10) {
     const r = await runAgent({ contactId: q.contact_id, trigger: trig, inputMessageId: q.input_message_id, runId: q.id, formSubmitted: fi });
     out.push({ contactId: q.contact_id, action: r.action });
   }
-  const { data: due } = await db.from("followups").select("id, contact_id, attempt, kind, channel").eq("status", "pending").lte("due_at", new Date().toISOString()).order("due_at").limit(limit);
+  const { data: due } = await db.from("followups").select("id, contact_id, attempt, kind, channel, tries").eq("status", "pending").lte("due_at", new Date().toISOString()).order("due_at").limit(limit);
   for (const f of due ?? []) {
-    await db.from("followups").update({ status: "done" }).eq("id", f.id);
+    await db.from("followups").update({ status: "running" }).eq("id", f.id);
     const r = await runAgent({ contactId: f.contact_id, trigger: "followup", followupAttempt: f.attempt, followupKind: (f.kind as FollowupKind) ?? "nudge", followupChannel: (f.channel as "email" | "sms" | null) ?? null });
+    // A failed follow-up must not end the chase: try again in 15 min, 3 times, then the watchdog alerts the team.
+    const tries = (f.tries ?? 0) + 1;
+    if (r.action === "failed" && tries < 3) await db.from("followups").update({ status: "pending", tries, due_at: new Date(Date.now() + 15 * 60_000).toISOString() }).eq("id", f.id);
+    else await db.from("followups").update({ status: r.action === "failed" ? "failed" : "done", tries }).eq("id", f.id);
     out.push({ contactId: f.contact_id, action: `followup:${r.action}` });
   }
   return out;
