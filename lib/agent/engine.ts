@@ -202,6 +202,9 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
 
     // Hand-off words are caught in code, before the model (asks for a person, legal words, anger).
     const ownLast = lastInboundTurn ? ownReply(lastInboundTurn.body) : "";
+    // Instantly's AI (or a person) already marked this driver Interested: a question like "what's the pay?"
+    // from them is a yes too, so they get the full workflow (answer + link by email + texts + chase).
+    const markedInterested = c.stage === "interested";
     if (!dry && lastInboundTurn && input.trigger !== "followup" && HUMAN_WORDS.test(ownLast)) {
       await handoff(c, `Driver wrote: "${ownLast.slice(0, 200)}"`);
       await log({ action: "handed_off", decision: { reason: "hand-off words" } });
@@ -281,7 +284,7 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
       if (!parts.length || parsed.handoff) { decision = parsed; problems = []; break; }
       const bad = parts.flatMap((t) => checkReply(t, { channel, formUrl: link.url }).problems);
       const replyTrig = input.trigger === "email_received" || input.trigger === "text_received";
-      const saidYes = replyTrig && !NEGATIVE_INTENTS.includes(parsed.intent) && (POSITIVE_INTENTS.includes(parsed.intent) || parsed.stage === "interested" || looksLikeYes(lastInboundTurn?.body));
+      const saidYes = replyTrig && !NEGATIVE_INTENTS.includes(parsed.intent) && (POSITIVE_INTENTS.includes(parsed.intent) || parsed.stage === "interested" || markedInterested || looksLikeYes(lastInboundTurn?.body));
       const chasing = input.trigger === "followup" && (input.followupKind === "chase" || input.followupKind === "chase_extra");
       const engaged = replyTrig && !NEGATIVE_INTENTS.includes(parsed.intent) && !linkRecentlySent(turns, link.url);
       if (!link.form.completed && !parts.some((t) => t.includes(link.url))) {
@@ -344,7 +347,7 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
     if (decision.stage) await moveStage(c as Contact, decision.stage, "agent");
     // A yes (any wording, any language): Interested in the CRM and in Instantly, texting on, one alert to the team.
     const replyTrigger = input.trigger === "email_received" || input.trigger === "text_received";
-    const positive = replyTrigger && !NEGATIVE_INTENTS.includes(decision.intent) && (POSITIVE_INTENTS.includes(decision.intent) || decision.stage === "interested" || looksLikeYes(lastInboundTurn?.body));
+    const positive = replyTrigger && !NEGATIVE_INTENTS.includes(decision.intent) && (POSITIVE_INTENTS.includes(decision.intent) || decision.stage === "interested" || markedInterested || looksLikeYes(lastInboundTurn?.body));
     if (positive) {
       if (["new", "contacted", "replied"].includes(c.stage)) await moveStage(c as Contact, "interested", "agent");
       if (mayTextNew) {
