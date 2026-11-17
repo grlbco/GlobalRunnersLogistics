@@ -127,7 +127,9 @@ export async function recordMessage(m: NewMessage): Promise<string | null> {
 /** STOP-style keywords + plain-language requests. Checked in code before any assistant reply. */
 const OPT_OUT = /^\s*(stop|stopall|unsubscribe|cancel|end|quit|revoke|opt[\s-]?out)\s*[.!]*\s*$/i;
 const OPT_OUT_PHRASES = /\b(don'?t (text|email|contact|message) me|stop (texting|emailing|messaging|contacting)|remove me|take me off|unsubscribe me|leave me alone|do not contact)\b/i;
-export const isOptOut = (text: string) => OPT_OUT.test(text) || OPT_OUT_PHRASES.test(text);
+/** The first line the driver typed ("Stop" above a signature, "STOP." on a phone). */
+const firstLine = (text: string) => text.split(/\r?\n/).map((l) => l.replace(/[*_~]/g, "").trim()).find(Boolean) ?? "";
+export const isOptOut = (text: string) => OPT_OUT.test(text) || OPT_OUT.test(firstLine(text)) || OPT_OUT_PHRASES.test(text);
 
 export async function suppress(contact: Contact, channel: "email" | "sms", reason: "stop" | "unsubscribe" | "bounce" | "complaint" | "manual" | "wrong_person") {
   const db = adminDb();

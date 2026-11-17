@@ -101,3 +101,14 @@ describe("hand-off words: only the driver's own request for a person", () => {
     for (const t of ["can I talk to a manager", "let me speak with a real person", "have your manager call me", "I'll get a lawyer", "this is harassment", "I'll report you"]) expect(HUMAN_WORDS.test(t), t).toBe(true);
   });
 });
+
+describe("opt-out above a signature", () => {
+  it("'Stop' followed by an email signature unsubscribes", async () => {
+    const { isOptOut } = await import("@/lib/crm/ingest");
+    expect(isOptOut("Stop\n\n\n*Roy Gulutzo*\n*TX. Long Shot LLC. *\n*Just Moving Your Freight*")).toBe(true);
+    expect(isOptOut("STOP.")).toBe(true);
+    expect(isOptOut("Unsubscribe\nSent from my iPhone")).toBe(true);
+    expect(isOptOut("Stop by the yard tomorrow?")).toBe(false);
+    expect(isOptOut("Yes\nRoy")).toBe(false);
+  });
+});
