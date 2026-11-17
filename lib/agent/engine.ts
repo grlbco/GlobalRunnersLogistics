@@ -101,7 +101,9 @@ const NURTURE_GAP_H = 30 * 24;
 const NURTURE_MAX = 3;
 export type FollowupKind = "nudge" | "chase" | "chase_extra" | "nurture";
 // Asking for a person, legal words, threats. ("are you human?" / "is this a scam?" get an honest answer instead.)
-export const HUMAN_WORDS = /\b((talk|speak|chat)\s+(to|with)\s+(a\s+|an\s+)?(real\s+)?(person|human|manager|supervisor|someone|recruiter)|manager|supervisor|lawyer|attorney|sue you|lawsuit|complaint|harass\w*|police|report you)\b/i;
+// Checked on the driver's OWN words only (never the quoted email, which mentions "Ken, our hiring manager").
+// A bare "manager" isn't enough ("I was a fleet manager"): it has to be a request for one.
+export const HUMAN_WORDS = /\b((talk|speak|chat|get)\s+(to|with)\s+(a\s+|an\s+|your\s+|the\s+)?(real\s+)?(person|human|manager|supervisor|someone|recruiter|boss)|(your|the|a)\s+(manager|supervisor|boss)\s+(call|contact|email|reach)|lawyer|attorney|sue (you|your)|lawsuit|(file|filing|make|making) a complaint|harass\w*|police|report you)\b/i;
 
 /** Moves a follow-up time into a good texting window in the driver's zone: 10-11am or 5-6:30pm, Mon-Sat. */
 export function inGoodWindow(due: Date, tz: string | null): Date {
@@ -199,8 +201,9 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
     const lastInboundTurn = [...turns].reverse().find((t) => t.direction === "inbound");
 
     // Hand-off words are caught in code, before the model (asks for a person, legal words, anger).
-    if (!dry && lastInboundTurn && input.trigger !== "followup" && HUMAN_WORDS.test(lastInboundTurn.body)) {
-      await handoff(c, `Driver wrote: "${lastInboundTurn.body.slice(0, 120)}"`);
+    const ownLast = lastInboundTurn ? ownReply(lastInboundTurn.body) : "";
+    if (!dry && lastInboundTurn && input.trigger !== "followup" && HUMAN_WORDS.test(ownLast)) {
+      await handoff(c, `Driver wrote: "${ownLast.slice(0, 200)}"`);
       await log({ action: "handed_off", decision: { reason: "hand-off words" } });
       return { action: "handed_off", reason: "hand-off words" };
     }

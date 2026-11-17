@@ -88,3 +88,16 @@ describe("yes detector (code-level, can't be talked out of it)", () => {
     expect(ownReply("ok\n\nFrom: Adrian Hall\nSent: Monday")).toBe("ok");
   });
 });
+
+describe("hand-off words: only the driver's own request for a person", () => {
+  const david = "What's the pay?\n\nOn Tue, Nov 17, 2026 at 12:11 PM Ashley Wright <ashley@motuscosmichinge.com>\nwrote:\n\n> Hey David,\n> Or call or text Ken, our hiring manager, at (312) 975-3377.";
+  it("doesn't hand off because our quoted email says 'hiring manager'", async () => {
+    const { HUMAN_WORDS, ownReply } = await import("@/lib/agent/engine");
+    expect(HUMAN_WORDS.test(ownReply(david))).toBe(false);
+    expect(HUMAN_WORDS.test("I was a fleet manager for 3 years")).toBe(false);
+  });
+  it("still hands off real requests and legal words", async () => {
+    const { HUMAN_WORDS } = await import("@/lib/agent/engine");
+    for (const t of ["can I talk to a manager", "let me speak with a real person", "have your manager call me", "I'll get a lawyer", "this is harassment", "I'll report you"]) expect(HUMAN_WORDS.test(t), t).toBe(true);
+  });
+});
