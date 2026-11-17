@@ -103,7 +103,16 @@ export type FollowupKind = "nudge" | "chase" | "chase_extra" | "nurture";
 // Asking for a person, legal words, threats. ("are you human?" / "is this a scam?" get an honest answer instead.)
 // Checked on the driver's OWN words only (never the quoted email, which mentions "Ken, our hiring manager").
 // A bare "manager" isn't enough ("I was a fleet manager"): it has to be a request for one.
-export const HUMAN_WORDS = /\b((talk|speak|chat|get)\s+(to|with)\s+(a\s+|an\s+|your\s+|the\s+)?(real\s+)?(person|human|manager|supervisor|someone|recruiter|boss)|(your|the|a)\s+(manager|supervisor|boss)\s+(call|contact|email|reach)|lawyer|attorney|sue (you|your)|lawsuit|(file|filing|make|making) a complaint|harass\w*|police|report you)\b/i;
+export const HUMAN_WORDS = new RegExp([
+  // asks for a person (hand-off). Everything else, Claudia answers herself.
+  String.raw`\b(talk|speak|chat|get)\s+(to|with)\s+(a\s+|an\s+|your\s+|the\s+|someone\s+)?(real\s+)?(person|human|manager|supervisor|someone|somebody|recruiter|boss|ken|dispatcher|anyone)\b`,
+  String.raw`\b(can|could|will|would)\s+(someone|somebody|a person|a recruiter|ken|your (manager|boss|recruiter))\s+(call|text|phone|contact)\s+me\b`,
+  String.raw`\b(is there|what'?s|give me)\s+(a|the|your)\s+(number|phone( number)?)\s+(i can|to)\s+call\b`,
+  String.raw`\b(your|the|a)\s+(manager|supervisor|boss)\s+(call|contact|email|reach)`,
+  String.raw`\b(i want|i need|i'd like)\s+(a|to talk to a|to speak to a)\s+(real\s+)?(person|human)\b`,
+  // legal / safety words (hand-off)
+  String.raw`\b(lawyer|attorney|sue (you|your)|lawsuit|(file|filing|make|making) a complaint|harass\w*|police|report you)\b`,
+].join("|"), "i");
 
 /** Moves a follow-up time into a good texting window in the driver's zone: 10-11am or 5-6:30pm, Mon-Sat. */
 export function inGoodWindow(due: Date, tz: string | null): Date {

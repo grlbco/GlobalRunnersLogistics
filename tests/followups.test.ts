@@ -112,3 +112,14 @@ describe("opt-out above a signature", () => {
     expect(isOptOut("Yes\nRoy")).toBe(false);
   });
 });
+
+describe("hand-off only when they ask for a person (or legal words)", () => {
+  it("asks for a person → hand-off", async () => {
+    const { HUMAN_WORDS } = await import("@/lib/agent/engine");
+    for (const t of ["can I talk to someone?", "I want to speak with a real person", "can someone call me", "could Ken call me tomorrow", "talk to Ken", "is there a number I can call", "I need a human", "let me talk to your dispatcher", "my lawyer will call you"]) expect(HUMAN_WORDS.test(t), t).toBe(true);
+  });
+  it("everything else → Claudia answers", async () => {
+    const { HUMAN_WORDS } = await import("@/lib/agent/engine");
+    for (const t of ["What's the pay?", "how much home time", "who is this?", "is this a scam?", "are you a bot?", "I only have a permit", "call me after 5", "I was a fleet manager", "what trucks do you run", "yes interested"]) expect(HUMAN_WORDS.test(t), t).toBe(false);
+  });
+});
