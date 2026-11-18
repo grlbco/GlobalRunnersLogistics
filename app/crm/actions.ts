@@ -20,6 +20,17 @@ export async function setStage(formData: FormData) {
     data: { from: before.stage, to: parsed.data.stage },
     actor: `user:${staff.id}`,
   });
+  if (parsed.data.stage === "to_call") {
+    // The team calls this driver: stop the form chase and put a call task on the list.
+    const { adminDb } = await import("@/lib/crm/admin");
+    const db = adminDb();
+    await db.from("followups").update({ status: "cancelled" }).eq("contact_id", parsed.data.id).eq("status", "pending");
+    const { data: open } = await db.from("tasks").select("id").eq("contact_id", parsed.data.id).is("done_at", null).ilike("title", "📞%").limit(1);
+    if (!open?.length) {
+      const { data: c } = await db.from("contacts").select("first_name, last_name").eq("id", parsed.data.id).single();
+      await db.from("tasks").insert({ contact_id: parsed.data.id, title: `📞 CALL: ${[c?.first_name, c?.last_name].filter(Boolean).join(" ") || "driver"}`, due_at: new Date().toISOString(), created_by: "workflow" });
+    }
+  }
   const { emit } = await import("@/lib/automations/engine");
   await emit("stage_changed", parsed.data.id, { from: before.stage, to: parsed.data.stage });
   revalidatePath(`/crm/contacts/${parsed.data.id}`);

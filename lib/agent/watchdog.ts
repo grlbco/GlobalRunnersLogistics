@@ -152,5 +152,12 @@ export async function watchdog() {
       res.alerts++;
     }
   }
+  // 6) Drivers on the call list for 24 h: one reminder to the team
+  const { data: toCall } = await db.from("contacts").select("id, first_name, last_name, stage_changed_at").eq("stage", "to_call").lte("stage_changed_at", new Date(now - 24 * 60 * MIN).toISOString()).limit(50);
+  for (const c of toCall ?? []) {
+    if (!(await once(c.id, "to_call_24h", String(c.stage_changed_at)))) continue;
+    await alert(c, "Still on the call list", "This driver has been waiting for a call for 24 hours. Call them, then move the card (Qualified, With the team, Nurture, or back to Form sent).", false);
+    res.alerts++;
+  }
   return res;
 }

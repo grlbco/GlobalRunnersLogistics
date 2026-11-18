@@ -7,7 +7,7 @@ import type { Stage } from "./stages";
  * so a message is stored once (unique external id) and stage moves stay forward-only.
  */
 const RANK: Record<Stage, number> = {
-  new: 0, contacted: 1, replied: 2, interested: 3, form_sent: 4, chasing: 4.5, applied: 5, qualified: 6, sent_to_ken: 7, hired: 8,
+  new: 0, contacted: 1, replied: 2, interested: 3, form_sent: 4, chasing: 4.5, to_call: 4.8, applied: 5, qualified: 6, sent_to_ken: 7, hired: 8,
   nurture: 1.5, not_fit: 9, not_interested: 9, unsubscribed: 10, bounced: 10,
 };
 const TERMINAL = new Set<Stage>(["hired", "not_fit", "unsubscribed", "bounced"]);

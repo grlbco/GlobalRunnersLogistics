@@ -1,5 +1,5 @@
 export type Stage =
-  | "new" | "contacted" | "replied" | "interested" | "form_sent" | "chasing" | "applied" | "qualified" | "sent_to_ken" | "hired"
+  | "new" | "contacted" | "replied" | "interested" | "form_sent" | "chasing" | "to_call" | "applied" | "qualified" | "sent_to_ken" | "hired"
   | "nurture" | "not_fit" | "not_interested" | "unsubscribed" | "bounced";
 
 export type Tone = "cold" | "warm" | "hot" | "won" | "lost";
@@ -11,6 +11,7 @@ export const STAGES: { key: Stage; label: string; tone: Tone }[] = [
   { key: "interested", label: "Interested", tone: "warm" },
   { key: "form_sent", label: "Form sent", tone: "warm" },
   { key: "chasing", label: "Following up", tone: "warm" },
+  { key: "to_call", label: "To call", tone: "hot" },
   { key: "applied", label: "Applied", tone: "hot" },
   { key: "qualified", label: "Qualified", tone: "hot" },
   { key: "sent_to_ken", label: "With the team", tone: "hot" },
@@ -27,7 +28,7 @@ export const stageLabel = (s: string) => STAGES.find((x) => x.key === s)?.label 
 export const stageTone = (s: string): Tone => STAGES.find((x) => x.key === s)?.tone ?? "cold";
 
 /** Pipeline board columns. Cold stages live in the Contacts table. */
-export const BOARD: Stage[] = ["replied", "interested", "form_sent", "chasing", "applied", "qualified", "sent_to_ken", "hired", "nurture"];
+export const BOARD: Stage[] = ["replied", "interested", "form_sent", "chasing", "to_call", "applied", "qualified", "sent_to_ken", "hired", "nurture"];
 
 /** Funnel shown on the dashboard, in order. */
 export const FUNNEL: Stage[] = ["contacted", "replied", "interested", "form_sent", "applied", "hired"];

@@ -32,7 +32,7 @@ export type CallRequest = { ok: true; inHours: boolean; kenPhone: string; contac
  * The team gets it instantly (Telegram + text to the alert phone), the team gets an urgent task,
  * the card moves forward and the driver hears back with our number.
  */
-export async function requestCall(p: { contactId?: string | null; phone?: string | null; name?: string | null; source: string; notifyDriver?: boolean }): Promise<CallRequest> {
+export async function requestCall(p: { contactId?: string | null; phone?: string | null; name?: string | null; source: string; notifyDriver?: boolean; reason?: "asked" | "no_form" }): Promise<CallRequest> {
   const db = adminDb();
   type C = Contact & { last_name?: string | null; state?: string | null };
   let c: C | null = null;
@@ -53,19 +53,23 @@ export async function requestCall(p: { contactId?: string | null; phone?: string
   const inHours = inCallHours(hours);
   if (count) return { ok: true, inHours, kenPhone: company.phone.display, contactId: contact.id };
 
-  await moveStage(contact, "interested", p.source);
-  await activity(contact.id, "call_requested", { source: p.source, in_hours: inHours }, p.source);
-  await db.from("tasks").insert({ contact_id: contact.id, title: `📞 CALL NOW: ${[contact.first_name, contact.last_name].filter(Boolean).join(" ") || "driver"} asked for a call`, due_at: new Date().toISOString(), created_by: "workflow" });
+  const noForm = p.reason === "no_form";
+  // "To call": the team calls them, the form chase stops (they asked for a call or won't do forms).
+  await moveStage(contact, "to_call", p.source);
+  await db.from("followups").update({ status: "cancelled" }).eq("contact_id", contact.id).eq("status", "pending");
+  await activity(contact.id, "call_requested", { source: p.source, in_hours: inHours, reason: p.reason ?? "asked" }, p.source);
+  const who = [contact.first_name, contact.last_name].filter(Boolean).join(" ") || "driver";
+  await db.from("tasks").insert({ contact_id: contact.id, title: noForm ? `📞 CALL: ${who} won't fill out the form` : `📞 CALL NOW: ${who} asked for a call`, due_at: new Date().toISOString(), created_by: "workflow" });
 
   const name = [contact.first_name, contact.last_name].filter(Boolean).join(" ") || "A driver";
   const phone = contact.cell_phone ?? contact.phone ?? p.phone ?? "";
   const link = `${siteUrl()}/crm/contacts/${contact.id}`;
-  await sendTelegram(`📞 <b>Call now: ${esc(name)}</b>${contact.state ? ` (${esc(contact.state)})` : ""}\n<a href="tel:${esc(phone)}">${esc(phoneDisplay(phone) ?? phone)}</a>\nAsked via ${esc(p.source.replace(/_/g, " "))}${inHours ? "" : "\n⏰ After hours: told them you'll call first thing."}\n\n<a href="${link}">Open in GRL Command</a>`);
+  await sendTelegram(`📞 <b>${noForm ? "TO CALL" : "Call now"}: ${esc(name)}</b>${noForm ? " · won't fill out the form" : ""}${contact.state ? ` (${esc(contact.state)})` : ""}\n<a href="tel:${esc(phone)}">${esc(phoneDisplay(phone) ?? phone)}</a>\nAsked via ${esc(p.source.replace(/_/g, " "))}${inHours ? "" : "\n⏰ After hours: told them you'll call first thing."}\n\n<a href="${link}">Open in GRL Command</a>`);
   const kenCell = process.env.NOTIFY_SMS_TO;
   const { isSendingOn } = await import("./sending");
   if (kenCell && (await isSendingOn())) {
     const { sendText } = await import("@/lib/integrations/quo");
-    await sendText(kenCell, `CALL NOW: ${name} ${phoneDisplay(phone) ?? phone} wants a call${inHours ? "" : " (after hours, first thing tomorrow)"}. ${link}`).catch(() => {});
+    await sendText(kenCell, `CALL NOW: ${name} ${phoneDisplay(phone) ?? phone} ${noForm ? "won't do the form, call them" : "wants a call"}${inHours ? "" : " (after hours, first thing tomorrow)"}. ${link}`).catch(() => {});
   }
 
   // let the driver know (only by text when they agreed to texts)

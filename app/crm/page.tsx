@@ -61,7 +61,7 @@ async function Body() {
   const col = (k: keyof Daily) => days.map((d) => Number(d[k]));
   const reached = (key: string) => {
     // contacts at this stage or any later stage (every in-between stage counts, e.g. Following up, With the team)
-    const ORDER = ["contacted", "replied", "interested", "form_sent", "chasing", "applied", "qualified", "sent_to_ken", "hired"];
+    const ORDER = ["contacted", "replied", "interested", "form_sent", "chasing", "to_call", "applied", "qualified", "sent_to_ken", "hired"];
     const later = ORDER.slice(Math.max(0, ORDER.indexOf(key)));
     return later.reduce((s, k) => s + (stage[k] ?? 0), 0) + (key === "contacted" ? ["nurture", "not_fit", "not_interested", "unsubscribed", "bounced"].reduce((s, k) => s + (stage[k] ?? 0), 0) : 0);
   };

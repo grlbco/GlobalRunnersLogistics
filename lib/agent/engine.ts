@@ -68,7 +68,9 @@ export function withFormLink(text: string, url: string, channel: "sms" | "email"
   return channel === "sms" ? `${body} ${add}`.trim() : [body, add, signature].filter(Boolean).join("\n\n");
 }
 
-export const POSITIVE_INTENTS = ["interested", "ready", "call_request"];
+export const POSITIVE_INTENTS = ["interested", "ready", "call_request", "no_form"];
+/** The team calls these drivers instead of chasing the form. */
+export const CALL_INTENTS = ["call_request", "no_form"];
 /** Intents after which we never push the form again. */
 export const NEGATIVE_INTENTS = ["not_interested", "stop", "wrong_person"];
 
@@ -214,6 +216,7 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
     // Instantly's AI (or a person) already marked this driver Interested: a question like "what's the pay?"
     // from them is a yes too, so they get the full workflow (answer + link by email + texts + chase).
     const markedInterested = c.stage === "interested";
+    const onCallList = c.stage === "to_call";
     if (!dry && lastInboundTurn && input.trigger !== "followup" && HUMAN_WORDS.test(ownLast)) {
       await handoff(c, `Driver wrote: "${ownLast.slice(0, 200)}"`);
       await log({ action: "handed_off", decision: { reason: "hand-off words" } });
@@ -296,12 +299,15 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
       const saidYes = replyTrig && !NEGATIVE_INTENTS.includes(parsed.intent) && (POSITIVE_INTENTS.includes(parsed.intent) || parsed.stage === "interested" || markedInterested || looksLikeYes(lastInboundTurn?.body));
       const chasing = input.trigger === "followup" && (input.followupKind === "chase" || input.followupKind === "chase_extra");
       const engaged = replyTrig && !NEGATIVE_INTENTS.includes(parsed.intent) && !linkRecentlySent(turns, link.url);
-      if (!link.form.completed && !parts.some((t) => t.includes(link.url))) {
+      const callPath = onCallList || CALL_INTENTS.includes(parsed.intent);
+      if (CALL_INTENTS.includes(parsed.intent) && !parts.some((t) => t.includes(company.phone.display))) bad.push(`tell them one of our team members will call them soon, and give our number in case they want to call us: ${company.phone.vanity} (${company.phone.display})`);
+      // Drivers on the call list get a call, not the form.
+      if (!callPath && !link.form.completed && !parts.some((t) => t.includes(link.url))) {
         if (saidYes) bad.push(`the driver said yes, so this reply must include the form link ${link.url} (don't ask whether to send it, send it)`);
         else if (chasing) bad.push(`this is a form follow-up, it must include the form link ${link.url}`);
         else if (engaged) bad.push(`end this reply with the form link ${link.url} (answer them first, then the link)`);
       }
-      if (saidYes && !link.form.completed && alsoText && !parsed.sms_replies.some((t) => t.includes(link.url))) bad.push(`the driver said yes and has a phone: "sms_replies" needs 1-2 short texts, the last one with the form link ${link.url}`);
+      if (!callPath && saidYes && !link.form.completed && alsoText && !parsed.sms_replies.some((t) => t.includes(link.url))) bad.push(`the driver said yes and has a phone: "sms_replies" needs 1-2 short texts, the last one with the form link ${link.url}`);
       if (!bad.length) { decision = { ...parsed, replies: parts }; problems = []; break; }
       problems = bad;
       messages.push({ role: "assistant", content: r.content.slice(0, 2000) }, { role: "user", content: `[INSTRUCTION] Your texts broke these rules: ${bad.join("; ")}. Rewrite them so every rule is followed. Return the full JSON again.` });
@@ -345,9 +351,10 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
       await log({ action: "unsubscribed", decision, ...meta });
       return { action: "unsubscribed", decision };
     }
-    if (decision.intent === "call_request") {
+    const callPath = onCallList || CALL_INTENTS.includes(decision.intent);
+    if (CALL_INTENTS.includes(decision.intent)) {
       const { requestCall } = await import("@/lib/crm/callme");
-      await requestCall({ contactId: c.id, source: "assistant", notifyDriver: false }); // the assistant's own reply tells the driver
+      await requestCall({ contactId: c.id, source: "assistant", notifyDriver: false, reason: decision.intent === "no_form" ? "no_form" : "asked" }); // the assistant's own reply tells the driver
     }
     if (decision.intent === "wrong_person") {
       await suppress(c as Contact, channel, "wrong_person");
@@ -382,11 +389,11 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
     const mustLink = positive
       || (input.trigger === "followup" && (input.followupKind === "chase" || input.followupKind === "chase_extra"))
       || (replyTrigger && !NEGATIVE_INTENTS.includes(decision.intent) && !linkRecentlySent(turns, link.url));
-    if (mustLink && !decision.handoff && !link.form.completed && decision.replies.length && !decision.replies.some((t) => t.includes(link.url))) {
+    if (mustLink && !callPath && !decision.handoff && !link.form.completed && decision.replies.length && !decision.replies.some((t) => t.includes(link.url))) {
       decision.replies[decision.replies.length - 1] = withFormLink(decision.replies[decision.replies.length - 1], link.url, channel);
       problems = [...problems, "form link added by code"];
     }
-    if (positive && !link.form.completed && alsoText && !decision.sms_replies.some((t) => t.includes(link.url))) {
+    if (positive && !callPath && !link.form.completed && alsoText && !decision.sms_replies.some((t) => t.includes(link.url))) {
       const first = (c.first_name ?? "").trim().split(/\s+/)[0];
       decision.sms_replies = [`hi${first ? ` ${first}` : ""}, it's Claudia from Global Runners about the CDL-A job you replied to`, `here's the short form, takes about 2 min: ${link.url}`];
     }
@@ -434,7 +441,7 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
     // Next touch. The extra email of a "text + email" chase step leaves the schedule alone.
     if (input.followupKind !== "chase_extra") {
       await db.from("followups").update({ status: "cancelled" }).eq("contact_id", c.id).eq("status", "pending");
-      const done = ["not_interested", "stop", "wrong_person", "owner_operator"].includes(decision.intent) || decision.stage === "not_interested";
+      const done = callPath || ["not_interested", "stop", "wrong_person", "owner_operator"].includes(decision.intent) || decision.stage === "not_interested";
       const linkOut = link.form.sent || [...parts].some((t) => t.includes(link.url)) || decision.sms_replies.some((t) => t.includes(link.url));
       if (!done && !link.form.completed) await scheduleNext(c, { linkOut, kind: input.trigger === "followup" ? input.followupKind ?? "nudge" : null, attempt: input.followupAttempt ?? 0, maxNudges: settings.max_followups });
     }
