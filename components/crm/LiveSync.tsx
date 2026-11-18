@@ -17,6 +17,10 @@ export function LiveSync({ dev }: { dev: boolean }) {
       if (pending.current) clearTimeout(pending.current);
       pending.current = setTimeout(() => router.refresh(), 400);
     };
+    // Coming back to the tab (or the computer waking up): reload, so nothing on screen is stale.
+    const onVisible = () => { if (document.visibilityState === "visible") refresh(); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
     const sb = browserClient();
     let ch: ReturnType<typeof sb.channel> | null = null;
     let cancelled = false;
@@ -47,6 +51,8 @@ export function LiveSync({ dev }: { dev: boolean }) {
     }
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
       if (ch) sb.removeChannel(ch);
       if (timer) clearInterval(timer);
       if (pending.current) clearTimeout(pending.current);

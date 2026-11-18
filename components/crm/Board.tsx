@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useOptimistic, useState, useTransition } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { motion } from "motion/react";
 import { clsx } from "clsx";
 import { moveContact } from "@/app/crm/actions";
 import { stageTone, toneDot } from "@/lib/crm/stages";
@@ -63,14 +63,14 @@ export function Board({ columns }: { columns: Col[] }) {
             <span className="rounded-[7px] bg-hover px-1.5 py-0.5 text-[0.72rem] font-medium tabular-nums text-muted">{col.count.toLocaleString("en-US")}</span>
           </header>
           <ul className="flex max-h-[calc(100dvh-13rem)] min-h-28 flex-col gap-2 overflow-y-auto p-2 pt-1">
-            <AnimatePresence initial={false}>
+            {/* No exit animation: in a background tab the browser pauses animations, so a card leaving a
+                column would never finish fading out and would stay behind as a duplicate ("ghost"). */}
               {col.items.map((c) => (
                 <motion.li
                   key={c.id}
                   layout
                   initial={{ opacity: 0, scale: 0.97 }}
                   animate={{ opacity: dragging === c.id ? 0.4 : 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.97 }}
                   transition={{ duration: 0.25, ease: EASE }}
                 >
                   <div
@@ -117,7 +117,7 @@ export function Board({ columns }: { columns: Col[] }) {
                   </div>
                 </motion.li>
               ))}
-            </AnimatePresence>
+            
             {col.items.length === 0 && <li className="rounded-[12px] border border-dashed border-line-strong px-2 py-8 text-center text-[0.75rem] text-faint">Drop a card here</li>}
           </ul>
         </section>
