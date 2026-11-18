@@ -29,7 +29,7 @@ export function organizationSchema() {
     knowsLanguage: ["en", "es"],
     founder: { "@type": "Person", name: company.owner },
     areaServed: [{ "@type": "State", name: "Nevada" }, { "@type": "Country", name: "United States" }],
-    knowsAbout: ["Truckload freight", "53' dry van trucking", "CDL-A truck driving jobs", "Team truck driving", "Owner-operator trucking", "Drop and hook"],
+    knowsAbout: ["Truckload freight", "53' dry van trucking", "CDL-A truck driving jobs", "Team truck driving", "Drop and hook"],
     contactPoint: [
       { "@type": "ContactPoint", contactType: "recruiting", telephone: company.phone.e164, areaServed: "US-NV", availableLanguage: ["English", "Spanish"] },
     ],

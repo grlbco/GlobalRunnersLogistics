@@ -39,7 +39,7 @@ export function pageMarkdown(path: string): MdPage | null {
       title,
       markdown:
         front(title, "/", "Now hiring CDL-A solo and team drivers in Las Vegas and Henderson, NV.") +
-        `# ${title}\n\n${company.shortName} is a ${fleet.trucks}-truck CDL-A dry van carrier in ${company.office.city}, Nevada, hiring solo and team company drivers and owner-operators. Your road. Your future. Our family.\n\n${facts}\n\n## Why drivers stay\n\n${list(["Pay you can count on — weekly guaranteed minimum or per mile, paid every Friday", "Consistent runs", "No wait time", "Home on time, not late"])}\n\n## Open positions\n\n${jobs.map((j) => `- [${j.title}](${U}/drive/${j.slug}) — ${j.route}`).join("\n")}\n\n## How hiring works\n\n1. Apply in 2 minutes\n2. Our recruiter calls you back (usually within the hour, Central Time)\n3. Finish your full DOT application online\n4. ${hiring.orientationDays}-day orientation in Henderson, NV — first load the next day\n\n## FAQ\n\n${faqMd(faqs.slice(0, 8))}\n\n${contact}\n`,
+        `# ${title}\n\n${company.shortName} is a ${fleet.trucks}-truck CDL-A dry van carrier in ${company.office.city}, Nevada, hiring solo and team company drivers. An owner-operator program is coming soon. Your road. Your future. Our family.\n\n${facts}\n\n## Why drivers stay\n\n${list(["Pay you can count on — weekly guaranteed minimum or per mile, paid every Friday", "Consistent runs", "No wait time", "Home on time, not late"])}\n\n## Open positions\n\n${jobs.map((j) => `- [${j.title}](${U}/drive/${j.slug}) — ${j.route}`).join("\n")}\n\n## How hiring works\n\n1. Apply in 2 minutes\n2. Our recruiter calls you back (usually within the hour, Central Time)\n3. Finish your full DOT application online\n4. ${hiring.orientationDays}-day orientation in Henderson, NV — first load the next day\n\n## FAQ\n\n${faqMd(faqs.slice(0, 8))}\n\n${contact}\n`,
     };
   }
   if (clean === "/drive") {
@@ -64,8 +64,8 @@ export function pageMarkdown(path: string): MdPage | null {
     };
   }
   if (clean === "/owner-operators") {
-    const title = "Owner-Operator Trucking Jobs — Las Vegas, NV";
-    return { path: clean, title, markdown: front(title, clean, "Run consistent 53' dry van freight with Global Runners Logistics.") + `# ${title}\n\nOwn your truck? Run consistent ${fleet.trailer} freight with ${company.shortName}, a Las Vegas fleet hauling since ${company.foundedYear}. Dedicated dispatch 24/7 in English and Spanish. Program terms are reviewed with you on the first call.\n\nTell us about your truck: ${U}/owner-operators#apply\n\n${contact}\n` };
+    const title = "Owner-Operator Program — Coming Soon";
+    return { path: clean, title, markdown: front(title, clean, "Our owner-operator program is coming soon. Right now we hire CDL-A company drivers.") + `# ${title}\n\nRight now ${company.shortName} hires CDL-A company drivers only. Our owner-operator program for ${fleet.trailer} freight out of Las Vegas is coming soon.\n\nGet notified when it opens: ${U}/owner-operators#apply\n\nHave a CDL-A and want to drive now? Apply as a company driver: ${U}/apply/driver\n\n${contact}\n` };
   }
   if (clean === "/about") {
     const title = `About ${company.shortName}`;

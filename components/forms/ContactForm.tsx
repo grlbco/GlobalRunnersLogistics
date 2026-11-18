@@ -47,7 +47,7 @@ export function ContactForm({ locale, paths }: { locale: Locale; paths: { privac
     >
       <Honeypot value={hp} onChange={setHp} />
       <Chips legend="What's this about?" columns={4} value={d.topic} onChange={(v) => set("topic", v as ContactInput["topic"])} error={errors.topic}
-        options={[{ value: "driving", label: "Driving job" }, { value: "owner_operator", label: "Owner-operator" }, { value: "shipper", label: "Shipper" }, { value: "other", label: "Other" }]} />
+        options={[{ value: "driving", label: "Driving job" }, { value: "owner_operator", label: "Owner-operator (coming soon)" }, { value: "shipper", label: "Shipper" }, { value: "other", label: "Other" }]} />
       <TextField label="Name" name="name" autoComplete="name" value={d.name ?? ""} onChange={(e) => set("name", e.target.value)} error={errors.name} />
       <div className="grid gap-6 sm:grid-cols-2">
         <TextField label="Email" name="email" type="email" autoComplete="email" value={d.email ?? ""} onChange={(e) => set("email", e.target.value)} error={errors.email} />

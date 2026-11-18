@@ -11,7 +11,7 @@ export const OFFER_FACTS = [
   `Trailer/freight: ${fleet.trailer}, mostly ${fleet.freight.toLowerCase()}; ${fleet.loading.join(" and ").toLowerCase()}.`,
   `Runs: ${fleet.runTypes.join(", ")}. Main lane ${fleet.mainLane.from} ↔ ${fleet.mainLane.to}.`,
   `Trucks start from the yard in ${company.yard.city}, NV. Drivers can take the truck home.`,
-  `Hiring: CDL-A solo and team company drivers, and owner-operators.`,
+  `Hiring: CDL-A solo and team company drivers ONLY right now. Owner-operator program: coming soon, not open yet (no terms, no pay, no dates to share).`,
   `Pay: ${pay.type.toLowerCase()}, paid ${pay.schedule.toLowerCase()} every ${pay.payday} (pay period ${pay.payPeriod}). ${guaranteeLine} (in words: team 80 to 90 cents a mile, solo 60 to 70 cents a mile). ${pay.workersComp}. $${pay.anniversaryBonus.toLocaleString()} bonus on every work anniversary.`,
   `Only quote the guaranteed minimums and per-mile ranges above, exactly as written. Never invent a yearly number or a single exact rate; the exact rate inside the range depends on the run and our team confirms it on the call.`,
   `What drivers get: ${whatYouGet.map((x) => x.replace(/\s*[—–]\s*/g, ", ")).join(". ")}.`,

@@ -10,7 +10,7 @@ export function GET() {
   const u = company.url;
   const body = `# ${company.legalName}
 
-> ${company.shortName} is a ${fleet.trucks}-truck CDL-A dry van trucking company based in ${company.office.city}, Nevada, hauling since ${company.foundedYear}. It hires CDL-A solo and team company drivers and owner-operators. Trucks start from the yard in ${company.yard.city}, NV. Phone: ${company.phone.display}.
+> ${company.shortName} is a ${fleet.trucks}-truck CDL-A dry van trucking company based in ${company.office.city}, Nevada, hauling since ${company.foundedYear}. It hires CDL-A solo and team company drivers. An owner-operator program is coming soon (not open yet). Trucks start from the yard in ${company.yard.city}, NV. Phone: ${company.phone.display}.
 
 Key facts:
 - Office: ${company.office.street}, ${company.office.city}, ${company.office.region} ${company.office.postalCode}
@@ -30,7 +30,7 @@ ${jobs.map((j) => `- [${j.title}](${u}/drive/${j.slug}): ${j.route}`).join("\n")
 
 ## Pages
 - [Drive for Global Runners Logistics](${u}/drive): pay, requirements and benefits for company drivers
-- [Owner-operators](${u}/owner-operators): program inquiry
+- [Owner-operators](${u}/owner-operators): program coming soon, waitlist
 - [About](${u}/about)
 - [Locations](${u}/locations): Las Vegas office, Henderson yard, hiring areas
 - [FAQ](${u}/faq)

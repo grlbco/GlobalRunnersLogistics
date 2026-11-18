@@ -25,9 +25,9 @@ export function OwnerOperatorForm({ locale, paths }: { locale: Locale; paths: { 
   if (done)
     return (
       <div className="border border-white/15 bg-navy p-8 md:p-12">
-        <h2 className="h2">Thanks — we got it.</h2>
+        <h2 className="h2">You&apos;re on the list.</h2>
         <p className="body-lg mt-4 max-w-xl text-white/70">
-          We&apos;ll call you from {company.phone.display} to walk you through the owner-operator program.
+          Our owner-operator program is coming soon. We&apos;ll reach out from {company.phone.display} as soon as it opens.
         </p>
       </div>
     );
@@ -79,7 +79,7 @@ export function OwnerOperatorForm({ locale, paths }: { locale: Locale; paths: { 
       </p>
       <ErrorText>{serverError}</ErrorText>
       <button type="submit" disabled={pending} className="inline-flex h-14 items-center gap-2 rounded bg-signal px-8 font-medium hover:bg-signal-ink disabled:opacity-60">
-        {pending ? "Sending…" : "Send"} {!pending && <Arrow />}
+        {pending ? "Sending…" : "Notify me"} {!pending && <Arrow />}
       </button>
     </form>
   );

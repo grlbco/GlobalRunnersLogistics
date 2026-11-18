@@ -250,8 +250,8 @@ export async function submitOwnerLead(input: OwnerLeadInput): Promise<ActionResu
   });
   const name = `${d.first_name} ${d.last_name}`;
   await notifyRecruiter({
-    subject: `New owner-operator lead: ${name}`,
-    sms: `New owner-operator lead: ${name}, ${[d.truck_year, d.truck_make, d.truck_model].filter(Boolean).join(" ") || "truck n/a"}. Call ${phone}`,
+    subject: `Owner-operator waitlist (program coming soon): ${name}`,
+    sms: `Owner-operator waitlist (coming soon): ${name}, ${[d.truck_year, d.truck_make, d.truck_model].filter(Boolean).join(" ") || "truck n/a"}. Call ${phone}`,
     rows: [
       ["Name", name],
       ["Phone", phone],
