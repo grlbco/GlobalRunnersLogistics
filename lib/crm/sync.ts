@@ -178,8 +178,10 @@ export async function handleInstantlyStatus(event: { event_type: string; lead_em
       await activity(contact.id, "instantly_label", { label: "not_interested" }, "instantly");
       break;
     case "lead_wrong_person":
+      // Not the driver (e.g. "this email is no longer in use"): stop emailing that address, but don't
+      // label the person "not a fit". That's the calling team's decision.
       await suppress(contact, "email", "wrong_person");
-      await moveStage(contact, "not_fit", "instantly");
+      await activity(contact.id, "instantly_label", { label: "wrong_person" }, "instantly");
       break;
     case "email_bounced":
       await suppress(contact, "email", "bounce");

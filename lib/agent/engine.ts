@@ -70,7 +70,7 @@ export function withFormLink(text: string, url: string, channel: "sms" | "email"
 
 export const POSITIVE_INTENTS = ["interested", "ready", "call_request"];
 /** Intents after which we never push the form again. */
-export const NEGATIVE_INTENTS = ["not_interested", "not_fit", "stop", "wrong_person"];
+export const NEGATIVE_INTENTS = ["not_interested", "stop", "wrong_person"];
 
 /** Just the driver's own words from a reply: drops the quoted thread (English, Spanish, Chinese, Outlook headers). */
 export function ownReply(body: string) {
@@ -351,8 +351,8 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
     }
     if (decision.intent === "wrong_person") {
       await suppress(c as Contact, channel, "wrong_person");
-      await moveStage(c as Contact, "not_fit", "agent");
     }
+    // We never disqualify: "not_fit" is not a stage the assistant may set (the calling team decides).
     if (decision.stage) await moveStage(c as Contact, decision.stage, "agent");
     // A yes (any wording, any language): Interested in the CRM and in Instantly, texting on, one alert to the team.
     const replyTrigger = input.trigger === "email_received" || input.trigger === "text_received";
@@ -434,7 +434,7 @@ export async function runAgent(input: RunInput): Promise<RunResult> {
     // Next touch. The extra email of a "text + email" chase step leaves the schedule alone.
     if (input.followupKind !== "chase_extra") {
       await db.from("followups").update({ status: "cancelled" }).eq("contact_id", c.id).eq("status", "pending");
-      const done = ["not_interested", "not_fit", "stop", "wrong_person", "owner_operator"].includes(decision.intent) || decision.stage === "not_interested" || decision.stage === "not_fit";
+      const done = ["not_interested", "stop", "wrong_person", "owner_operator"].includes(decision.intent) || decision.stage === "not_interested";
       const linkOut = link.form.sent || [...parts].some((t) => t.includes(link.url)) || decision.sms_replies.some((t) => t.includes(link.url));
       if (!done && !link.form.completed) await scheduleNext(c, { linkOut, kind: input.trigger === "followup" ? input.followupKind ?? "nudge" : null, attempt: input.followupAttempt ?? 0, maxNudges: settings.max_followups });
     }

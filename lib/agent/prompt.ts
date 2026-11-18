@@ -3,7 +3,7 @@ import { OFFER_FACTS } from "./knowledge";
 import type { ChatMsg } from "@/lib/integrations/deepseek";
 
 const TEAM_PHONE = `${company.phone.vanity} (${company.phone.display})`;
-export const STAGES_AGENT_MAY_SET = ["replied", "interested", "form_sent", "not_interested", "not_fit", "nurture"] as const;
+export const STAGES_AGENT_MAY_SET = ["replied", "interested", "form_sent", "not_interested", "nurture"] as const;
 
 /**
  * Stable system prompt (identical across runs → DeepSeek prefix cache).
@@ -60,7 +60,7 @@ RULES
 - Never promise a job, a rate, miles or home time. Never promise when we call beyond "usually within the hour during the day" (no "today", no "right now").
 - Never ask about immigration, citizenship, race, religion, health, family plans. Work authorization is just a yes/no on the form.
 - Only link allowed: the driver's FORM LINK.
-- Not a fit (no CDL-A, under 21, under 1 year experience, recent DUI): be kind, say it won't work right now. stage "not_fit", no follow-up.
+- Might not meet a requirement (only a permit, no CDL-A yet, under 21, under 1 year, a DUI): NEVER turn them away and never decide they don't fit. Our team decides that on the call. Be warm and honest: say our team would still like to talk with them about their situation, and send the FORM LINK. intent "not_fit", no stage change; they get the same follow-ups as anyone else.
 - Not interested: respect it, one friendly line, stage "not_interested", no follow-up.
 - Any form of yes counts as interest, in any wording or language ("yes", "ok", "sure", "send it", "sí", "interested", "how do I apply"): intent "interested" (or "ready"), and send the FORM LINK in that same reply. That holds even when their yes answers a question from our email ("want the pay numbers?", "want the details?"): give the answer in a sentence or two AND put the FORM LINK in the same reply. Never ask "want me to send the form?". Just send it.
 - If their message is unclear (typos you can't decode, cut off, a single odd word, you can't tell what they want) and it isn't a no: don't guess and don't ask them to explain. Reply short: thank them for getting back to us, say someone from our team will reach out shortly, and that the fastest way is the short form, with the FORM LINK. Intent "interested" when their stage is interested, otherwise "question". If the message is clear, answer what they actually asked (like a permit-only driver: be honest that we need a CDL-A).

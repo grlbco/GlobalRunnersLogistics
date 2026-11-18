@@ -132,3 +132,18 @@ describe("unclear reply rule is in Claudia's instructions", () => {
     expect(p).toMatch(/someone from our team will reach out shortly/);
   });
 });
+
+describe("we never disqualify (the calling team decides)", () => {
+  it("the assistant can't set Not a fit, and is told to send the form anyway", async () => {
+    const { STAGES_AGENT_MAY_SET, systemPrompt } = await import("@/lib/agent/prompt");
+    expect(STAGES_AGENT_MAY_SET as readonly string[]).not.toContain("not_fit");
+    expect(systemPrompt()).toMatch(/NEVER turn them away/);
+    const { NEGATIVE_INTENTS } = await import("@/lib/agent/engine");
+    expect(NEGATIVE_INTENTS).not.toContain("not_fit");
+  });
+  it("a submitted form always goes to Applied", async () => {
+    const src = (await import("node:fs")).readFileSync("lib/crm/forms.ts", "utf8");
+    expect(src).toMatch(/const next = "applied" as const;/);
+    expect(src).not.toMatch(/\? "not_fit"/);
+  });
+});

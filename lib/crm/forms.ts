@@ -90,7 +90,9 @@ export async function completeForm(f: Completion): Promise<string | null> {
     ...(f.sms_consent ? { sms_consent: true } : {}),
   };
   if (f.email && !contact.email) patch.email = f.email.toLowerCase();
-  const next = f.flags.some((x) => ["no_cdl_a", "under_1yr", "dui", "drug_test_or_sap", "under_21"].includes(x)) ? "not_fit" : "applied";
+  // Every submitted form is an applicant. We only bring leads; the team that calls decides who fits.
+  // Anything worth checking (no CDL-A, under 1 yr, DUI...) is shown in red on the application and alert.
+  const next = "applied" as const;
   await moveStage(contact, next, "website", patch);
 
   const now = new Date().toISOString();
@@ -106,7 +108,7 @@ export async function completeForm(f: Completion): Promise<string | null> {
   await activity(contact.id, "form_completed", { flags: f.flags }, "website");
   const { emit } = await import("@/lib/automations/engine");
   await emit("form_completed", contact.id, {});
-  if (next === "applied") {
+  {
     await db.from("tasks").insert({ contact_id: contact.id, title: `Call ${f.first_name} ${f.last_name}: form completed`, due_at: new Date(Date.now() + 3600_000).toISOString(), created_by: "workflow" });
     // Confirmation back to the driver, through the outbox so it shows in the timeline (texts only with consent).
     const smsOk = f.sms_consent || contact.sms_consent;
@@ -120,7 +122,7 @@ export async function completeForm(f: Completion): Promise<string | null> {
       await db.from("outbox").insert({ contact_id: contact.id, channel: "sms", author: "workflow", body: lines[Math.floor(Math.random() * lines.length)], status: "pending", send_after: new Date(Date.now() + 20_000).toISOString(), is_reply: true });
     }
   }
-  await db.from("agent_memory").upsert({ contact_id: contact.id, next_step: next === "applied" ? "Form completed. Waiting for our team's call." : "Form completed, flagged as not a fit.", updated_at: now });
+  await db.from("agent_memory").upsert({ contact_id: contact.id, next_step: "Form completed. Waiting for our team's call.", updated_at: now });
 
   // Telegram alert to Ken's group: a card he can act on from his phone.
   try {
@@ -134,9 +136,9 @@ export async function completeForm(f: Completion): Promise<string | null> {
     const concerns = (f.answers ?? []).filter(isConcern).map((x) => `${x.label}: ${x.value}`);
     const place = [full?.city, full?.state].filter(Boolean).join(", ");
     const row = (label: string, value: string) => `<b>${esc(label)}</b>  ${esc(value)}`;
-    const ok = next === "applied" && concerns.length === 0;
+    const ok = concerns.length === 0;
     const lines = [
-      next === "applied" ? `✅ <b>APPLICATION IN</b> · ${ok ? "ready for a call" : "check before calling"}` : "⛔ <b>APPLICATION IN</b> · not a fit",
+      `✅ <b>APPLICATION IN</b> · ${ok ? "ready for a call" : "check before calling"}`,
       DIVIDER,
       `👤 <b>${esc(f.first_name)} ${esc(f.last_name)}</b>`,
       `📞 <a href="tel:${esc(f.phone)}">${esc(shown)}</a>  <i>confirmed on the form</i>`,
@@ -157,7 +159,7 @@ export async function completeForm(f: Completion): Promise<string | null> {
         : esc(f.summary),
       concerns.length ? `\n⚠️ <b>Check:</b> ${esc(concerns.join(" · "))}` : null,
       "",
-      next === "applied" ? "➡️ Moved to <b>Applied</b>. Over to Ken: call task due in 1 hour." : "➡️ Moved to <b>Not a fit</b>.",
+      "➡️ Moved to <b>Applied</b>. Over to Ken: call task due in 1 hour.",
     ].filter((x) => x !== null) as string[];
     const buttons = [
       [
