@@ -125,52 +125,7 @@ export async function completeForm(f: Completion): Promise<string | null> {
   await db.from("agent_memory").upsert({ contact_id: contact.id, next_step: "Form completed. Waiting for our team's call.", updated_at: now });
 
   // Telegram alert to Ken's group: a card he can act on from his phone.
-  try {
-    const { sendTelegram, esc, DIVIDER } = await import("@/lib/integrations/telegram");
-    const { siteUrl } = await import("@/lib/site");
-    const { isConcern } = await import("@/lib/crm/applications");
-    const { data: full } = await db.from("contacts").select("state, city, company_name, usdot, tier_label, sms_consent").eq("id", contact.id).single();
-    const shown = f.phone.replace(/^\+?1?(\d{3})(\d{3})(\d{4})$/, "($1) $2-$3");
-    const A = new Map((f.answers ?? []).map((x) => [x.label, x.value]));
-    const v = (k: string) => A.get(k) ?? "—";
-    const concerns = (f.answers ?? []).filter(isConcern).map((x) => `${x.label}: ${x.value}`);
-    const place = [full?.city, full?.state].filter(Boolean).join(", ");
-    const row = (label: string, value: string) => `<b>${esc(label)}</b>  ${esc(value)}`;
-    const ok = concerns.length === 0;
-    const lines = [
-      `✅ <b>APPLICATION IN</b> · ${ok ? "ready for a call" : "check before calling"}`,
-      DIVIDER,
-      `👤 <b>${esc(f.first_name)} ${esc(f.last_name)}</b>`,
-      `📞 <a href="tel:${esc(f.phone)}">${esc(shown)}</a>  <i>confirmed on the form</i>`,
-      f.email ? `✉️ ${esc(f.email)}` : null,
-      full?.company_name ? `🚛 ${esc(full.company_name)}${full.usdot ? ` · USDOT ${esc(String(full.usdot))}` : ""}` : null,
-      place || full?.tier_label ? `📍 ${esc([place, full?.tier_label ? `Tier ${full.tier_label}` : null].filter(Boolean).join(" · "))}` : null,
-      "",
-      A.size
-        ? [
-            row("Drives", [v("How they want to drive"), v("Runs")].filter((x) => x !== "—").join(" · ")),
-            row("CDL-A", `${v("Valid CDL-A")} · ${v("CDL-A experience")}`),
-            row("Endorsements", v("Endorsements")),
-            row("Record", `${v("Moving violations (3 yrs)")} violations · ${v("Accidents (3 yrs)")} accidents · DUI ${v("Ever had a DUI").toLowerCase()}`),
-            row("Drug test issue", v("Failed/refused drug test or SAP")),
-            row("21+ / US work auth", `${v("21 or older")} / ${v("Authorized to work in the U.S.")}`),
-            row("Texts OK", f.sms_consent || full?.sms_consent ? "Yes" : "No"),
-          ].join("\n")
-        : esc(f.summary),
-      concerns.length ? `\n⚠️ <b>Check:</b> ${esc(concerns.join(" · "))}` : null,
-      "",
-      "➡️ Moved to <b>Applied</b>. Over to Ken: call task due in 1 hour.",
-    ].filter((x) => x !== null) as string[];
-    const buttons = [
-      [
-        ...(appCode ? [{ text: "📄 Application", url: `${siteUrl()}/crm/applications/${appCode}` }] : []),
-        { text: "👤 Profile", url: `${siteUrl()}/crm/contacts/${contact.id}` },
-      ],
-    ];
-    await sendTelegram(lines.join("\n"), buttons);
-  } catch (e) {
-    console.error("telegram alert", e);
-  }
+  await sendApplicationAlert(contact.id).catch((e) => console.error("telegram alert", e));
   return contact.id;
 }
 
@@ -192,3 +147,57 @@ export async function queueAbandonedNudges() {
   return data?.length ?? 0;
 }
 
+
+/**
+ * The "APPLICATION IN" Telegram card, built from what's saved (so it can be re-sent later, e.g. as a
+ * correction). `note` adds a first line such as "Correction: this driver is in Applied".
+ */
+export async function sendApplicationAlert(contactId: string, note?: string) {
+  const db = adminDb();
+  const { sendTelegram, esc, DIVIDER } = await import("@/lib/integrations/telegram");
+  const { siteUrl } = await import("@/lib/site");
+  const { isConcern } = await import("@/lib/crm/applications");
+  const [{ data: c }, { data: link }] = await Promise.all([
+    db.from("contacts").select("id, first_name, last_name, email, phone, cell_phone, state, city, company_name, usdot, tier_label, sms_consent").eq("id", contactId).single(),
+    db.from("form_links").select("code, answers").eq("contact_id", contactId).not("completed_at", "is", null).order("completed_at", { ascending: false }).limit(1).maybeSingle(),
+  ]);
+  if (!c) return false;
+  const answers = ((link?.answers as { label: string; value: string }[] | null) ?? []);
+  const phone = c.cell_phone ?? c.phone ?? "";
+  const shown = phone.replace(/^\+?1?(\d{3})(\d{3})(\d{4})$/, "($1) $2-$3");
+  const A = new Map(answers.map((x) => [x.label, x.value]));
+  const v = (k: string) => A.get(k) ?? "—";
+  const concerns = answers.filter(isConcern).map((x) => `${x.label}: ${x.value}`);
+  const place = [c.city, c.state].filter(Boolean).join(", ");
+  const row = (label: string, value: string) => `<b>${esc(label)}</b>  ${esc(value)}`;
+  const lines = [
+    note ? `🔁 <i>${esc(note)}</i>` : null,
+    `✅ <b>APPLICATION IN</b> · ${concerns.length ? "check before calling" : "ready for a call"}`,
+    DIVIDER,
+    `👤 <b>${esc([c.first_name, c.last_name].filter(Boolean).join(" "))}</b>`,
+    phone ? `📞 <a href="tel:${esc(phone)}">${esc(shown)}</a>  <i>confirmed on the form</i>` : null,
+    c.email ? `✉️ ${esc(c.email)}` : null,
+    c.company_name ? `🚛 ${esc(c.company_name)}${c.usdot ? ` · USDOT ${esc(String(c.usdot))}` : ""}` : null,
+    place || c.tier_label ? `📍 ${esc([place, c.tier_label ? `Tier ${c.tier_label}` : null].filter(Boolean).join(" · "))}` : null,
+    "",
+    A.size
+      ? [
+          row("Drives", [v("How they want to drive"), v("Runs")].filter((x) => x !== "—").join(" · ")),
+          row("CDL-A", `${v("Valid CDL-A")} · ${v("CDL-A experience")}`),
+          row("Endorsements", v("Endorsements")),
+          row("Record", `${v("Moving violations (3 yrs)")} violations · ${v("Accidents (3 yrs)")} accidents · DUI ${v("Ever had a DUI").toLowerCase()}`),
+          row("Drug test issue", v("Failed/refused drug test or SAP")),
+          row("21+ / US work auth", `${v("21 or older")} / ${v("Authorized to work in the U.S.")}`),
+          row("Texts OK", c.sms_consent ? "Yes" : "No"),
+        ].join("\n")
+      : "Answers are on the application.",
+    concerns.length ? `\n⚠️ <b>Check:</b> ${esc(concerns.join(" · "))}` : null,
+    "",
+    "➡️ Moved to <b>Applied</b>. Over to Ken: call task due in 1 hour.",
+  ].filter((x) => x !== null) as string[];
+  const buttons = [[
+    ...(link?.code ? [{ text: "📄 Application", url: `${siteUrl()}/crm/applications/${link.code}` }] : []),
+    { text: "👤 Profile", url: `${siteUrl()}/crm/contacts/${c.id}` },
+  ]];
+  return sendTelegram(lines.join("\n"), buttons);
+}

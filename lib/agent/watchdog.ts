@@ -141,5 +141,16 @@ export async function watchdog() {
       res.alerts++;
     }
   }
+  // 5) Alerts the team asked to (re)send, e.g. a corrected "APPLICATION IN" card
+  const { data: asks } = await db.from("activities").select("id, contact_id, data").eq("type", "alert_requested").is("data->>sent", null).limit(10);
+  for (const a of asks ?? []) {
+    const d = (a.data ?? {}) as { kind?: string; note?: string };
+    await db.from("activities").update({ data: { ...d, sent: new Date().toISOString() } }).eq("id", a.id);
+    if (d.kind === "application") {
+      const { sendApplicationAlert } = await import("@/lib/crm/forms");
+      await sendApplicationAlert(a.contact_id, d.note);
+      res.alerts++;
+    }
+  }
   return res;
 }
